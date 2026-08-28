@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <rect width="500" height="700" fill="#171c2d"/>
+  <rect y="375" width="500" height="325" fill="#202e42"/>
+  <circle cx="368" cy="188" r="72" fill="#d8bd7f" opacity=".86"/>
+  <circle cx="348" cy="168" r="72" fill="#171c2d"/>
+  <path d="M0 425c83-29 145-29 224 0s143 29 276 0v275H0Z" fill="#18283b"/>
+  <g fill="none" stroke="#7899a6" stroke-width="3" opacity=".58">
+    <path d="M39 515c58-17 110-17 160 0s106 17 160 0 99-17 102-16"/>
+    <path d="M15 576c58-17 110-17 160 0s106 17 160 0 99-17 150-15"/>
+  </g>
+  <path d="M121 461h55l-7 151h-41Z" fill="#d6d0ae"/>
+  <path d="M111 461h75l-13-43h-49Z" fill="#c08d68"/>
+  <path d="M104 418h89v12h-89Z" fill="#e1c27d"/>
+  <path d="M148 378v40" stroke="#e1c27d" stroke-width="4"/>
+  <path d="M151 380h39" stroke="#e1c27d" stroke-width="2" opacity=".7"/>
+  <rect x="38" y="52" width="68" height="4" fill="#e1c27d"/>
+  <text x="38" y="105" fill="#ece5ce" font-family="sans-serif" font-size="24" font-weight="700" letter-spacing="3">SLEEPING LIGHT</text>
+  <text x="38" y="136" fill="#a7bec0" font-family="sans-serif" font-size="16" letter-spacing="4">COASTAL LOG 11</text>
+  <text x="38" y="661" fill="#a7bec0" font-family="sans-serif" font-size="12" letter-spacing="3">NIGHT WATCH / LAST ENTRY</text>
+</svg>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <rect width="500" height="700" fill="#101827"/>
+  <rect y="397" width="500" height="303" fill="#182638"/>
+  <circle cx="387" cy="147" r="48" fill="#d4be7e" opacity=".88"/>
+  <g fill="#a9c4c4">
+    <circle cx="55" cy="121" r="3"/><circle cx="117" cy="219" r="2"/><circle cx="195" cy="102" r="3"/><circle cx="302" cy="184" r="2"/><circle cx="454" cy="251" r="3"/>
+  </g>
+  <path d="M0 399h500" stroke="#8295a5" stroke-width="3"/>
+  <path d="M76 414h330" stroke="#718594" stroke-width="5"/>
+  <path d="M106 450h288M76 494h347M47 543h409M19 602h460M0 671h500" stroke="#536b7d" stroke-width="3"/>
+  <path d="M0 473 500 430M0 558l500-70M0 661l500-104" stroke="#263e50" stroke-width="18" opacity=".9"/>
+  <g transform="translate(115 303)">
+    <path d="M0 0h238l27 30v91H-18V30Z" fill="#263c4f" stroke="#91acb3" stroke-width="3"/>
+    <path d="M-18 30h283" stroke="#91acb3" stroke-width="3"/>
+    <path d="M32 28v93M78 28v93M124 28v93M170 28v93M216 28v93" stroke="#6d8b99" stroke-width="3"/>
+    <g fill="#d8c17c"><rect x="34" y="51" width="22" height="18"/><rect x="80" y="51" width="22" height="18"/><rect x="126" y="51" width="22" height="18"/><rect x="172" y="51" width="22" height="18"/><rect x="218" y="51" width="12" height="18"/></g>
+  </g>
+  <rect x="38" y="52" width="68" height="4" fill="#d4be7e"/>
+  <text x="38" y="105" fill="#e6e7d0" font-family="sans-serif" font-size="25" font-weight="700" letter-spacing="4">NIGHT</text>
+  <text x="38" y="136" fill="#afc9c5" font-family="sans-serif" font-size="16" letter-spacing="4">TRAIN 05</text>
+  <text x="38" y="661" fill="#afc9c5" font-family="sans-serif" font-size="12" letter-spacing="3">SKETCHES FROM THE LAST PLATFORM</text>
+</svg>

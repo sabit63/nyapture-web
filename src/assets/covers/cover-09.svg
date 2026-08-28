@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <rect width="500" height="700" fill="#241d34"/>
+  <rect y="390" width="500" height="310" fill="#302740"/>
+  <g fill="none" stroke="#9bb6ad" stroke-width="3" opacity=".58">
+    <path d="M38 214c58-31 112-31 170 0s112 31 170 0 80-31 84-30"/>
+    <path d="M38 260c58-31 112-31 170 0s112 31 170 0 80-31 84-30"/>
+    <path d="M38 306c58-31 112-31 170 0s112 31 170 0 80-31 84-30"/>
+  </g>
+  <g fill="#d6b77d" opacity=".8">
+    <circle cx="86" cy="470" r="13"/><circle cx="176" cy="548" r="8"/>
+    <circle cx="292" cy="446" r="10"/><circle cx="407" cy="576" r="15"/>
+  </g>
+  <g fill="none" stroke="#d6b77d" stroke-width="2" opacity=".5">
+    <circle cx="86" cy="470" r="30"/><circle cx="176" cy="548" r="20"/>
+    <circle cx="292" cy="446" r="24"/><circle cx="407" cy="576" r="34"/>
+  </g>
+  <rect x="38" y="52" width="68" height="4" fill="#d6b77d"/>
+  <text x="38" y="105" fill="#ede1cb" font-family="sans-serif" font-size="24" font-weight="700" letter-spacing="4">STILL AIR</text>
+  <text x="38" y="136" fill="#a9c2b8" font-family="sans-serif" font-size="16" letter-spacing="4">SPECIMEN 09</text>
+  <text x="38" y="661" fill="#a9c2b8" font-family="sans-serif" font-size="12" letter-spacing="3">A CATALOG OF QUIET WEATHER</text>
+</svg>

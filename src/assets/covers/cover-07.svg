@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <rect width="500" height="700" fill="#222230"/>
+  <rect y="434" width="500" height="266" fill="#292d3d"/>
+  <g fill="#5c6070">
+    <rect x="33" y="307" width="57" height="194"/><rect x="103" y="250" width="77" height="251"/><rect x="192" y="345" width="48" height="156"/>
+    <rect x="254" y="279" width="80" height="222"/><rect x="348" y="222" width="56" height="279"/><rect x="418" y="335" width="48" height="166"/>
+  </g>
+  <g fill="#d0b479" opacity=".8">
+    <rect x="48" y="336" width="13" height="26"/><rect x="72" y="336" width="13" height="26"/><rect x="121" y="284" width="15" height="28"/><rect x="151" y="284" width="15" height="28"/>
+    <rect x="269" y="311" width="15" height="28"/><rect x="302" y="311" width="15" height="28"/><rect x="363" y="254" width="14" height="28"/><rect x="386" y="254" width="14" height="28"/>
+  </g>
+  <g transform="rotate(-8 144 207)">
+    <rect x="61" y="107" width="167" height="198" fill="#c6b98f"/>
+    <rect x="75" y="121" width="139" height="133" fill="#4d6771"/>
+    <path d="M75 223h139l-43-48-28 26-21-18Z" fill="#79908a"/>
+    <circle cx="172" cy="154" r="20" fill="#d0b479" opacity=".75"/>
+  </g>
+  <g transform="rotate(11 343 189)">
+    <rect x="283" y="104" width="129" height="170" fill="#a9b8b1"/>
+    <rect x="296" y="117" width="103" height="112" fill="#5b657f"/>
+    <path d="M296 209h103l-31-42-29 24-18-15Z" fill="#a1816c"/>
+  </g>
+  <path d="M0 505h500" stroke="#d0b479" stroke-width="3" opacity=".6"/>
+  <rect x="38" y="52" width="68" height="4" fill="#d0b479"/>
+  <text x="38" y="105" fill="#ece4ca" font-family="sans-serif" font-size="25" font-weight="700" letter-spacing="4">CITY</text>
+  <text x="38" y="136" fill="#b9c1c1" font-family="sans-serif" font-size="16" letter-spacing="4">MEMORY 07</text>
+  <text x="38" y="661" fill="#b9c1c1" font-family="sans-serif" font-size="12" letter-spacing="3">FRAGMENTS / STREETS / AFTERIMAGES</text>
+</svg>

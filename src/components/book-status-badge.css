@@ -1,0 +1,127 @@
+.book-status-effect {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  pointer-events: none;
+}
+
+.book-status-effect--error {
+  background: linear-gradient(to bottom, transparent 56%, #6f172566 100%);
+}
+
+.book-status-effect--candidate {
+  background: #1010182e;
+  -webkit-backdrop-filter: saturate(.68) brightness(.84);
+  backdrop-filter: saturate(.68) brightness(.84);
+}
+
+.book-status-effect--short-page {
+  background: linear-gradient(to bottom, transparent 56%, #6f172566 100%);
+}
+
+.book-status-effect--shredding {
+  background: linear-gradient(to bottom, #190e1a26 34%, #58133f9c 100%);
+}
+
+.book-status-effect--deleted {
+  background: linear-gradient(to bottom, #10101852 28%, #101018c2 100%);
+  -webkit-backdrop-filter: grayscale(1) brightness(.72);
+  backdrop-filter: grayscale(1) brightness(.72);
+}
+
+.book-status-badge {
+  position: absolute;
+  z-index: 3;
+  top: 9px;
+  left: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 54px);
+  padding: 5px 8px;
+  overflow: hidden;
+  border: 1px solid #ffffff35;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px #08081070;
+  color: #f8f8fc;
+  font-size: .63rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.book-status-badge--inline {
+  position: static;
+  z-index: auto;
+  max-width: 100%;
+  box-shadow: none;
+  pointer-events: auto;
+}
+
+.book-status-badge > svg {
+  flex: 0 0 auto;
+}
+
+.book-status-badge--info { border-color: #77bcec; background: #1d5f8f; }
+.book-status-badge--candidate { border-color: #92a6b48c; background: #4b647270; color: #d2dde2; }
+.book-status-badge--accent { border-color: #b593de; background: #5b3f7e; }
+.book-status-badge--neutral { border-color: #aab3c1; background: #3c4653; }
+.book-status-badge--danger { border-color: #ff9aa5; background: #a52c3a; }
+.book-status-badge--warning { border-color: #f8d98a; background: #93631c; color: #fff8df; }
+.book-status-badge--destructive { border-color: #f6a5d6; background: #772d63; color: #ffedf9; }
+.book-status-badge--muted { border-color: #b4b4c1; background: #4b4b55; }
+
+.book-card {
+  position: relative;
+}
+
+.book-card[data-book-status='DownloadError'],
+.book-card[data-book-status='SaveError'],
+.book-card[data-book-status='ShortPage'],
+.book-card[data-book-status='Shredding'] {
+  --book-status-border-color: #ff6675;
+}
+
+.book-card[data-book-status='Shredding'] {
+  --book-status-border-color: #f06bb8;
+}
+
+.book-card[data-book-status='Downloading'] {
+  --book-status-border-color: #77bcec;
+}
+
+.book-card[data-book-status='Cancel'] {
+  --book-status-border-color: #f5c451;
+}
+
+.book-card[data-book-status='DownloadError']::after,
+.book-card[data-book-status='SaveError']::after,
+.book-card[data-book-status='ShortPage']::after,
+.book-card[data-book-status='Shredding']::after,
+.book-card[data-book-status='Downloading']::after,
+.book-card[data-book-status='Cancel']::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  border: 2px solid var(--book-status-border-color);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.book-status-spinner {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: book-status-spinner-spin 1.35s linear infinite !important;
+}
+
+@keyframes book-status-spinner-spin {
+  to { transform: rotate(360deg); }
+}

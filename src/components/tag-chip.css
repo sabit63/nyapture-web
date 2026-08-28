@@ -1,0 +1,64 @@
+[data-tag-type='Artists'] { --tag-color: #F0A3D7; --tag-accent: #A3307D; }
+[data-tag-type='Groups'] { --tag-color: #9ED0EA; --tag-accent: #236B8E; }
+[data-tag-type='Parodies'] { --tag-color: #F3BA72; --tag-accent: #94580E; }
+[data-tag-type='Characters'] { --tag-color: #C4B2FF; --tag-accent: #5C43A5; }
+[data-tag-type='Categories'] { --tag-color: #75D6CC; --tag-accent: #16736B; }
+[data-tag-type='Tags'] { --tag-color: #9BD08B; --tag-accent: #3F732F; }
+[data-tag-type='Languages'] { --tag-color: #A9BFFF; --tag-accent: #3957A4; }
+[data-tag-type='Unknown'] { --tag-color: #B5B5C2; --tag-accent: #626271; }
+
+.tag-chip {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 1 auto;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tag-accent, #626271) 78%, #000 22%);
+  border-radius: 7px;
+  background: var(--tag-accent, #626271);
+  color: #fff;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.tag-chip--compact {
+  height: 25px;
+  padding: 3px 7px;
+  font-size: .68rem;
+}
+
+.tag-chip--default {
+  height: 30px;
+  padding: 5px 9px;
+  font-size: .75rem;
+}
+
+button.tag-chip {
+  cursor: pointer;
+}
+
+button.tag-chip:hover {
+  border-color: color-mix(in srgb, var(--tag-accent, #626271) 84%, #fff 16%);
+  background: color-mix(in srgb, var(--tag-accent, #626271) 88%, #fff 12%);
+}
+
+.tag-chip__hash {
+  flex: 0 0 auto;
+  color: #fff;
+  font-weight: 800;
+}
+
+.tag-chip__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-chip__remove {
+  flex: 0 0 auto;
+  color: #fff;
+}

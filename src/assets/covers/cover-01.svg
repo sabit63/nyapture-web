@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <rect width="500" height="700" fill="#141d2d"/>
+  <rect y="425" width="500" height="275" fill="#17283a"/>
+  <path d="M0 438C92 415 168 438 252 427s157-13 248 7v44H0Z" fill="#1d3448"/>
+  <path d="M0 511c79-23 151 18 233-1 99-23 165 10 267-8v198H0Z" fill="#152337"/>
+  <g fill="none" stroke="#6f9bb6" stroke-width="3" opacity=".72">
+    <path d="M57 85 30 366"/><path d="M112 45 87 372"/><path d="M176 92 151 367"/>
+    <path d="M248 38 222 369"/><path d="M318 78 291 373"/><path d="M385 44 361 370"/>
+    <path d="M454 99 428 369"/>
+  </g>
+  <g fill="none" stroke="#8db4c7" stroke-width="2" opacity=".42">
+    <path d="M31 548c37-16 71-16 108 0s70 16 108 0 72-16 111 0 72 16 111 0"/>
+    <path d="M7 588c39-16 77-16 116 0s76 16 116 0 77-16 117 0 77 16 137 0"/>
+    <path d="M42 634c38-15 77-15 115 0s75 15 113 0 77-15 116 0 76 15 113 0"/>
+  </g>
+  <circle cx="390" cy="128" r="42" fill="#27475d"/>
+  <circle cx="390" cy="128" r="28" fill="#38677d"/>
+  <path d="M375 120h31M375 130h31M375 140h19" stroke="#a9ced2" stroke-width="3"/>
+  <rect x="38" y="52" width="68" height="4" fill="#88bdc5"/>
+  <text x="38" y="105" fill="#d5e5e2" font-family="sans-serif" font-size="27" font-weight="700" letter-spacing="6">RAIN</text>
+  <text x="38" y="136" fill="#9bb7c4" font-family="sans-serif" font-size="16" letter-spacing="4">ARCHIVE 01</text>
+  <text x="38" y="661" fill="#9bb7c4" font-family="sans-serif" font-size="12" letter-spacing="3">WEATHER NOTES / FIELD EDITION</text>
+</svg>

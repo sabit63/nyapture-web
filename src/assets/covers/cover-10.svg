@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 700">
+  <rect width="500" height="700" fill="#101c2c"/>
+  <rect x="54" y="178" width="392" height="420" fill="#172c40" stroke="#79a6ae" stroke-width="2" opacity=".86"/>
+  <rect x="82" y="206" width="336" height="364" fill="#1e4050" stroke="#b7d2c9" stroke-width="2" opacity=".42"/>
+  <g fill="none" stroke="#a5c8c5" opacity=".68">
+    <path d="M82 278c62-47 123-47 185 0s123 47 151 0" stroke-width="4"/>
+    <path d="M82 340c62-47 123-47 185 0s123 47 151 0" stroke-width="3"/>
+    <path d="M82 402c62-47 123-47 185 0s123 47 151 0" stroke-width="2"/>
+    <path d="M82 464c62-47 123-47 185 0s123 47 151 0" stroke-width="1"/>
+  </g>
+  <circle cx="354" cy="116" r="28" fill="#d1a66c" opacity=".9"/>
+  <path d="M38 52h68" stroke="#d1a66c" stroke-width="4"/>
+  <text x="38" y="105" fill="#e4e8db" font-family="sans-serif" font-size="22" font-weight="700" letter-spacing="3">GLASS ECHO</text>
+  <text x="38" y="136" fill="#9fc1bd" font-family="sans-serif" font-size="16" letter-spacing="4">TRACE 10</text>
+  <text x="38" y="661" fill="#9fc1bd" font-family="sans-serif" font-size="12" letter-spacing="3">REFRACTIONS FROM A DISTANT ROOM</text>
+</svg>
