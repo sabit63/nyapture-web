@@ -27,16 +27,31 @@ type TagChipStaticProps = TagChipBaseProps & {
 
 export type TagChipProps = TagChipSearchProps | TagChipRemoveProps | TagChipStaticProps
 
-const tagChipContent = (tag: BookTag) => (
+const getTagCountLabel = (count: BookTag['count']) => (
+  typeof count === 'number' && Number.isFinite(count)
+    ? count.toLocaleString('ja-JP')
+    : undefined
+)
+
+const tagChipContent = (tag: BookTag, countLabel: string | undefined) => (
   <>
     <span className="tag-chip__hash" aria-hidden="true">#</span>
     <span className="tag-chip__label">{getTagLabel(tag)}</span>
+    {countLabel !== undefined && (
+      <span className="tag-chip__count">
+        <span className="sr-only">使用回数 </span>
+        {countLabel}
+        <span className="sr-only"> 件</span>
+      </span>
+    )}
   </>
 )
 
 export function TagChip(props: TagChipProps) {
   const { tag, size, title, ariaLabel } = props
   const label = getTagLabel(tag)
+  const countLabel = getTagCountLabel(tag.count)
+  const countAriaLabel = countLabel === undefined ? '' : `（使用回数${countLabel}件）`
   const typeLabel = TAG_TYPE_LABELS[tag.type]
   const className = `tag-chip tag-chip--${size}`
   const commonProps = {
@@ -50,10 +65,10 @@ export function TagChip(props: TagChipProps) {
       <button
         {...commonProps}
         type="button"
-        aria-label={ariaLabel ?? `${typeLabel}「${label}」で検索`}
+        aria-label={ariaLabel ?? `${typeLabel}「${label}」${countAriaLabel}で検索`}
         onClick={props.onClick}
       >
-        {tagChipContent(tag)}
+        {tagChipContent(tag, countLabel)}
       </button>
     )
   }
@@ -63,10 +78,10 @@ export function TagChip(props: TagChipProps) {
       <button
         {...commonProps}
         type="button"
-        aria-label={ariaLabel ?? `${typeLabel}「${label}」を削除`}
+        aria-label={ariaLabel ?? `${typeLabel}「${label}」${countAriaLabel}を削除`}
         onClick={props.onRemove}
       >
-        {tagChipContent(tag)}
+        {tagChipContent(tag, countLabel)}
         <X className="tag-chip__remove" size={13} aria-hidden="true" />
       </button>
     )
@@ -75,7 +90,7 @@ export function TagChip(props: TagChipProps) {
   return (
     <span {...commonProps}>
       <span className="sr-only">{typeLabel}: </span>
-      {tagChipContent(tag)}
+      {tagChipContent(tag, countLabel)}
     </span>
   )
 }

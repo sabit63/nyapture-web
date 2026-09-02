@@ -1,7 +1,5 @@
 import {
   Activity,
-  ArrowLeft,
-  ArrowUpRight,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
@@ -21,13 +19,11 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  DASHBOARD_MOCK_DATA,
-  DASHBOARD_MOCK_LOGS,
-} from '../mocks/dashboard'
+import { getDashboardLogs, getDashboardSummary, getErrorMessage } from '../api'
 import type {
   CacheSummary,
   DashboardLogEntryDto,
+  DashboardLogsResponse,
   DashboardSummaryResponse,
   DataFolderSummary,
   DataStoreSummary,
@@ -35,6 +31,7 @@ import type {
   MaintenanceSummary,
   WebPilotSummary,
 } from '../mocks/dashboard'
+import { DashboardDetails } from './DashboardDetails'
 import './dashboard.css'
 
 export type DashboardRoute =
@@ -51,6 +48,8 @@ export type DashboardRoute =
 export interface DashboardProps {
   /** Parent shell can pass the current pathname; omitted in the browser uses window.location.pathname. */
   path?: string
+  /** Changes whenever the active API client settings are replaced. */
+  apiRevision: number
 }
 
 const DASHBOARD_PATHS: Record<string, DashboardRoute> = {
@@ -64,53 +63,6 @@ const DASHBOARD_PATHS: Record<string, DashboardRoute> = {
   '/dashboard/maintenance': 'maintenance',
   '/dashboard/cache': 'cache',
   '/dashboard/logs': 'logs',
-}
-
-const DETAIL_COPY: Record<Exclude<DashboardRoute, 'home'>, {
-  title: string
-  description: string
-  icon: LucideIcon
-}> = {
-  downloads: {
-    title: 'Downloads',
-    description: 'ダウンロードの実行状況と直近の失敗を確認する詳細画面です。',
-    icon: CloudDownload,
-  },
-  datastore: {
-    title: 'Data Store',
-    description: 'Data Storeの接続状態と診断情報を確認する詳細画面です。',
-    icon: Database,
-  },
-  datafolder: {
-    title: 'DataFolder',
-    description: 'DataFolderの利用可能状態と容量情報を確認する詳細画面です。',
-    icon: FolderOpen,
-  },
-  webpilot: {
-    title: 'WebPilot',
-    description: 'WebPilotの設定状態と接続テスト結果を確認する詳細画面です。',
-    icon: Server,
-  },
-  'image-worker': {
-    title: 'ImageWorker',
-    description: 'ImageWorkerの設定状態と接続テスト結果を確認する詳細画面です。',
-    icon: Image,
-  },
-  maintenance: {
-    title: 'Maintenance',
-    description: 'メンテナンスの実行状態と検出された問題を確認する詳細画面です。',
-    icon: Wrench,
-  },
-  cache: {
-    title: 'Cache',
-    description: 'キャッシュの利用状況とヒット率を確認する詳細画面です。',
-    icon: Zap,
-  },
-  logs: {
-    title: 'Logs',
-    description: 'Warning以上のシステムログを確認する詳細画面です。',
-    icon: ListChecks,
-  },
 }
 
 type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'muted'
@@ -134,6 +86,9 @@ const UNKNOWN_STATUS: StatusPresentation = {
   tone: 'muted',
   icon: STATUS_ICONS.muted,
 }
+
+const EMPTY_SUMMARY: DashboardSummaryResponse = {}
+const EMPTY_LOGS: DashboardLogsResponse = { entries: [] }
 
 const normalizeStatus = (value?: string | null) => value?.trim().toLocaleLowerCase('en-US') ?? ''
 
@@ -215,7 +170,7 @@ const getServiceStatus = (summary?: WebPilotSummary | ImageWorkerSummary | null)
   return UNKNOWN_STATUS
 }
 
-const getServiceTestLabel = (value?: string | null) => value ? getFreeStringStatus(value).label : '未取得'
+const getServiceTestLabel = (value: string) => getFreeStringStatus(value).label
 
 const getMaintenanceStatus = (summary?: MaintenanceSummary | null): StatusPresentation => {
   if (!summary) return UNKNOWN_STATUS
@@ -331,13 +286,6 @@ const resolveDashboardPath = (path?: string) => {
 
 export const resolveDashboardRoute = (path?: string): DashboardRoute => DASHBOARD_PATHS[resolveDashboardPath(path)] ?? 'home'
 
-const DetailLink = ({ href, label = '詳細を見る' }: { href: string; label?: string }) => (
-  <a className="dashboard__detail-link" href={href}>
-    <span>{label}</span>
-    <ChevronRight size={15} aria-hidden="true" />
-  </a>
-)
-
 const StatusBadge = ({ status, compact = false }: { status: StatusPresentation; compact?: boolean }) => {
   const Icon = status.icon
   return (
@@ -350,15 +298,21 @@ const StatusBadge = ({ status, compact = false }: { status: StatusPresentation; 
 
 function DashboardHome({
   summary,
+  logs,
   lastUpdated,
   isRefreshing,
   announcement,
+  errorMessage,
+  apiStatus,
   onRefresh,
 }: {
   summary: DashboardSummaryResponse
+  logs: DashboardLogsResponse
   lastUpdated?: string | null
   isRefreshing: boolean
   announcement: string
+  errorMessage?: string | null
+  apiStatus: 'loading' | 'connected' | 'error'
   onRefresh: () => void
 }) {
   const dataStoreStatus = getDataStoreStatus(summary.dataStore)
@@ -384,54 +338,69 @@ function DashboardHome({
     { label: 'ImageWorker', summary: summary.imageWorker },
   ].filter((service) => normalizeStatus(service.summary?.lastTestStatus) === 'degraded')
 
-  const latestLogs = useMemo(() => (DASHBOARD_MOCK_LOGS.entries ?? [])
+  const latestLogs = useMemo(() => (logs.entries ?? [])
+    .slice()
     .filter((entry) => isWarningOrHigher(entry.level))
     .sort((left, right) => (right.sequence ?? 0) - (left.sequence ?? 0))
-    .slice(0, 5), [])
+    .slice(0, 5), [logs])
 
   const attentionItems: Array<{
     label: string
     value: string
     detail: string
-    href: string
     tone: StatusTone
     icon: LucideIcon
-  }> = [
-    {
+  }> = []
+
+  if (typeof failedDownloadCount === 'number' && Number.isFinite(failedDownloadCount) && failedDownloadCount > 0) {
+    attentionItems.push({
       label: '失敗ダウンロード',
       value: `${formatCount(failedDownloadCount)}件`,
       detail: '直近の失敗',
-      href: '/dashboard/downloads',
       tone: getCountTone(failedDownloadCount, 'danger'),
       icon: CloudDownload,
-    },
-    {
+    })
+  }
+  if (
+    typeof summary.maintenance?.issuesCount === 'number'
+    && Number.isFinite(summary.maintenance.issuesCount)
+    && summary.maintenance.issuesCount > 0
+  ) {
+    attentionItems.push({
       label: 'Maintenance問題',
       value: `${formatCount(summary.maintenance?.issuesCount)}件`,
       detail: '検出された問題',
-      href: '/dashboard/maintenance',
       tone: getCountTone(summary.maintenance?.issuesCount, 'warning'),
       icon: Wrench,
-    },
-    {
+    })
+  }
+  if (
+    typeof summary.logs?.warnings24h === 'number'
+    && Number.isFinite(summary.logs.warnings24h)
+    && summary.logs.warnings24h > 0
+  ) {
+    attentionItems.push({
       label: '警告ログ',
       value: `${formatCount(summary.logs?.warnings24h)}件`,
       detail: '過去24時間',
-      href: '/dashboard/logs',
       tone: getCountTone(summary.logs?.warnings24h, 'warning'),
       icon: TriangleAlert,
-    },
-    {
+    })
+  }
+  if (degradedServices.length > 0) {
+    attentionItems.push({
       label: '劣化サービス',
       value: `${formatCount(degradedServices.length)}件`,
-      detail: degradedServices.map((service) => service.label).join('、') || '該当なし',
-      href: degradedServices.some((service) => service.label === 'ImageWorker')
-        ? '/dashboard/image-worker'
-        : '/dashboard/webpilot',
-      tone: degradedServices.length === 0 ? 'success' : 'warning',
+      detail: degradedServices.map((service) => service.label).join('、'),
+      tone: 'warning',
       icon: Server,
-    },
-  ]
+    })
+  }
+
+  const dataStoreDetails = [
+    summary.dataStore?.storeName,
+    summary.dataStore?.providerVersion,
+  ].flatMap((value) => value?.trim() ? [value.trim()] : [])
 
   return (
     <section className="dashboard" aria-labelledby="dashboard-title" aria-busy={isRefreshing}>
@@ -441,18 +410,17 @@ function DashboardHome({
         <div className="dashboard__hero-heading">
           <span className="dashboard__hero-icon" aria-hidden="true"><Gauge size={25} strokeWidth={2.1} /></span>
           <div>
-            <p className="dashboard__eyebrow">OPERATIONS DASHBOARD</p>
             <h1 id="dashboard-title">システムダッシュボード</h1>
-            <p className="dashboard__hero-description">システムの健全性と運用状況をひと目で確認できます。</p>
           </div>
         </div>
 
         <div className="dashboard__hero-meta">
           <div className="dashboard__hero-badges">
-            <span className="dashboard__mock-badge">モックデータ</span>
-            <span className="dashboard__api-status">
+            <span className={`dashboard__api-status dashboard__api-status--${apiStatus}`}>
               <span className="dashboard__api-dot" aria-hidden="true" />
-              <span>API 接続中</span>
+              <span className={apiStatus === 'loading' ? 'sr-only' : undefined}>
+                {apiStatus === 'loading' ? 'API 読み込み中' : apiStatus === 'error' ? 'API エラー' : 'API 接続中'}
+              </span>
             </span>
           </div>
           <div className="dashboard__update-row">
@@ -462,47 +430,54 @@ function DashboardHome({
               className="dashboard__refresh-button"
               type="button"
               aria-label={isRefreshing ? 'Dashboardを更新中' : 'Dashboardを更新'}
-              title={isRefreshing ? '更新中' : '更新'}
               disabled={isRefreshing}
               onClick={onRefresh}
             >
               <RefreshCw className={isRefreshing ? 'dashboard__refresh-icon is-spinning' : 'dashboard__refresh-icon'} size={16} aria-hidden="true" />
-              <span>{isRefreshing ? '更新中' : '更新'}</span>
             </button>
           </div>
         </div>
       </header>
 
-      <section className="dashboard__section" aria-labelledby="dashboard-attention-title">
-        <div className="dashboard__section-heading">
-          <div>
-            <p className="dashboard__eyebrow">ATTENTION</p>
-            <h2 id="dashboard-attention-title">要確認</h2>
+      {errorMessage ? (
+        <div className="dashboard__error dashboard__error--inline" role="alert">
+          <CircleAlert size={17} aria-hidden="true" />
+          <p>{errorMessage}</p>
+          <button className="dashboard__retry-button" type="button" disabled={isRefreshing} onClick={onRefresh}>
+            再試行
+          </button>
+        </div>
+      ) : null}
+
+      {attentionItems.length > 0 && (
+        <section className="dashboard__section" aria-labelledby="dashboard-attention-title">
+          <div className="dashboard__section-heading">
+            <div>
+              <h2 id="dashboard-attention-title">要確認</h2>
+            </div>
+            <span className="dashboard__section-count">{attentionItems.length}項目</span>
           </div>
-          <span className="dashboard__section-count">{attentionItems.length}項目</span>
-        </div>
-        <div className="dashboard__attention-grid">
-          {attentionItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <a className={`dashboard__attention-item dashboard__attention-item--${item.tone}`} href={item.href} key={item.label}>
-                <span className="dashboard__attention-icon" aria-hidden="true"><Icon size={18} /></span>
-                <span className="dashboard__attention-copy">
-                  <span className="dashboard__attention-label">{item.label}</span>
-                  <strong>{item.value}</strong>
-                  <small>{item.detail}</small>
-                </span>
-                <ArrowUpRight className="dashboard__attention-arrow" size={16} aria-hidden="true" />
-              </a>
-            )
-          })}
-        </div>
-      </section>
+          <div className="dashboard__attention-grid">
+            {attentionItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <article className={`dashboard__attention-item dashboard__attention-item--${item.tone}`} key={item.label}>
+                  <span className="dashboard__attention-icon" aria-hidden="true"><Icon size={18} /></span>
+                  <span className="dashboard__attention-copy">
+                    <span className="dashboard__attention-label">{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <small>{item.detail}</small>
+                  </span>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="dashboard__section" aria-labelledby="dashboard-kpi-title">
         <div className="dashboard__section-heading">
           <div>
-            <p className="dashboard__eyebrow">AT A GLANCE</p>
             <h2 id="dashboard-kpi-title">システム概要</h2>
           </div>
         </div>
@@ -511,28 +486,19 @@ function DashboardHome({
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon" aria-hidden="true"><Database size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">DATA STORE</p>
                 <h3>Data Store</h3>
               </div>
               <StatusBadge status={dataStoreStatus} compact />
             </div>
-            <div className="dashboard__metric-row">
-              <strong className="dashboard__metric-value">{dataStoreStatus.label}</strong>
-              <span className="dashboard__metric-caption">接続状態</span>
-            </div>
-            <p className="dashboard__card-note">
-              {summary.dataStore?.storeName ?? 'ストア名不明'}
-              <span aria-hidden="true"> · </span>
-              {summary.dataStore?.providerVersion ?? 'バージョン不明'}
-            </p>
-            <DetailLink href="/dashboard/datastore" />
+            {dataStoreDetails.length > 0 && (
+              <p className="dashboard__card-note">{dataStoreDetails.join(' · ')}</p>
+            )}
           </article>
 
           <article className="dashboard__card dashboard__kpi-card">
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon" aria-hidden="true"><HardDrive size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">STORAGE</p>
                 <h3>DataFolder</h3>
               </div>
               <StatusBadge status={dataFolderStatus} compact />
@@ -553,14 +519,12 @@ function DashboardHome({
               <span style={{ width: `${dataFolderPercent ?? 0}%` }} />
             </div>
             <p className="dashboard__card-note">空き {formatBytes(summary.dataFolder?.freeBytes)} / {formatBytes(summary.dataFolder?.totalBytes)}</p>
-            <DetailLink href="/dashboard/datafolder" />
           </article>
 
           <article className="dashboard__card dashboard__kpi-card">
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon" aria-hidden="true"><CloudDownload size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">DOWNLOADS</p>
                 <h3>Downloads</h3>
               </div>
               <StatusBadge
@@ -577,22 +541,18 @@ function DashboardHome({
               <span className="dashboard__metric-caption">稼働中</span>
             </div>
             <p className="dashboard__card-note">実行中 {formatCount(runningCount)} · 待機中 {formatCount(queuedCount)}</p>
-            <p className={`dashboard__inline-notice ${failedDownloadCount && failedDownloadCount > 0 ? 'dashboard__inline-notice--warning' : ''}`}>
-              <TriangleAlert size={13} aria-hidden="true" />
-              <span>{typeof failedDownloadCount !== 'number' || !Number.isFinite(failedDownloadCount)
-                ? '失敗数 不明'
-                : failedDownloadCount > 0
-                  ? `失敗 ${formatCount(failedDownloadCount)}件`
-                  : '失敗なし'}</span>
-            </p>
-            <DetailLink href="/dashboard/downloads" />
+            {typeof failedDownloadCount === 'number' && Number.isFinite(failedDownloadCount) && failedDownloadCount > 0 && (
+              <p className="dashboard__inline-notice dashboard__inline-notice--warning">
+                <TriangleAlert size={13} aria-hidden="true" />
+                <span>失敗 {formatCount(failedDownloadCount)}件</span>
+              </p>
+            )}
           </article>
 
           <article className="dashboard__card dashboard__kpi-card">
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon" aria-hidden="true"><Gauge size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">CACHE</p>
                 <h3>Cache hit率</h3>
               </div>
               <StatusBadge status={cacheStatus} compact />
@@ -613,7 +573,6 @@ function DashboardHome({
               <span style={{ width: `${cachePercent ?? 0}%` }} />
             </div>
             <p className="dashboard__card-note">{formatCount(summary.cache?.entryCount)}エントリ · {formatBytes(summary.cache?.sizeBytes)}</p>
-            <DetailLink href="/dashboard/cache" />
           </article>
         </div>
       </section>
@@ -621,7 +580,6 @@ function DashboardHome({
       <section className="dashboard__section" aria-labelledby="dashboard-operations-title">
         <div className="dashboard__section-heading">
           <div>
-            <p className="dashboard__eyebrow">OPERATIONS</p>
             <h2 id="dashboard-operations-title">運用サービス</h2>
           </div>
         </div>
@@ -630,7 +588,6 @@ function DashboardHome({
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon dashboard__card-icon--warning" aria-hidden="true"><Wrench size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">MAINTENANCE</p>
                 <h3>Maintenance</h3>
               </div>
               <StatusBadge status={maintenanceStatus} compact />
@@ -643,41 +600,32 @@ function DashboardHome({
               <div><dt>最終実行</dt><dd>{formatDateTime(summary.maintenance?.lastExecutionTime)}</dd></div>
               <div><dt>次回実行</dt><dd>{formatDateTime(summary.maintenance?.nextExecutionTime)}</dd></div>
             </dl>
-            <DetailLink href="/dashboard/maintenance" />
           </article>
 
           <article className="dashboard__card dashboard__operation-card">
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon" aria-hidden="true"><Server size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">WEBPILOT</p>
                 <h3>WebPilot</h3>
               </div>
               <StatusBadge status={webPilotStatus} compact />
             </div>
-            <div className="dashboard__operation-main">
-              <strong>{webPilotStatus.label}</strong>
-              <span>{summary.webPilot?.isConfigured ? '設定済み' : '接続設定'}</span>
-            </div>
-            <p className="dashboard__card-note">最終テスト: {getServiceTestLabel(summary.webPilot?.lastTestStatus)}</p>
-            <DetailLink href="/dashboard/webpilot" />
+            {summary.webPilot?.lastTestStatus && (
+              <p className="dashboard__card-note">最終テスト: {getServiceTestLabel(summary.webPilot.lastTestStatus)}</p>
+            )}
           </article>
 
           <article className="dashboard__card dashboard__operation-card">
             <div className="dashboard__card-heading">
               <span className="dashboard__card-icon dashboard__card-icon--purple" aria-hidden="true"><Image size={18} /></span>
               <div>
-                <p className="dashboard__card-eyebrow">IMAGE WORKER</p>
                 <h3>ImageWorker</h3>
               </div>
               <StatusBadge status={imageWorkerStatus} compact />
             </div>
-            <div className="dashboard__operation-main">
-              <strong>{imageWorkerStatus.label}</strong>
-              <span>{summary.imageWorker?.isConfigured ? '設定済み' : '接続設定'}</span>
-            </div>
-            <p className="dashboard__card-note">最終テスト: {getServiceTestLabel(summary.imageWorker?.lastTestStatus)}</p>
-            <DetailLink href="/dashboard/image-worker" />
+            {summary.imageWorker?.lastTestStatus && (
+              <p className="dashboard__card-note">最終テスト: {getServiceTestLabel(summary.imageWorker.lastTestStatus)}</p>
+            )}
           </article>
         </div>
       </section>
@@ -685,10 +633,8 @@ function DashboardHome({
       <section className="dashboard__section" aria-labelledby="dashboard-activity-title">
         <div className="dashboard__section-heading">
           <div>
-            <p className="dashboard__eyebrow">ACTIVITY</p>
             <h2 id="dashboard-activity-title">最新のアクティビティ</h2>
           </div>
-          <DetailLink href="/dashboard/logs" label="ログをすべて見る" />
         </div>
         <article className="dashboard__card dashboard__activity-card">
           {latestLogs.length > 0 ? (
@@ -714,67 +660,164 @@ function ActivityEntry({ entry }: { entry: DashboardLogEntryDto }) {
           <span>{entry.category ?? 'システムログ'}</span>
           <time dateTime={entry.timestamp ?? undefined}>{formatDateTime(entry.timestamp)}</time>
         </div>
-        <p>{entry.message ?? 'メッセージなし'}</p>
+        {entry.message && <p>{entry.message}</p>}
       </div>
       <ChevronRight className="dashboard__activity-chevron" size={16} aria-hidden="true" />
     </li>
   )
 }
 
-function DashboardDetailPlaceholder({ route }: { route: Exclude<DashboardRoute, 'home'> }) {
-  const copy = DETAIL_COPY[route]
-  const Icon = copy.icon
+function DashboardLoadingState({ announcement }: { announcement: string }) {
   return (
-    <section className="dashboard dashboard--detail" aria-labelledby="dashboard-detail-title">
-      <article className="dashboard__placeholder">
-        <span className="dashboard__placeholder-icon" aria-hidden="true"><Icon size={25} /></span>
-        <p className="dashboard__eyebrow">DASHBOARD DETAIL</p>
-        <h1 id="dashboard-detail-title">{copy.title}</h1>
-        <p className="dashboard__placeholder-description">{copy.description}</p>
-        <p className="dashboard__placeholder-note">この詳細画面はモックです。実データの取得と操作は今後の実装で追加されます。</p>
-        <a className="dashboard__back-link" href="/dashboard">
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>Dashboardへ戻る</span>
-        </a>
-      </article>
+    <section className="dashboard dashboard--state" aria-labelledby="dashboard-title" aria-busy="true">
+      <p className="dashboard__live-region sr-only" role="status" aria-live="polite">{announcement}</p>
+      <h1 id="dashboard-title" className="sr-only">システムダッシュボード</h1>
+      <div className="dashboard__loading-skeleton" aria-hidden="true">
+        <div className="dashboard__loading-hero">
+          <div className="dashboard__loading-hero-heading">
+            <span className="dashboard__skeleton dashboard__skeleton--hero-icon" />
+            <span className="dashboard__loading-hero-copy">
+              <span className="dashboard__skeleton dashboard__skeleton--hero-title" />
+              <span className="dashboard__skeleton dashboard__skeleton--hero-subtitle" />
+            </span>
+          </div>
+          <div className="dashboard__loading-hero-meta">
+            <span className="dashboard__skeleton dashboard__skeleton--hero-badge" />
+            <span className="dashboard__skeleton dashboard__skeleton--hero-time" />
+          </div>
+        </div>
+
+        <div className="dashboard__loading-section">
+          <span className="dashboard__skeleton dashboard__skeleton--section-title" />
+          <div className="dashboard__loading-grid dashboard__loading-grid--kpi">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div className="dashboard__loading-card dashboard__loading-card--kpi" key={index}>
+                <span className="dashboard__loading-card-heading">
+                  <span className="dashboard__skeleton dashboard__skeleton--card-icon" />
+                  <span className="dashboard__skeleton dashboard__skeleton--card-title" />
+                <span className="dashboard__skeleton dashboard__skeleton--status" />
+              </span>
+              <span className="dashboard__skeleton dashboard__skeleton--metric" />
+              <span className="dashboard__skeleton dashboard__skeleton--card-note" />
+            </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </section>
   )
 }
 
-export function Dashboard({ path }: DashboardProps = {}) {
+function DashboardErrorState({ message, announcement, onRetry }: {
+  message: string
+  announcement: string
+  onRetry: () => void
+}) {
+  return (
+    <section className="dashboard dashboard--state" aria-labelledby="dashboard-title" aria-busy="false">
+      <p className="dashboard__live-region sr-only" role="status" aria-live="polite">{announcement}</p>
+      <div className="dashboard__state-card dashboard__state-card--error" role="alert">
+        <span className="dashboard__state-icon" aria-hidden="true"><CircleAlert size={25} /></span>
+        <h1 id="dashboard-title">システムダッシュボード</h1>
+        <p>{message}</p>
+        <button className="dashboard__retry-button" type="button" onClick={onRetry}>再試行</button>
+      </div>
+    </section>
+  )
+}
+
+export function Dashboard({ path, apiRevision }: DashboardProps) {
   const route = resolveDashboardRoute(path)
-  const [summary, setSummary] = useState<DashboardSummaryResponse>(() => DASHBOARD_MOCK_DATA)
-  const [lastUpdated, setLastUpdated] = useState<string | null>(() => DASHBOARD_MOCK_DATA.generatedAt ?? null)
+  const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null)
+  const [logs, setLogs] = useState<DashboardLogsResponse | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [announcement, setAnnouncement] = useState('')
-  const refreshTimerRef = useRef<number | null>(null)
+  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const requestControllerRef = useRef<AbortController | null>(null)
 
-  useEffect(() => () => {
-    if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current)
-  }, [])
+  const refresh = (resetApiData = false) => {
+    if (route !== 'home' || requestControllerRef.current !== null) return
 
-  const refresh = () => {
-    if (isRefreshing) return
+    const controller = new AbortController()
+    const hasExistingData = !resetApiData && (summary !== null || logs !== null)
+    requestControllerRef.current = controller
+    if (resetApiData) {
+      setSummary(null)
+      setLogs(null)
+      setLastUpdated(null)
+    }
     setIsRefreshing(true)
-    setAnnouncement('Dashboardを更新しています。')
-    refreshTimerRef.current = window.setTimeout(() => {
-      const refreshedAt = new Date().toISOString()
-      setSummary((current) => ({ ...current, generatedAt: refreshedAt }))
-      setLastUpdated(refreshedAt)
+    setLoadState(hasExistingData ? 'success' : 'loading')
+    setErrorMessage(null)
+    setAnnouncement(hasExistingData ? 'Dashboardを更新しています。' : 'Dashboardを読み込んでいます。')
+
+    void Promise.all([
+      getDashboardSummary<DashboardSummaryResponse>(controller.signal),
+      getDashboardLogs<DashboardLogsResponse>(0, controller.signal),
+    ]).then(([summaryResponse, logsResponse]) => {
+      if (controller.signal.aborted) return
+
+      const nextSummary = summaryResponse.data ?? EMPTY_SUMMARY
+      const nextLogs = logsResponse.data ?? EMPTY_LOGS
+      setSummary(nextSummary)
+      setLogs(nextLogs)
+      setLastUpdated(nextSummary.generatedAt ?? nextLogs.generatedAt ?? null)
+      setLoadState('success')
+      setErrorMessage(null)
+      setAnnouncement(hasExistingData ? 'Dashboardを更新しました。' : 'Dashboardを読み込みました。')
+    }).catch((error: unknown) => {
+      if (controller.signal.aborted) return
+
+      const message = getErrorMessage(error)
+      setLoadState(hasExistingData ? 'success' : 'error')
+      setErrorMessage(message)
+      setAnnouncement(`${hasExistingData ? 'Dashboardの更新' : 'Dashboardの読み込み'}に失敗しました。${message}`)
+    }).finally(() => {
+      if (requestControllerRef.current !== controller) return
+      requestControllerRef.current = null
       setIsRefreshing(false)
-      setAnnouncement('Dashboardを更新しました。')
-      refreshTimerRef.current = null
-    }, 650)
+    })
   }
 
-  if (route !== 'home') return <DashboardDetailPlaceholder route={route} />
+  useEffect(() => {
+    if (route !== 'home') {
+      requestControllerRef.current?.abort()
+      requestControllerRef.current = null
+      return
+    }
+
+    refresh(true)
+    return () => {
+      requestControllerRef.current?.abort()
+      requestControllerRef.current = null
+    }
+  }, [apiRevision, route])
+
+  if (route !== 'home') return <DashboardDetails route={route} apiRevision={apiRevision} />
+
+  if (summary === null && loadState !== 'error') {
+    return <DashboardLoadingState announcement={announcement || 'Dashboardを読み込んでいます。'} />
+  }
+
+  if (summary === null) {
+    return <DashboardErrorState
+      message={errorMessage ?? 'Dashboardの読み込みに失敗しました。'}
+      announcement={announcement}
+      onRetry={refresh}
+    />
+  }
 
   return (
     <DashboardHome
       summary={summary}
+      logs={logs ?? EMPTY_LOGS}
       lastUpdated={lastUpdated}
       isRefreshing={isRefreshing}
       announcement={announcement}
+      errorMessage={errorMessage}
+      apiStatus={isRefreshing ? 'loading' : errorMessage ? 'error' : 'connected'}
       onRefresh={refresh}
     />
   )

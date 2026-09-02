@@ -29,11 +29,10 @@
   object-fit: cover;
   object-position: center top;
   opacity: 0;
-  transition: opacity .16s ease, transform .18s ease;
+  transition: opacity .16s ease;
 }
 
 .book-cover.is-loaded .book-cover__image { opacity: 1; }
-.book-card:hover .book-cover.is-loaded .book-cover__image { transform: scale(1.015); }
 
 .book-cover__skeleton {
   position: absolute;

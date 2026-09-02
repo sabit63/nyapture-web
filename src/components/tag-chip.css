@@ -58,6 +58,16 @@ button.tag-chip:hover {
   white-space: nowrap;
 }
 
+.tag-chip__count {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 18%);
+  font-size: .9em;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
 .tag-chip__remove {
   flex: 0 0 auto;
   color: #fff;

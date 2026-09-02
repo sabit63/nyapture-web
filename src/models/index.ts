@@ -119,6 +119,27 @@ export type EBookResponse = NyaApiResponse & {
   pageSize?: number
 }
 
+export type BookDeletionDisposition = 'Logical' | 'Physical'
+
+export type BookDeletionJobStatus = 'Pending' | 'Running' | 'Succeeded' | 'Failed'
+
+export type BookDeletionJob = {
+  jobId: string
+  groupId: string
+  bookId: string
+  disposition: BookDeletionDisposition
+  status: BookDeletionJobStatus
+  createdAtUtc: string
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  failureMessage: string | null
+  statusUrl: string
+}
+
+export type BookDeletionJobResponse = NyaApiResponse & {
+  data?: BookDeletionJob
+}
+
 export type EBookGroup = {
   keyTagType?: string
   keyTagValue?: string
@@ -326,11 +347,7 @@ export type TagAdditionalNameUpsertResponse = {
   updated?: number
 }
 
-export const SEARCH_SOURCES = ['Local', 'HitomiLa', 'NHentai'] as const
-
-export type SearchSource = (typeof SEARCH_SOURCES)[number]
-
-export const SORT_TYPES = ['updated', 'title', 'pages'] as const
+export const SORT_TYPES = ['uploaded', 'title', 'pages'] as const
 
 export type SortType = (typeof SORT_TYPES)[number]
 
@@ -352,9 +369,13 @@ export type SearchCriteria = {
   pagesMax: string
 }
 
-export type BookCardModel = EBook & {
+type LegacyBookFixtureFields = Partial<Record<'source', string>>
+
+export type BookCardModel = EBook & LegacyBookFixtureFields & {
   groupId: string
   bookId: string
+  apiGroupId?: string
+  apiBookId?: string
   url: string
   title: string
   captions: Record<string, string>
@@ -363,7 +384,7 @@ export type BookCardModel = EBook & {
   uploadedTime: string
   pageUrls: string[]
   status: NyaBookStatus
-  source: SearchSource
+  sourceLabel?: string
   tags: BookTag[]
   thumbnailUrl?: string
   cover: string

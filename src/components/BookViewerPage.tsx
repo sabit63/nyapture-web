@@ -8,53 +8,33 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react'
+import { getBookPageBlob } from '../api'
 import type { BookCardModel, BookTag, NyaTagType } from '../models'
 import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
 import './book-viewer.css'
 
-type BookViewerRouteState = 'missing' | 'notFound' | 'ready'
+type BookViewerRouteState = 'missing' | 'loading' | 'notFound' | 'error' | 'ready'
 
 export type BookViewerPageProps = {
   routeState: BookViewerRouteState
   routeIdentity: string
   book?: BookCardModel
+  errorMessage?: string
+  onRetry?: () => void
   onTagSearch: (tag: BookTag) => void
 }
 
 type PagePhase = 'loading' | 'loaded' | 'error'
 
-const MOCK_PAGE_WIDTH = 1000
-const MOCK_PAGE_HEIGHT = 1400
-const MOCK_MAX_PAGE_COUNT = 99
-const MOCK_FAILURE_PAGE = 3
-const MOCK_DELAY_BY_PAGE = new Map<number, number>([
-  [1, 260],
-  [3, 420],
-  [7, 320],
-])
-const mockPageUrlCache = new Map<string, string>()
+const PAGE_WIDTH = 1000
+const PAGE_HEIGHT = 1400
+const MAX_PAGE_COUNT = 10_000
 
-const isValidTotalPage = (value: number) => Number.isInteger(value) && value > 0 && value <= MOCK_MAX_PAGE_COUNT
+const isValidTotalPage = (value: number) => Number.isInteger(value) && value > 0 && value <= MAX_PAGE_COUNT
 
 const getBookIdentity = (book: Pick<BookCardModel, 'groupId' | 'bookId'>) => `${book.groupId}\u0000${book.bookId}`
-
-const createNeutralPageUrl = (bookIdentity: string, pageNumber: number) => {
-  const cacheKey = `${bookIdentity}:${pageNumber}`
-  const cachedUrl = mockPageUrlCache.get(cacheKey)
-  if (cachedUrl) return cachedUrl
-
-  const palette = ['#e5e0d6', '#d9e1e6', '#e7dce2', '#dfe5d8', '#e4dcd0']
-  const accentPalette = ['#8b6b82', '#62788c', '#9b725e', '#6d836e', '#7d728b']
-  const background = palette[(pageNumber - 1) % palette.length]
-  const accent = accentPalette[(pageNumber - 1) % accentPalette.length]
-  const offset = (pageNumber * 29) % 190
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${MOCK_PAGE_WIDTH}" height="${MOCK_PAGE_HEIGHT}" viewBox="0 0 ${MOCK_PAGE_WIDTH} ${MOCK_PAGE_HEIGHT}"><rect width="1000" height="1400" fill="${background}"/><rect x="84" y="92" width="832" height="1216" rx="18" fill="#ffffff" fill-opacity=".54"/><path d="M142 ${256 + offset}h716M142 ${312 + offset}h560M142 ${368 + offset}h650" stroke="${accent}" stroke-opacity=".48" stroke-width="12" stroke-linecap="round"/><rect x="142" y="${548 + (offset % 120)}" width="716" height="390" rx="12" fill="${accent}" fill-opacity=".15"/><path d="M142 ${1018 + (offset % 100)}h460M142 ${1068 + (offset % 100)}h600M142 ${1118 + (offset % 100)}h330" stroke="${accent}" stroke-opacity=".34" stroke-width="10" stroke-linecap="round"/><circle cx="820" cy="1170" r="38" fill="${accent}" fill-opacity=".24"/></svg>`
-  const url = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-  mockPageUrlCache.set(cacheKey, url)
-  return url
-}
 
 const formatUploadDate = (uploadedTime: string) => {
   const date = new Date(uploadedTime)
@@ -120,7 +100,7 @@ const pickClosestEntry = (entries: Map<Element, IntersectionObserverEntry>) => {
   return closest
 }
 
-function BookViewerPage({ routeState, routeIdentity, book, onTagSearch }: BookViewerPageProps) {
+function BookViewerPage({ routeState, routeIdentity, book, errorMessage, onRetry, onTagSearch }: BookViewerPageProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const lastFocusedRouteRef = useRef<string | null>(null)
 
@@ -139,17 +119,41 @@ function BookViewerPage({ routeState, routeIdentity, book, onTagSearch }: BookVi
     return <BookViewerReady book={book} headingRef={headingRef} onTagSearch={onTagSearch} />
   }
 
+  if (routeState === 'loading') {
+    return (
+      <section className="book-viewer book-viewer--route-loading" aria-busy="true" aria-labelledby="book-viewer-route-title">
+        <h1 id="book-viewer-route-title" ref={headingRef} className="sr-only" tabIndex={-1}>Bookビューア</h1>
+        <p className="sr-only" role="status" aria-live="polite">Bookビューアのページを準備しています</p>
+        <div className="book-viewer__reader" aria-hidden="true">
+          <div className="book-viewer__pages">
+            {Array.from({ length: 3 }, (_, index) => (
+              <div className="book-viewer__page book-viewer__page--loading" key={`book-viewer-loading-page-${index + 1}`}>
+                <div className="book-viewer__page-frame">
+                  <span className="book-viewer__page-skeleton" aria-hidden="true" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   const isMissing = routeState === 'missing'
+  const isError = routeState === 'error'
   return (
     <section className="book-viewer book-viewer--route-error" aria-labelledby="book-viewer-route-title">
       <h1 id="book-viewer-route-title" ref={headingRef} tabIndex={-1}>
-        {isMissing ? 'Bookの指定が必要です' : 'Bookが見つかりません'}
+        {isMissing ? 'Bookの指定が必要です' : isError ? 'Bookを読み込めません' : 'Bookが見つかりません'}
       </h1>
       <p>
         {isMissing
           ? 'id と gid を指定すると、Bookの画像一覧を表示できます。'
-          : '指定されたBookはライブラリまたは検索結果にありません。'}
+          : isError
+            ? errorMessage ?? 'APIへの接続を確認して、もう一度お試しください。'
+            : '指定されたBookはライブラリまたは検索結果にありません。'}
       </p>
+      {isError && onRetry && <button className="button button--primary" type="button" onClick={onRetry}>再試行</button>}
       <a className="button button--secondary" href="/search">検索へ戻る</a>
     </section>
   )
@@ -165,6 +169,7 @@ function BookViewerReady({
   onTagSearch: (tag: BookTag) => void
 }) {
   const bookIdentity = useMemo(() => getBookIdentity(book), [book])
+  const sourceLabel = book.sourceLabel?.trim() || undefined
   const totalPages = isValidTotalPage(book.totalPage) ? book.totalPage : 0
   const tagGroups = useMemo(() => groupBookTags(book.tags), [book.tags])
   const [currentPage, setCurrentPage] = useState(totalPages > 0 ? 1 : 0)
@@ -309,7 +314,7 @@ function BookViewerReady({
     <section className="book-viewer" aria-labelledby={titleId}>
       <h1 id={titleId} ref={headingRef} className="sr-only" tabIndex={-1}>{book.title}の画像一覧</h1>
 
-      <button className="book-viewer__back" type="button" aria-label="戻る" title="戻る" onClick={navigateBack}>
+      <button className="book-viewer__back" type="button" aria-label="戻る" onClick={navigateBack}>
         <ArrowLeft size={18} aria-hidden="true" />
       </button>
 
@@ -335,7 +340,7 @@ function BookViewerReady({
       </section>
 
       {showScrollTop && (
-        <button className="book-viewer__scroll-top" type="button" aria-label="先頭へ戻る" title="先頭へ戻る" onClick={scrollToTop}>
+        <button className="book-viewer__scroll-top" type="button" aria-label="先頭へ戻る" onClick={scrollToTop}>
           <ArrowUp size={18} aria-hidden="true" />
         </button>
       )}
@@ -354,7 +359,6 @@ function BookViewerReady({
             aria-expanded={detailsOpen}
             aria-controls="book-viewer-details"
             aria-label="情報パネルを展開"
-            title="展開"
             onClick={() => setDetailsOpen(true)}
           >
             <ChevronUp size={20} aria-hidden="true" />
@@ -395,7 +399,7 @@ function BookViewerReady({
             <div>
               <h2 id="book-viewer-details-title">{book.title}</h2>
             </div>
-            <button className="book-viewer__shrink" type="button" data-details-initial-focus aria-label="情報パネルを縮小" title="縮小" onClick={closeDetails}>
+            <button className="book-viewer__shrink" type="button" data-details-initial-focus aria-label="情報パネルを縮小" onClick={closeDetails}>
               <ChevronDown size={20} aria-hidden="true" />
             </button>
           </header>
@@ -403,7 +407,7 @@ function BookViewerReady({
           <div className="book-viewer__details-body">
             <div className="book-viewer__details-meta" aria-label="Bookのメタデータ">
               <div className="book-viewer__details-meta-group book-viewer__details-meta-group--left">
-                <span className="book-viewer__meta-chip book-viewer__meta-chip--source">{book.source}</span>
+                {sourceLabel && <span className="book-viewer__meta-chip book-viewer__meta-chip--source">{sourceLabel}</span>}
                 <BookStatusBadge status={book.status} variant="inline" />
               </div>
               <div className="book-viewer__details-meta-group book-viewer__details-meta-group--right">
@@ -456,25 +460,32 @@ function BookViewerPageImage({
 }) {
   const [phase, setPhase] = useState<PagePhase>('loading')
   const [retryCount, setRetryCount] = useState(0)
-  const pageUrl = useMemo(() => createNeutralPageUrl(bookIdentity, pageNumber), [bookIdentity, pageNumber])
+  const [pageUrl, setPageUrl] = useState<string>()
 
   useEffect(() => {
-    let active = true
-    const delay = MOCK_DELAY_BY_PAGE.get(pageNumber) ?? 0
-    const timer = window.setTimeout(() => {
-      if (!active) return
-      if (pageNumber === MOCK_FAILURE_PAGE && retryCount === 0) {
-        setPhase('error')
-      } else {
-        setPhase('loaded')
-      }
-    }, delay)
+    const controller = new AbortController()
+    let objectUrl: string | undefined
+    setPhase('loading')
+    setPageUrl(undefined)
+    getBookPageBlob({
+      groupId: book.groupId,
+      bookId: book.bookId,
+      page: pageNumber,
+    }, controller.signal)
+      .then((blob) => {
+        if (controller.signal.aborted) return
+        objectUrl = URL.createObjectURL(blob)
+        setPageUrl(objectUrl)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPhase('error')
+      })
 
     return () => {
-      active = false
-      window.clearTimeout(timer)
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [pageNumber, retryCount, pageUrl])
+  }, [book.bookId, book.groupId, bookIdentity, pageNumber, retryCount])
 
   const retryPage = () => {
     setPhase('loading')
@@ -489,12 +500,12 @@ function BookViewerPageImage({
     >
       <div className="book-viewer__page-frame">
         {phase === 'loading' && <span className="book-viewer__page-skeleton" aria-hidden="true" />}
-        {phase === 'loaded' && (
+        {pageUrl && (
           <img
             src={pageUrl}
             alt={`${book.title}の${pageNumber}ページ目`}
-            width={MOCK_PAGE_WIDTH}
-            height={MOCK_PAGE_HEIGHT}
+            width={PAGE_WIDTH}
+            height={PAGE_HEIGHT}
             loading="lazy"
             decoding="async"
             onLoad={() => setPhase('loaded')}
