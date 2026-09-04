@@ -10,6 +10,9 @@ import type {
   OnlineBookPageResponse,
   OnlineBookResponse,
   TagAutocompleteResponse,
+  TagAdditionalNameDto,
+  TagAdditionalNameUpsertRequest,
+  TagAdditionalNameUpsertResponse,
 } from '../models'
 import { requestBlob, requestJson } from './client'
 
@@ -110,6 +113,22 @@ export const getBookPageBlob = (
 export const autocompleteTags = (query: string, type?: NyaTagType, signal?: AbortSignal) => (
   requestJson<TagAutocompleteResponse>('/api/tag/autocomplete', {
     query: { q: query, type, limit: 10 },
+    signal,
+  })
+)
+
+export const getTagAdditionalName = (tagType: NyaTagType, name: string, signal?: AbortSignal) => (
+  requestJson<TagAdditionalNameDto>(`/api/tag-additional/${segment(tagType)}/${segment(name)}`, { signal })
+)
+
+export const upsertTagAdditionalNames = (
+  requests: TagAdditionalNameUpsertRequest[],
+  signal?: AbortSignal,
+) => (
+  requestJson<TagAdditionalNameUpsertResponse>('/api/tag-additional', {
+    method: 'POST',
+    body: requests,
+    auth: 'edit',
     signal,
   })
 )

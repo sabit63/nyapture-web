@@ -1,8 +1,6 @@
 import {
-  ArrowLeft,
   ArrowUp,
   ChevronDown,
-  ChevronUp,
   ImageOff,
   RotateCcw,
 } from 'lucide-react'
@@ -31,6 +29,10 @@ export type BookViewerPageProps = {
   errorMessage?: string
   onRetry?: () => void
   onTagSearch: (tag: BookTag) => void
+  onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
+  detailsOpen: boolean
+  onDetailsOpenChange: (open: boolean) => void
+  detailsTriggerRef: RefObject<HTMLButtonElement | null>
 }
 
 const PAGE_WIDTH = 1000
@@ -105,7 +107,18 @@ const pickClosestEntry = (entries: Map<Element, IntersectionObserverEntry>) => {
   return closest
 }
 
-function BookViewerPage({ routeState, routeIdentity, book, errorMessage, onRetry, onTagSearch }: BookViewerPageProps) {
+function BookViewerPage({
+  routeState,
+  routeIdentity,
+  book,
+  errorMessage,
+  onRetry,
+  onTagSearch,
+  onTagSearchDestinationRequest,
+  detailsOpen,
+  onDetailsOpenChange,
+  detailsTriggerRef,
+}: BookViewerPageProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const lastFocusedRouteRef = useRef<string | null>(null)
 
@@ -121,7 +134,17 @@ function BookViewerPage({ routeState, routeIdentity, book, errorMessage, onRetry
   }, [routeIdentity])
 
   if (routeState === 'ready' && book) {
-    return <BookViewerReady book={book} headingRef={headingRef} onTagSearch={onTagSearch} />
+    return (
+      <BookViewerReady
+        book={book}
+        headingRef={headingRef}
+        onTagSearch={onTagSearch}
+        onTagSearchDestinationRequest={onTagSearchDestinationRequest}
+        detailsOpen={detailsOpen}
+        onDetailsOpenChange={onDetailsOpenChange}
+        detailsTriggerRef={detailsTriggerRef}
+      />
+    )
   }
 
   if (routeState === 'loading') {
@@ -168,22 +191,28 @@ function BookViewerReady({
   book,
   headingRef,
   onTagSearch,
+  onTagSearchDestinationRequest,
+  detailsOpen,
+  onDetailsOpenChange,
+  detailsTriggerRef,
 }: {
   book: BookCardModel
   headingRef: RefObject<HTMLHeadingElement | null>
   onTagSearch: (tag: BookTag) => void
+  onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
+  detailsOpen: boolean
+  onDetailsOpenChange: (open: boolean) => void
+  detailsTriggerRef: RefObject<HTMLButtonElement | null>
 }) {
   const bookIdentity = useMemo(() => getBookIdentity(book), [book])
   const sourceLabel = book.sourceLabel?.trim() || undefined
   const totalPages = isValidTotalPage(book.totalPage) ? book.totalPage : 0
   const tagGroups = useMemo(() => groupBookTags(book.tags), [book.tags])
   const [currentPage, setCurrentPage] = useState(totalPages > 0 ? 1 : 0)
-  const [detailsOpen, setDetailsOpen] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
   const readerRef = useRef<HTMLElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const detailsPanelRef = useRef<HTMLDivElement>(null)
-  const expandButtonRef = useRef<HTMLButtonElement>(null)
   const pointerStartedOutsideRef = useRef(false)
   const activeEntriesRef = useRef<Map<Element, IntersectionObserverEntry>>(new Map())
   const centerEntriesRef = useRef<Map<Element, IntersectionObserverEntry>>(new Map())
@@ -200,6 +229,10 @@ function BookViewerReady({
   }), [book.bookId, book.groupId, totalPages])
 
   useEffect(() => pageLoader.attach(), [pageLoader])
+
+  useEffect(() => {
+    setCurrentPage(totalPages > 0 ? 1 : 0)
+  }, [bookIdentity, totalPages])
 
   useEffect(() => {
     const reader = readerRef.current
@@ -237,7 +270,6 @@ function BookViewerReady({
   }, [])
 
   useEffect(() => {
-    setCurrentPage(totalPages > 0 ? 1 : 0)
     const reader = readerRef.current
     if (!reader || totalPages === 0 || typeof IntersectionObserver === 'undefined') return
 
@@ -458,24 +490,8 @@ function BookViewerReady({
   const closeDetails = useCallback(() => {
     const dialog = dialogRef.current
     if (dialog?.open) dialog.close()
-    else setDetailsOpen(false)
-  }, [])
-
-  const navigateBack = () => {
-    try {
-      const referrer = document.referrer ? new URL(document.referrer) : null
-      const safeReferrer = referrer
-        && referrer.origin === window.location.origin
-        && referrer.pathname !== '/book/viewer'
-      if (safeReferrer && window.history.length > 1) {
-        window.history.back()
-        return
-      }
-    } catch {
-      // Fall through to the stable search destination when the referrer is malformed.
-    }
-    window.location.assign('/search')
-  }
+    else onDetailsOpenChange(false)
+  }, [onDetailsOpenChange])
 
   const scrollToTop = () => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -507,7 +523,6 @@ function BookViewerReady({
     }
   }
 
-  const displayCurrentPage = totalPages > 0 ? currentPage : 0
   const titleId = 'book-viewer-heading'
   const renderedPages = useMemo(() => Array.from({ length: totalPages }, (_, index) => (
     <BookViewerPageImage
@@ -521,16 +536,6 @@ function BookViewerReady({
   return (
     <section className="book-viewer" aria-labelledby={titleId}>
       <h1 id={titleId} ref={headingRef} className="sr-only" tabIndex={-1}>{book.title}の画像一覧</h1>
-
-      <IconButton
-        className="book-viewer__back book-viewer__back--control"
-        variant="ghost"
-        tone="neutral"
-        aria-label="戻る"
-        onClick={navigateBack}
-      >
-        <ArrowLeft size={18} aria-hidden="true" />
-      </IconButton>
 
       <section ref={readerRef} className="book-viewer__reader" aria-labelledby={titleId}>
         {totalPages > 0 ? (
@@ -546,6 +551,16 @@ function BookViewerReady({
         )}
       </section>
 
+      {totalPages > 0 && (
+        <div
+          className="book-viewer__page-indicator"
+          role="img"
+          aria-label={`現在${currentPage}ページ、全${totalPages}ページ`}
+        >
+          {currentPage} / {totalPages}
+        </div>
+      )}
+
       {showScrollTop && (
         <IconButton
           className="book-viewer__scroll-top book-viewer__scroll-top--control"
@@ -557,27 +572,6 @@ function BookViewerReady({
           <ArrowUp size={18} aria-hidden="true" />
         </IconButton>
       )}
-
-      <aside className="book-viewer__dock" aria-label="Book操作">
-        <div className="book-viewer__dock-inner">
-          <div className="book-viewer__dock-title" title={book.title}>{book.title}</div>
-          <span className="book-viewer__progress" aria-label={`現在${displayCurrentPage}ページ、全${totalPages}ページ`}>
-            {displayCurrentPage} / {totalPages}
-          </span>
-          <button
-            ref={expandButtonRef}
-            className="book-viewer__expand"
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={detailsOpen}
-            aria-controls="book-viewer-details"
-            aria-label="情報パネルを展開"
-            onClick={() => setDetailsOpen(true)}
-          >
-            <ChevronUp size={20} aria-hidden="true" />
-          </button>
-        </div>
-      </aside>
 
       <dialog
         ref={dialogRef}
@@ -603,8 +597,8 @@ function BookViewerReady({
           pointerStartedOutsideRef.current = false
         }}
         onClose={() => {
-          setDetailsOpen(false)
-          window.requestAnimationFrame(() => expandButtonRef.current?.focus())
+          onDetailsOpenChange(false)
+          window.requestAnimationFrame(() => detailsTriggerRef.current?.focus())
         }}
       >
         <div ref={detailsPanelRef} className="book-viewer__details-panel">
@@ -645,6 +639,7 @@ function BookViewerReady({
                         tag={tag}
                         size="default"
                         title={getTagChipTitle(tag)}
+                        onSearchDestinationRequest={onTagSearchDestinationRequest}
                         onClick={() => {
                           closeDetails()
                           onTagSearch(tag)

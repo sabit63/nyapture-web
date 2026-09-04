@@ -1,4 +1,4 @@
-import { Menu, X } from 'lucide-react'
+import { ArrowLeft, Menu, X } from 'lucide-react'
 import { type ReactNode, type RefObject } from 'react'
 
 import nyaIcon from '../assets/icon.png'
@@ -12,6 +12,7 @@ export type AppShellProps = {
   onOpenDrawer: () => void
   onCloseDrawer: () => void
   onNavigate: () => void
+  onBack?: () => void
   menuButtonRef: RefObject<HTMLButtonElement | null>
   headerCenter: ReactNode
   headerActions: ReactNode
@@ -24,6 +25,7 @@ export function AppShell({
   onOpenDrawer,
   onCloseDrawer,
   onNavigate,
+  onBack,
   menuButtonRef,
   headerCenter,
   headerActions,
@@ -47,10 +49,22 @@ export function AppShell({
           >
             <Menu size={20} aria-hidden="true" />
           </IconButton>
-          <a className="brand" href="/search" aria-label="Nyapture ホーム">
-            <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
-            <span className="brand__name">Nyapture</span>
-          </a>
+          {onBack ? (
+            <IconButton
+              className="header-back-button"
+              variant="ghost"
+              tone="neutral"
+              aria-label="戻る"
+              onClick={onBack}
+            >
+              <ArrowLeft size={20} aria-hidden="true" />
+            </IconButton>
+          ) : (
+            <a className="brand" href="/search" aria-label="Nyapture ホーム">
+              <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
+              <span className="brand__name">Nyapture</span>
+            </a>
+          )}
         </div>
 
         {headerCenter}

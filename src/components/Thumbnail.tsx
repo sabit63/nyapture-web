@@ -1,9 +1,26 @@
 import { ImageOff, RotateCcw } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MouseEventHandler, ReactNode } from 'react'
+import {
+  getThumbnailRetryDelayMs,
+  THUMBNAIL_MAX_AUTO_RETRIES,
+} from './thumbnail-retry'
 import './thumbnail.css'
 
 type ThumbnailImageState = 'loading' | 'loaded' | 'error'
+
+type ThumbnailLifecycle = {
+  active: boolean
+  startLoad: () => void
+  releaseObjectUrl: () => void
+}
+
+const isAbortLikeThumbnailError = (error: unknown) => (
+  typeof error === 'object'
+  && error !== null
+  && 'name' in error
+  && error.name === 'AbortError'
+)
 
 export type ThumbnailProps = {
   /** Image URL. When omitted, the component renders the missing-image fallback. */
@@ -20,6 +37,8 @@ export type ThumbnailProps = {
   linkAriaLabel?: string
   /** Optional tab order for the optional link. */
   linkTabIndex?: number
+  /** Optional click handler for the thumbnail link. */
+  linkOnClick?: MouseEventHandler<HTMLAnchorElement>
   /** Text rendered in the fallback when the image is missing or cannot load. */
   fallbackText?: string
   /** Accessible name for the fallback region. */
@@ -54,6 +73,7 @@ function ThumbnailInstance({
   linkHref,
   linkAriaLabel,
   linkTabIndex,
+  linkOnClick,
   fallbackText,
   fallbackAriaLabel,
   retryOnError = true,
@@ -63,39 +83,155 @@ function ThumbnailInstance({
 }: ThumbnailProps) {
   const [imageState, setImageState] = useState<ThumbnailImageState>(src || load ? 'loading' : 'error')
   const [retryKey, setRetryKey] = useState(0)
-  const [resolvedSrc, setResolvedSrc] = useState(src)
+  const [resolvedSrc, setResolvedSrc] = useState(load ? undefined : src)
+  const lifecycleRef = useRef<ThumbnailLifecycle | null>(null)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const automaticRetriesRef = useRef(0)
 
-  useEffect(() => {
-    if (!load) {
-      setResolvedSrc(src)
-      setImageState(src ? 'loading' : 'error')
+  const scheduleAutomaticRetry = useCallback(() => {
+    const lifecycle = lifecycleRef.current
+    if (!lifecycle?.active || retryTimerRef.current !== null) return
+
+    const retryNumber = automaticRetriesRef.current + 1
+    lifecycle.releaseObjectUrl()
+    if (retryNumber > THUMBNAIL_MAX_AUTO_RETRIES) {
+      setResolvedSrc(undefined)
+      setImageState('error')
       return
     }
 
-    const controller = new AbortController()
-    let objectUrl: string | undefined
+    automaticRetriesRef.current = retryNumber
     setResolvedSrc(undefined)
     setImageState('loading')
-    load(controller.signal)
-      .then((blob) => {
-        if (controller.signal.aborted) return
-        objectUrl = URL.createObjectURL(blob)
-        setResolvedSrc(objectUrl)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setImageState('error')
-      })
+    let timer: ReturnType<typeof setTimeout>
+    timer = setTimeout(() => {
+      if (retryTimerRef.current === timer) retryTimerRef.current = null
+      if (!lifecycle.active) return
+      if (load) {
+        lifecycle.startLoad()
+        return
+      }
+      if (!src) {
+        setImageState('error')
+        return
+      }
+      setResolvedSrc(src)
+      setImageState('loading')
+      setRetryKey((current) => current + 1)
+    }, getThumbnailRetryDelayMs(retryNumber))
+    retryTimerRef.current = timer
+  }, [load, src])
+
+  useEffect(() => {
+    const lifecycle: ThumbnailLifecycle = {
+      active: true,
+      startLoad: () => undefined,
+      releaseObjectUrl: () => undefined,
+    }
+    lifecycleRef.current = lifecycle
+    automaticRetriesRef.current = 0
+
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+
+    if (!load) {
+      setResolvedSrc(src)
+      setImageState(src ? 'loading' : 'error')
+      return () => {
+        lifecycle.active = false
+        if (retryTimerRef.current !== null) {
+          clearTimeout(retryTimerRef.current)
+          retryTimerRef.current = null
+        }
+        if (lifecycleRef.current === lifecycle) lifecycleRef.current = null
+      }
+    }
+
+    let controller: AbortController | undefined
+    let objectUrl: string | undefined
+    const revokeObjectUrl = () => {
+      const currentUrl = objectUrl
+      objectUrl = undefined
+      if (currentUrl) URL.revokeObjectURL(currentUrl)
+    }
+    const startLoad = () => {
+      if (!lifecycle.active) return
+      controller?.abort()
+      lifecycle.releaseObjectUrl()
+      const nextController = new AbortController()
+      controller = nextController
+      setResolvedSrc(undefined)
+      setImageState('loading')
+
+      let request: Promise<Blob>
+      try {
+        request = load(nextController.signal)
+      } catch (error) {
+        if (!nextController.signal.aborted && !isAbortLikeThumbnailError(error)) scheduleAutomaticRetry()
+        return
+      }
+      Promise.resolve(request)
+        .then((blob) => {
+          if (!lifecycle.active || nextController.signal.aborted) return
+          revokeObjectUrl()
+          objectUrl = URL.createObjectURL(blob)
+          setResolvedSrc(objectUrl)
+          setImageState('loading')
+        })
+        .catch((error: unknown) => {
+          if (!lifecycle.active || nextController.signal.aborted || isAbortLikeThumbnailError(error)) return
+          scheduleAutomaticRetry()
+        })
+    }
+    lifecycle.releaseObjectUrl = revokeObjectUrl
+    lifecycle.startLoad = startLoad
+    setResolvedSrc(undefined)
+    setImageState('loading')
+    startLoad()
 
     return () => {
-      controller.abort()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      lifecycle.active = false
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
+      controller?.abort()
+      revokeObjectUrl()
+      if (lifecycleRef.current === lifecycle) lifecycleRef.current = null
     }
-  }, [load, retryKey, src])
+  }, [load, scheduleAutomaticRetry, src])
 
   const retryImage = () => {
     if ((!src && !load) || !retryOnError) return
+    const lifecycle = lifecycleRef.current
+    if (!lifecycle?.active) return
+    automaticRetriesRef.current = 0
+    if (retryTimerRef.current !== null) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
     setImageState('loading')
-    setRetryKey((current) => current + 1)
+    setResolvedSrc(undefined)
+    lifecycle.releaseObjectUrl()
+    if (load) {
+      lifecycle.startLoad()
+    } else {
+      setResolvedSrc(src)
+      setRetryKey((current) => current + 1)
+    }
+  }
+
+  const imageLoaded = () => {
+    if (!lifecycleRef.current?.active) return
+    automaticRetriesRef.current = 0
+    setImageState('loaded')
+  }
+
+  const imageFailed = () => {
+    if (!lifecycleRef.current?.active) return
+    scheduleAutomaticRetry()
   }
 
   const imageContent = (
@@ -110,8 +246,8 @@ function ThumbnailInstance({
           height="700"
           loading="lazy"
           decoding="async"
-          onLoad={() => setImageState('loaded')}
-          onError={() => setImageState('error')}
+          onLoad={imageLoaded}
+          onError={imageFailed}
         />
       )}
       {imageState === 'loading' && <span className="book-cover__skeleton" aria-hidden="true" />}
@@ -124,6 +260,7 @@ function ThumbnailInstance({
       href={linkHref}
       aria-label={linkAriaLabel}
       tabIndex={linkTabIndex}
+      onClick={linkOnClick}
     >
       {imageContent}
     </a>

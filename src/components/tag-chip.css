@@ -38,11 +38,17 @@
 
 button.tag-chip {
   cursor: pointer;
+  user-select: none;
 }
 
 button.tag-chip:hover {
   border-color: color-mix(in srgb, var(--tag-accent, #626271) 84%, #fff 16%);
   background: color-mix(in srgb, var(--tag-accent, #626271) 88%, #fff 12%);
+}
+
+button.tag-chip--long-press-pending {
+  border-color: color-mix(in srgb, var(--tag-accent, #626271) 82%, #fff 18%);
+  background: color-mix(in srgb, var(--tag-accent, #626271) 84%, #fff 16%);
 }
 
 .tag-chip__hash {

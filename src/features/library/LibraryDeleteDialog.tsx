@@ -53,55 +53,15 @@ export function LibraryDeleteDialog({
       onAfterClose={onAfterClose}
       resolveRestoreFocus={resolveRestoreFocus}
       aria-labelledby="delete-dialog-title"
-      aria-describedby="delete-dialog-description"
     >
       {({ requestClose }) => (
         <div className="delete-dialog__panel">
           <DialogHeader className="delete-dialog__header">
             <div>
-              <span>蔵書の削除</span>
-              <h2 id="delete-dialog-title">削除の確認</h2>
+              <span>削除</span>
+              <h2 id="delete-dialog-title">{deleteDialogBook?.title ?? '削除の確認'}</h2>
             </div>
-          </DialogHeader>
-
-          <DialogBody className="delete-dialog__body">
-            {pending && <p className="sr-only" role="status" aria-live="polite">削除しています。完了までお待ちください。</p>}
-            {deleteDialogBook ? (
-              <>
-                <p id="delete-dialog-description" className="delete-dialog__description">
-                  「{deleteDialogBook.title}」を削除します。この操作は取り消せません。
-                </p>
-                <div className="delete-dialog__single">
-                  <Thumbnail
-                    className="delete-dialog__thumbnail"
-                    src={deleteDialogBook.thumbnailUrl}
-                    load={thumbnailRequest ? loadThumbnail : undefined}
-                    alt={`${deleteDialogBook.title}の表紙`}
-                    fallbackText={deleteDialogBook.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
-                    fallbackAriaLabel={`${deleteDialogBook.title}のサムネイルを表示できません`}
-                    variant={deleteDialogBook.cover}
-                  />
-                  <p className="delete-dialog__book-title">{deleteDialogBook.title}</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <p id="delete-dialog-description" className="delete-dialog__description">
-                  選択した蔵書を削除します。この操作は取り消せません。
-                </p>
-                <ul className="delete-dialog__title-list" aria-label="削除対象の蔵書">
-                  {books.map((book) => <li key={getBookIdentityKey(book)}>{book.title}</li>)}
-                </ul>
-              </>
-            )}
-            {error && <p className="delete-dialog__error" role="alert">{error}</p>}
-          </DialogBody>
-
-          <DialogFooter className="delete-dialog__footer">
             <IconButton
-              className="delete-dialog__action delete-dialog__action--cancel"
-              variant="ghost"
-              tone="neutral"
               size="default"
               type="button"
               aria-label="削除をキャンセル"
@@ -111,7 +71,31 @@ export function LibraryDeleteDialog({
             >
               <X size={19} aria-hidden="true" />
             </IconButton>
-            <span />
+          </DialogHeader>
+
+          <DialogBody className="delete-dialog__body">
+            {pending && <p className="sr-only" role="status" aria-live="polite">削除しています。完了までお待ちください。</p>}
+            {deleteDialogBook ? (
+              <div className="delete-dialog__single">
+                <Thumbnail
+                  className="delete-dialog__thumbnail"
+                  src={deleteDialogBook.thumbnailUrl}
+                  load={thumbnailRequest ? loadThumbnail : undefined}
+                  alt={`${deleteDialogBook.title}の表紙`}
+                  fallbackText={deleteDialogBook.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
+                  fallbackAriaLabel={`${deleteDialogBook.title}のサムネイルを表示できません`}
+                  variant={deleteDialogBook.cover}
+                />
+              </div>
+            ) : (
+              <ul className="delete-dialog__title-list">
+                {books.map((book) => <li key={getBookIdentityKey(book)}>{book.title}</li>)}
+              </ul>
+            )}
+            {error && <p className="delete-dialog__error" role="alert">{error}</p>}
+          </DialogBody>
+
+          <DialogFooter className="delete-dialog__footer">
             <IconButton
               className="delete-dialog__action delete-dialog__action--confirm"
               variant="ghost"

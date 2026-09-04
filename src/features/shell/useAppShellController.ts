@@ -20,15 +20,6 @@ export function useAppShellController() {
     return () => document.body.classList.remove('drawer-open')
   }, [drawerOpen])
 
-  useEffect(() => {
-    const desktopQuery = window.matchMedia('(min-width: 880px)')
-    const closeOverlayDrawer = (event: MediaQueryListEvent) => {
-      if (event.matches) setDrawerOpen(false)
-    }
-    desktopQuery.addEventListener('change', closeOverlayDrawer)
-    return () => desktopQuery.removeEventListener('change', closeOverlayDrawer)
-  }, [])
-
   const closeDrawer = () => {
     setDrawerOpen(false)
     menuButtonRef.current?.focus()

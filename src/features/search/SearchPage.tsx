@@ -38,7 +38,7 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
 
   return (
     <form className="quick-search" role="search" onSubmit={submitSearch}>
-      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : '蔵書'}を検索</label>
+      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : '検索'}</label>
       <input
         id="header-search"
         type="search"
@@ -113,6 +113,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     deleteSelectedLibraryBooks,
     toggleSelection,
     searchByTag,
+    openTagSearchDestination,
     refreshWebBook,
     downloadWebBook,
     deleteLibraryBook,
@@ -163,7 +164,7 @@ export function SearchPage({ controller }: SearchPageProps) {
         </div>
       </section>
 
-      <section id="results-region" className="results" aria-label={isWebSearch ? 'Web検索結果一覧' : '蔵書一覧'} aria-busy={isSearchLoading} tabIndex={-1}>
+      <section id="results-region" className="results" aria-busy={isSearchLoading} tabIndex={-1}>
         <div className="results-toolbar">
           <div className="results-actions">
             {selectMode && <span className="selection-count" aria-live="polite">{selected.length}件を選択中</span>}
@@ -269,7 +270,7 @@ export function SearchPage({ controller }: SearchPageProps) {
         )}
 
         {!isWebSearch && selectMode && (
-          <div className="selection-toolbar" role="group" aria-label="蔵書の一括操作">
+          <div className="selection-toolbar" role="group">
             <IconButton
               className="toolbar-icon"
               variant="ghost"
@@ -333,6 +334,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                   selected={selected.includes(getBookIdentityKey(book))}
                   onToggle={() => toggleSelection(getBookIdentityKey(book))}
                   onTagSearch={searchByTag}
+                  onTagSearchDestinationRequest={openTagSearchDestination}
                   isDownloadCandidate={isWebSearch
                     && (book.status === 'WebBook' || book.status === 'WebBookInPage')
                     && book.tags.some((tag) => (
@@ -353,13 +355,6 @@ export function SearchPage({ controller }: SearchPageProps) {
               </div>
             )}
           </div>
-        )}
-
-        {searchState === 'success' && visibleBooks.length === 0 && (
-          <StatePanel
-            title={hasCriteria ? `条件に一致する${isWebSearch ? 'Web検索結果' : '蔵書'}がありません` : `${isWebSearch ? 'Web検索結果' : '蔵書'}はありません`}
-            icon={<Search size={24} />}
-          />
         )}
 
         {visibleBooks.length > 0 && totalResultPages > 1 && (

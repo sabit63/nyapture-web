@@ -36,6 +36,7 @@
 
 .connection__icon { width: 17px; height: 17px; }
 .connection--connected { color: var(--color-success-fill); }
+.connection--warning { color: var(--color-warning-fill); }
 .connection--loading { color: var(--color-warning-fill); }
 .connection--error { color: var(--color-danger-fill); }
 .connection--stale { color: var(--color-danger-fill); background: color-mix(in srgb, var(--color-danger-fill) 9%, transparent); }

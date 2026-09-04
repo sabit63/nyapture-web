@@ -1,0 +1,4670 @@
+openapi: 3.1.0
+info:
+  title: Nyaputure API
+  version: v1
+  description: |-
+    Nya Book管理システム API - Book検索・ダウンロード管理・タグ管理・Webスクレイピング・データメンテナンス。
+    REST API は `paths`、SignalR Hub はルート拡張 `x-signalr-hubs` に記載する。
+
+servers:
+  - url: http://localhost:5270
+    description: ローカル開発環境
+
+x-signalr-hubs:
+  BookDownloadStatusHub:
+    endpoint: /api/bookDownloadHub
+    description: Bookダウンロードの状態、進捗、キュー、システム状態をリアルタイム配信するHub。
+    access: public-with-api-key
+    cors:
+      policy: NyaputureApiCors
+      allowPrivateNetworkOriginsSetting: Cors:AllowPrivateNetworkOrigins
+      allowedOriginsSetting: Cors:AllowedOrigins
+      allowCredentials: false
+    authentication:
+      dotNetClientHeader: X-Api-Key
+      browserHttpScheme: Bearer
+      browserWebSocketQueryParameter: access_token
+      browserWithCredentials: false
+      note: Bearer/access_token はこのHubのパスだけで検証される。APIキー使用時はHTTPSを利用する。
+    serverMethods:
+      - JoinGlobalMonitoring
+      - LeaveGlobalMonitoring
+      - RequestRunningDownloads
+      - RequestQueuedDownloads
+      - RequestAllDownloadStatuses
+      - RequestSystemStatus
+      - RequestBookDownloadStatus
+      - NotifyDownloadStarted
+      - NotifyDownloadProgress
+      - NotifyDownloadCompleted
+      - NotifyDownloadFailed
+      - NotifyDownloadCancelled
+    clientEvents:
+      - ReceiveRunningDownloads
+      - ReceiveQueuedDownloads
+      - ReceiveAllDownloadStatuses
+      - ReceiveSystemStatus
+      - ReceiveBookDownloadStatus
+      - BookDownloadStatusNotFound
+      - BookDownloadStarted
+      - BookDownloadProgress
+      - BookDownloadCompleted
+      - BookDownloadFailed
+      - BookDownloadCancelled
+      - BookDownloadStatusUpdate
+    payloadSchemas:
+      downloadStatus:
+        $ref: "#/components/schemas/BookDownloadStatus"
+      systemStatus:
+        $ref: "#/components/schemas/BookDownloadSystemStatus"
+
+  DashboardHub:
+    endpoint: /hub/dashboard
+    description: ViewerプロセスへDashboardの状態更新を配信するLocalOnly Hub。ブラウザからの直接接続は想定しない。
+    access: local-only
+    cors:
+      enabled: false
+    clientEvents:
+      - download.progress
+      - datastore.status
+      - mongodb.status
+      - cache.metrics
+      - maintenance.progress
+      - logs.entry
+    payloadSchemas:
+      downloadProgress:
+        $ref: "#/components/schemas/DownloadJobDto"
+      dataStoreStatus:
+        $ref: "#/components/schemas/DataStoreSummary"
+      legacyMongoStatus:
+        $ref: "#/components/schemas/MongoSummary"
+      cacheMetrics:
+        $ref: "#/components/schemas/CacheMetricsResponse"
+      maintenanceProgress:
+        $ref: "#/components/schemas/DashboardMaintenanceResponse"
+      logEntry:
+        $ref: "#/components/schemas/DashboardLogEntryDto"
+
+paths:
+  # ============================================================
+  # Book API
+  # ============================================================
+  /api/book/search:
+    post:
+      tags: [Book]
+      summary: Book検索
+      description: リクエストボディで検索フィルターを指定してBookを検索する
+      operationId: searchBooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookSearchFilter"
+      responses:
+        "200":
+          description: 検索結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "400":
+          description: リクエストパラメーターが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "503":
+          description: データベースタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+
+  /api/book/{gid}/{id}:
+    get:
+      tags: [Book]
+      summary: Book個別取得
+      description: グループIDとBookIDを指定して単一のBookを取得する
+      operationId: getBook
+      parameters:
+        - name: gid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: グループID
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: BookID
+      responses:
+        "200":
+          description: Book取得成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "404":
+          description: Bookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+    delete:
+      tags: [Book]
+      summary: Book削除ジョブ受付
+      description: |-
+        論理削除または物理削除をプロセス内キューへ登録し、直ちに202を返す。
+        同じBook・同じ削除モードの実行中ジョブがある場合は、そのジョブを冪等に返す。
+        キューとジョブ状態は永続化されないため、プロセス再起動時に失われる。
+      operationId: deleteBook
+      parameters:
+        - name: gid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: グループID
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: BookID
+        - name: remove
+          in: query
+          schema:
+            type: boolean
+          description: "削除モード（true: ページストレージとメタデータを削除、false/省略: ページストレージを削除してメタデータをDeletedで保持）"
+      responses:
+        "202":
+          description: 削除ジョブを登録、または同じ条件の実行中ジョブを返却
+          headers:
+            Location:
+              schema:
+                type: string
+              description: ジョブ状態取得URL
+            Retry-After:
+              schema:
+                type: integer
+              description: 再確認までの推奨秒数
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookDeletionJobResponse"
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: 権限不足
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: Bookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "409":
+          description: 同じBookに異なる削除モードのジョブが実行中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookDeletionJobResponse"
+        "503":
+          description: 削除キューが満杯
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: 再試行までの推奨秒数
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/book/deletion-jobs/{jobId}:
+    get:
+      tags: [Book]
+      summary: Book削除ジョブ状態取得
+      description: プロセス内に保持されている削除ジョブの状態を取得する。完了ジョブは既定で24時間保持される
+      operationId: getBookDeletionJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 削除ジョブID
+      responses:
+        "200":
+          description: ジョブ状態取得成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookDeletionJobResponse"
+        "404":
+          description: ジョブが存在しない、期限切れ、またはプロセス再起動で失われた
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/book/page:
+    get:
+      tags: [Book]
+      summary: Bookページ画像取得
+      description: 指定Bookのページ画像を取得する。リサイズ・圧縮オプション対応、キャッシュ機能付き
+      operationId: getBookPage
+      parameters:
+        - name: bookId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: BookのID
+        - name: groupId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: グループID
+        - name: page
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: ページ番号（1始まり）
+        - name: width
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: リサイズ後の画像幅（省略可能）
+        - name: height
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: リサイズ後の画像高さ（省略可能）
+        - name: size
+          in: query
+          schema:
+            type: number
+          description: 目標ファイルサイズ（バイト）
+        - name: strategy
+          in: query
+          schema:
+            type: string
+            enum: [balanced, quality, speed]
+            default: balanced
+          description: 圧縮戦略
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [jpg, jpeg, png, webp, avif]
+          description: 出力フォーマット。指定時はフォーマット変換を実行
+        - name: fallback_to_original
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: オリジナルフォールバック。true（デフォルト）の場合、変換済み画像がなければオリジナルを即時返却。falseの場合、変換完了まで待機
+      responses:
+        "200":
+          description: ページ画像データ
+          headers:
+            X-Image-Processed:
+              schema:
+                type: boolean
+              description: 返却された画像が変換処理済みかどうか
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: Bookまたはページが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "503":
+          description: 画像処理混雑（fallback_to_original=false時、並列制限超過）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/book/search/grouped:
+    post:
+      tags: [Book]
+      summary: タグタイプ別グループ検索
+      description: 指定したタグタイプ（Artists, Parodies等）でBookをグループ化して検索する
+      operationId: searchBooksGrouped
+      parameters:
+        - name: keyTagType
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/NyaTagType"
+          description: グループ化キーとなるタグタイプ
+        - name: booksPerGroup
+          in: query
+          schema:
+            type: integer
+          description: グループ内の最大Book数
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: グループのページ番号
+        - name: groupsPerPage
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: 1ページあたりのグループ数
+        - name: groupSortType
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookGroupSortType"
+          description: グループのソート種別
+        - name: isAscending
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: 昇順ソートフラグ
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookSearchFilter"
+        description: Book検索フィルター（省略可能）
+      responses:
+        "200":
+          description: グループ化された検索結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookGroupResponse"
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookGroupResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookGroupResponse"
+        "503":
+          description: データベースタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookGroupResponse"
+
+  /api/book/{gid}/{id}/title:
+    patch:
+      tags: [Book]
+      summary: Bookタイトル更新
+      description: 指定されたBookのタイトルを更新する
+      operationId: updateBookTitle
+      parameters:
+        - name: gid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: グループID
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: BookID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookTitleUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: Bookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/book/{gid}/{id}/tags:
+    post:
+      tags: [Book]
+      summary: Bookタグ追加
+      description: 指定されたBookにタグを追加する
+      operationId: addBookTags
+      parameters:
+        - name: gid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: グループID
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: BookID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookTagEditRequest"
+      responses:
+        "200":
+          description: タグ追加成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: Bookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+    delete:
+      tags: [Book]
+      summary: Bookタグ削除
+      description: 指定されたBookからタグを削除する
+      operationId: removeBookTags
+      parameters:
+        - name: gid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: グループID
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: BookID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookTagEditRequest"
+      responses:
+        "200":
+          description: タグ削除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: パラメーター不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: Bookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  # ============================================================
+  # Tag API
+  # ============================================================
+  /api/tag/search:
+    post:
+      tags: [Tag]
+      summary: タグ検索
+      description: リクエストボディで検索フィルターを指定してタグを検索する
+      operationId: searchTags
+      parameters:
+        - name: includeDisplayName
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: DisplayName（日本語表示名）をレスポンスに含めるか
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TagSearchFilter"
+      responses:
+        "200":
+          description: 検索結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+        "400":
+          description: リクエストパラメーターが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+        "503":
+          description: データベースタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagResponse"
+
+  /api/tag/autocomplete:
+    get:
+      tags: [Tag]
+      summary: タグ名オートコンプリート
+      description: provider-neutralなタグ名オートコンプリート契約。TagコレクションとTagAdditionalNameコレクションを横断検索し、英語名・日本語名の両方からサジェストする。現在のMongoDB provider実装はAtlas Searchを使用する
+      operationId: autocompleteTags
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: 検索クエリ（1文字以上、英語/日本語両対応）
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/NyaTagType"
+          description: タグタイプフィルター
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+          description: 最大件数
+      responses:
+        "200":
+          description: オートコンプリート候補
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAutocompleteResponse"
+        "400":
+          description: クエリが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAutocompleteResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAutocompleteResponse"
+        "503":
+          description: autocomplete provider利用不能（互換errorCodeはatlas_search_unavailable。名称はlegacyで、Atlasに限定されない）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAutocompleteResponse"
+
+  /api/dashboard/cache/{bookId}:
+    delete:
+      tags: [Dashboard]
+      summary: BookId指定画像キャッシュ削除
+      description: 同じBookIdを持つ全Groupの画像キャッシュを削除する互換API
+      operationId: removeDashboardBookCacheForAllGroups
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: BookIdが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/cache/{groupId}/{bookId}:
+    delete:
+      tags: [Dashboard]
+      summary: Group指定画像キャッシュ削除
+      description: GroupIdとBookIdが一致するBookの画像キャッシュだけを削除する
+      operationId: removeDashboardBookCacheForGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: 識別子が不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/backup:
+    post:
+      tags: [Dashboard]
+      summary: データストアバックアップ実行
+      description: >-
+        API内蔵バックアップを1回実行する。Dashboardの変更操作と同様に
+        LocalOnly/TrustedNetworks判定と、設定時はX-Edit-Api-Keyの検証を行う。
+      operationId: triggerDashboardBackup
+      responses:
+        "200":
+          description: バックアップ作成完了、または変更がなくスキップ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseBackupTriggerResponse"
+        "401":
+          description: 編集APIキーが不正または未指定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル／信頼ネットワーク以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "409":
+          description: バックアップがすでに実行中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "503":
+          description: バックアップ無効、設定不備、キャンセル、または実行失敗
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Dashboard概要取得
+      description: データストア、データフォルダ、ダウンロード、メンテナンス、キャッシュ、ログの概要を取得する
+      operationId: getDashboardSummary
+      responses:
+        "200":
+          description: Dashboard概要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDashboardSummaryResponse"
+
+  /api/dashboard/datastore:
+    get:
+      tags: [Dashboard]
+      summary: データストア診断取得
+      description: provider-neutralなデータストアの接続状態・トポロジー・リソース・統計を取得する
+      operationId: getDataStoreDiagnostics
+      responses:
+        "200":
+          description: データストア診断情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDataStoreDiagnosticsResponse"
+
+  /api/dashboard/mongodb:
+    get:
+      tags: [Dashboard]
+      summary: MongoDB診断取得（旧互換）
+      description: 旧MongoDB形式の診断情報を返す互換endpoint。新規クライアントは/api/dashboard/datastoreを使用する
+      operationId: getMongoDbDiagnostics
+      responses:
+        "200":
+          description: MongoDB互換診断情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseMongoDbDiagnosticsResponse"
+
+  /api/dashboard/datafolder:
+    get:
+      tags: [Dashboard]
+      summary: データフォルダ情報取得
+      operationId: getDataFolder
+      responses:
+        "200":
+          description: データフォルダ情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDataFolderResponse"
+
+  /api/dashboard/logs:
+    get:
+      tags: [Dashboard]
+      summary: Dashboardログ取得
+      description: 指定シーケンス以降のログを取得する
+      operationId: getDashboardLogs
+      parameters:
+        - name: since
+          in: query
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: このシーケンス番号より後のログだけを返す
+        - name: minLevel
+          in: query
+          schema:
+            type: string
+            enum: [Trace, Debug, Information, Warning, Error, Critical, None]
+          description: 最低ログレベル（大文字小文字を区別しない）
+      responses:
+        "200":
+          description: Dashboardログ一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDashboardLogsResponse"
+    delete:
+      tags: [Dashboard]
+      summary: Dashboardログ消去
+      description: ログリングバッファを消去する。ローカルからの変更操作のみ許可される
+      operationId: clearDashboardLogs
+      responses:
+        "200":
+          description: 消去成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/cache:
+    delete:
+      tags: [Dashboard]
+      summary: 画像キャッシュ全削除ジョブ開始
+      description: すべての画像キャッシュを非同期で削除する。進捗はキャッシュメトリクスで確認する。ローカルからの変更操作のみ許可される
+      operationId: clearDashboardCache
+      responses:
+        "202":
+          description: 削除ジョブ受付
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseCacheClearStartResponse"
+        "409":
+          description: 削除ジョブが既に実行中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseCacheClearStartResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/cache/metrics:
+    get:
+      tags: [Dashboard]
+      summary: 画像キャッシュメトリクス取得
+      operationId: getDashboardCacheMetrics
+      responses:
+        "200":
+          description: キャッシュメトリクス
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseCacheMetricsResponse"
+
+  /api/dashboard/downloads:
+    get:
+      tags: [Dashboard]
+      summary: Dashboardダウンロード一覧取得
+      operationId: getDashboardDownloads
+      responses:
+        "200":
+          description: ダウンロード一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDownloadsResponse"
+
+  /api/dashboard/downloads/intervals:
+    get:
+      tags: [Dashboard]
+      summary: ドメイン別ダウンロード間隔取得
+      operationId: getDashboardDownloadIntervals
+      responses:
+        "200":
+          description: ドメイン別間隔一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDomainIntervalsResponse"
+    patch:
+      tags: [Dashboard]
+      summary: ドメイン別ダウンロード間隔更新
+      operationId: updateDashboardDownloadIntervals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainIntervalsUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: updatesが空または不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/downloads/{jobId}/cancel:
+    post:
+      tags: [Dashboard]
+      summary: Dashboardダウンロードジョブキャンセル
+      description: URLをURLエンコードしたjobIdで指定してダウンロードジョブをキャンセルする
+      operationId: cancelDashboardDownloadJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URLエンコードされたBook URL
+      responses:
+        "200":
+          description: キャンセル成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: jobIdが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ジョブが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/downloads/{jobId}/retry:
+    post:
+      tags: [Dashboard]
+      summary: Dashboardダウンロードジョブ再試行
+      description: URLをURLエンコードしたjobIdで指定して失敗ジョブを再キューする
+      operationId: retryDashboardDownloadJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: URLエンコードされたBook URL
+      responses:
+        "200":
+          description: 再試行キュー投入成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: jobIdが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ジョブが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/webpilot/config:
+    get:
+      tags: [Dashboard]
+      summary: WebPilot設定取得
+      operationId: getWebPilotConfig
+      responses:
+        "200":
+          description: WebPilot設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebPilotConfigResponse"
+    patch:
+      tags: [Dashboard]
+      summary: WebPilot設定更新
+      operationId: updateWebPilotConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebPilotConfigUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: リクエストボディが必要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/webpilot/test:
+    post:
+      tags: [Dashboard]
+      summary: WebPilot接続試験
+      operationId: testWebPilot
+      responses:
+        "200":
+          description: 接続試験結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseConnectionTestResult"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/image-worker/config:
+    get:
+      tags: [Dashboard]
+      summary: Image Worker設定取得
+      operationId: getImageWorkerConfig
+      responses:
+        "200":
+          description: Image Worker設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseImageWorkerConfigResponse"
+    patch:
+      tags: [Dashboard]
+      summary: Image Worker設定更新
+      operationId: updateImageWorkerConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageWorkerConfigUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: リクエストボディが必要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/image-worker/test:
+    post:
+      tags: [Dashboard]
+      summary: Image Worker接続試験
+      operationId: testImageWorker
+      responses:
+        "200":
+          description: 接続試験結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseConnectionTestResult"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/maintenance:
+    get:
+      tags: [Dashboard]
+      summary: メンテナンス状態取得
+      operationId: getDashboardMaintenance
+      responses:
+        "200":
+          description: メンテナンス状態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseDashboardMaintenanceResponse"
+
+  /api/dashboard/maintenance/issues:
+    get:
+      tags: [Dashboard]
+      summary: メンテナンス問題一覧取得
+      operationId: getDashboardMaintenanceIssues
+      responses:
+        "200":
+          description: 問題一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseMaintenanceIssuesResponse"
+
+  /api/dashboard/maintenance/orphans:
+    delete:
+      tags: [Dashboard]
+      summary: 孤児ストレージエントリ削除
+      description: 現在のストレージを再検査し、DBに所有者が存在しないことを再確認してからopaque storage keyのエントリを削除する。ローカルからの変更操作のみ許可される
+      operationId: deleteOrphanStorageEntry
+      parameters:
+        - name: storageEntryKey
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Maintenance issueで返されたopaque storage entry key
+      responses:
+        "200":
+          description: 削除と空状態の確認に成功
+        "400":
+          description: storageEntryKeyが不正
+        "403":
+          description: ローカル変更権限がない
+        "404":
+          description: ストレージエントリが存在しない
+        "409":
+          description: DBに現在の所有Bookが存在する
+        "503":
+          description: DBまたはストレージが利用不能、または削除後の空状態を確認できない
+
+  /api/dashboard/maintenance/run:
+    post:
+      tags: [Dashboard]
+      summary: メンテナンス開始
+      operationId: triggerDashboardMaintenance
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceStartRequestDto"
+      responses:
+        "200":
+          description: 開始結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseMaintenanceTriggerResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/maintenance/cancel:
+    post:
+      tags: [Dashboard]
+      summary: メンテナンスキャンセル要求
+      operationId: cancelDashboardMaintenance
+      responses:
+        "200":
+          description: キャンセル要求結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/maintenance/pause:
+    post:
+      tags: [Dashboard]
+      summary: メンテナンス一時停止要求
+      operationId: pauseDashboardMaintenance
+      responses:
+        "200":
+          description: 一時停止要求結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseMaintenanceActionResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/maintenance/resume:
+    post:
+      tags: [Dashboard]
+      summary: メンテナンス再開要求
+      operationId: resumeDashboardMaintenance
+      responses:
+        "200":
+          description: 再開要求結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseMaintenanceActionResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/maintenance/runs/{runId}:
+    get:
+      tags: [Dashboard]
+      summary: メンテナンス実行詳細取得
+      operationId: getDashboardMaintenanceRun
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 実行詳細
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseMaintenanceRunDetailResponse"
+        "400":
+          description: runIdが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: 実行が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/maintenance/schedule:
+    patch:
+      tags: [Dashboard]
+      summary: メンテナンススケジュール更新
+      operationId: updateDashboardMaintenanceSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceScheduleUpdateRequest"
+      responses:
+        "200":
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: リクエストボディが必要
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "403":
+          description: ローカル以外からの変更操作
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/web-cache/config:
+    get:
+      tags: [Dashboard]
+      summary: Web Book Cache設定取得
+      operationId: getDashboardWebBookCacheConfig
+      responses:
+        "200":
+          description: Web Book Cache設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheConfigResponse"
+    patch:
+      tags: [Dashboard]
+      summary: Web Book Cache設定更新
+      operationId: updateDashboardWebBookCacheConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebBookCacheConfigDto"
+      responses:
+        "200":
+          description: 更新後の設定
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheConfigResponse"
+        "400":
+          description: 設定が不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheValidationResponse"
+
+  /api/dashboard/web-cache/config/validate:
+    post:
+      tags: [Dashboard]
+      summary: Web Book Cache設定検証
+      operationId: validateDashboardWebBookCacheConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebBookCacheConfigDto"
+      responses:
+        "200":
+          description: 検証結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheValidationResponse"
+
+  /api/dashboard/web-cache/config/reset:
+    post:
+      tags: [Dashboard]
+      summary: Web Book Cache設定リセット
+      operationId: resetDashboardWebBookCacheConfig
+      responses:
+        "200":
+          description: リセット成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/web-cache/status:
+    get:
+      tags: [Dashboard]
+      summary: Web Book Cache同期状態取得
+      operationId: getDashboardWebBookCacheStatus
+      responses:
+        "200":
+          description: 同期状態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheStatusResponse"
+
+  /api/dashboard/web-cache/sync/run:
+    post:
+      tags: [Dashboard]
+      summary: Web Book Cache同期開始
+      operationId: runDashboardWebBookCacheSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebBookCacheSyncRequest"
+      responses:
+        "200":
+          description: 同期開始結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheSyncStartResponse"
+
+  /api/dashboard/web-cache/sync/cancel:
+    post:
+      tags: [Dashboard]
+      summary: Web Book Cache同期キャンセル要求
+      operationId: cancelDashboardWebBookCacheSync
+      responses:
+        "200":
+          description: キャンセル要求成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/dashboard/web-cache/sites/{groupId}/test:
+    post:
+      tags: [Dashboard]
+      summary: Web Book Cacheサイト接続試験
+      operationId: testDashboardWebBookCacheSite
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: サイト接続試験結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheSiteTestResponse"
+        "400":
+          description: サイト設定がないまたはStartUrlが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  # ============================================================
+  # Tag Additional Name API
+  # ============================================================
+  /api/tag-additional:
+    get:
+      tags: [TagAdditionalName]
+      summary: タグ表示名一覧取得
+      description: タグの日本語表示名（AdditionalName）一覧を取得する。フィルター・ソート・ページネーション対応
+      operationId: getTagAdditionalNameList
+      parameters:
+        - name: tagType
+          in: query
+          schema:
+            $ref: "#/components/schemas/NyaTagType"
+          description: タグタイプフィルター
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AdditionalNameStatus"
+          description: ステータスフィルター
+        - name: source
+          in: query
+          schema:
+            $ref: "#/components/schemas/AdditionalNameSource"
+          description: ソースフィルター
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            default: name
+          description: ソートフィールド
+        - name: sortDesc
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: 降順ソートフラグ
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: 取得件数制限
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: ページ番号
+      responses:
+        "200":
+          description: タグ表示名一覧
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAdditionalNameListResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+    post:
+      tags: [TagAdditionalName]
+      summary: タグ表示名登録・更新（Upsert）
+      description: タグの日本語表示名を一括で登録・更新する
+      operationId: upsertTagAdditionalNames
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagAdditionalNameUpsertRequest"
+      responses:
+        "200":
+          description: 登録・更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAdditionalNameUpsertResponse"
+        "400":
+          description: リクエストが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/tag-additional/{tagType}/{name}:
+    get:
+      tags: [TagAdditionalName]
+      summary: タグ表示名個別取得
+      description: タグタイプとタグ名を指定してタグ表示名情報を取得する
+      operationId: getTagAdditionalNameByKey
+      parameters:
+        - name: tagType
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/NyaTagType"
+          description: タグタイプ
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: タグ名
+      responses:
+        "200":
+          description: タグ表示名情報
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAdditionalNameDto"
+        "404":
+          description: タグ表示名が見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/tag-additional/batch-get:
+    post:
+      tags: [TagAdditionalName]
+      summary: タグ表示名一括取得
+      description: 複数のタグ名・タグタイプを指定して表示名情報を一括取得する
+      operationId: batchGetTagAdditionalNames
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagAdditionalNameBatchGetRequest"
+      responses:
+        "200":
+          description: 一括取得結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagAdditionalNameBatchGetResponse"
+        "400":
+          description: リクエストが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  # ============================================================
+  # Download API
+  # ============================================================
+  /api/download/start:
+    post:
+      tags: [Download]
+      summary: ダウンロード開始
+      description: 指定URLのBookダウンロードをキューに追加して開始する
+      operationId: startBookDownload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookDownloadRequest"
+      responses:
+        "200":
+          description: ダウンロード開始成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: リクエスト不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "502":
+          description: スクレイピングサービス接続エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "503":
+          description: API停止中のためダウンロードを受け付けられない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "504":
+          description: リクエストタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/pause:
+    post:
+      tags: [Download]
+      summary: ダウンロード一時停止
+      description: 実行中のダウンロードを一時停止する
+      operationId: pauseBookDownload
+      responses:
+        "200":
+          description: 一時停止成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ダウンロードが見つからないまたは一時停止不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/resume:
+    post:
+      tags: [Download]
+      summary: ダウンロード再開
+      description: 一時停止中のダウンロードを再開する
+      operationId: resumeBookDownload
+      responses:
+        "200":
+          description: 再開成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ダウンロードが見つからないまたは再開不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "503":
+          description: API停止中のためダウンロードを再開できない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/pause-item:
+    post:
+      tags: [Download]
+      summary: 指定Bookダウンロード一時停止
+      description: URLを指定して対象Bookのダウンロードを一時停止する
+      operationId: pauseBookDownloadItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: 一時停止対象のBook URL
+      responses:
+        "200":
+          description: 一時停止成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: URLが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ダウンロードが見つからないまたは一時停止不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/resume-item:
+    post:
+      tags: [Download]
+      summary: 指定Bookダウンロード再開
+      description: URLを指定して対象Bookのダウンロードを再開する
+      operationId: resumeBookDownloadItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: 再開対象のBook URL
+      responses:
+        "200":
+          description: 再開成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "400":
+          description: URLが空
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ダウンロードが見つからないまたは再開不可
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "503":
+          description: API停止中のためダウンロードを再開できない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/delete:
+    post:
+      tags: [Download]
+      summary: ダウンロード削除
+      description: キューからダウンロードを削除する
+      operationId: deleteBookDownload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: ダウンロードキー（URL等）
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ダウンロードが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/queue/priority:
+    post:
+      tags: [Download]
+      summary: ダウンロード優先度更新
+      description: キュー内のダウンロードの優先度を変更する
+      operationId: updatePriority
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookDownloadRequest"
+      responses:
+        "200":
+          description: 優先度更新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: ダウンロードが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/status-all:
+    get:
+      tags: [Download]
+      summary: 全ダウンロード状況取得
+      description: すべてのBookダウンロードの状況を取得する
+      operationId: getAllBookDownloadStatuses
+      responses:
+        "200":
+          description: ダウンロード状況一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: "#/components/schemas/BookDownloadStatus"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/download/system-status:
+    get:
+      tags: [Download]
+      summary: ダウンロードシステム状況取得
+      description: ダウンロードシステム全体の稼働状況を取得する
+      operationId: getSystemStatus
+      responses:
+        "200":
+          description: システム状況
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookDownloadSystemStatus"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  # ============================================================
+  # Web Book Cache API
+  # ============================================================
+  /api/web-cache/search:
+    post:
+      tags: [WebBookCache]
+      summary: Web Book Cache検索
+      description: Web Book Cacheに保存されたBookを検索する
+      operationId: searchWebBookCache
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebBookCacheSearchRequest"
+      responses:
+        "200":
+          description: キャッシュBook検索結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebBookCacheSearchResponse"
+
+  /api/web-cache/{groupId}/{bookId}:
+    get:
+      tags: [WebBookCache]
+      summary: Web Book Cache個別取得
+      description: GroupIdとBookIdでキャッシュBookを取得する
+      operationId: getWebBookCacheBook
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: キャッシュBook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponseWebBookCacheBookDto"
+        "404":
+          description: キャッシュBookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+    delete:
+      tags: [WebBookCache]
+      summary: Web Book Cache削除
+      description: RAM上のWeb Book CacheからBookを同期的に削除する。サムネイルファイルは期限掃除に委ねる
+      operationId: deleteWebBookCacheBook
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 削除成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: キャッシュBookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/web-cache/{groupId}/{bookId}/thumbnail:
+    get:
+      tags: [WebBookCache]
+      summary: Web Book Cacheサムネイル取得
+      description: キャッシュBookのサムネイル画像を取得する
+      operationId: getWebBookCacheThumbnail
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: サムネイル画像
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/jpg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/bmp:
+              schema:
+                type: string
+                format: binary
+            image/avif:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Bookまたはサムネイルが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/web-cache/{groupId}/{bookId}/download:
+    post:
+      tags: [WebBookCache]
+      summary: Web Book Cache Bookダウンロード
+      description: キャッシュBookのURLをダウンロードキューへ追加する
+      operationId: downloadWebBookCacheBook
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bookId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ダウンロードキュー追加結果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: キャッシュBookが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  # ============================================================
+  # WebPage API
+  # ============================================================
+  /api/web/page:
+    post:
+      tags: [WebPage]
+      summary: Webページコンテンツ取得
+      description: 指定URLのWebページをスクレイピングしてBookコンテンツ一覧を取得する
+      operationId: getWebPageContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: 取得対象のURL
+      responses:
+        "200":
+          description: ページコンテンツ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnlineBookPageResponse"
+        "400":
+          description: URL不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: コンテンツが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "502":
+          description: スクレイピングサービスエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "504":
+          description: リクエストタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/web/book:
+    post:
+      tags: [WebPage]
+      summary: Bookコンテンツ取得
+      description: 指定URLのBook詳細情報をスクレイピングして取得する
+      operationId: getWebBookContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: 取得対象のURL
+      responses:
+        "200":
+          description: Bookコンテンツ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnlineBookResponse"
+        "400":
+          description: URL不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: コンテンツが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "502":
+          description: スクレイピングサービスエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "504":
+          description: リクエストタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  /api/web/book/thumbnail:
+    get:
+      tags: [WebPage]
+      summary: サムネイル取得（GET）
+      description: Base64エンコードされたURLからサムネイル画像を取得する
+      operationId: getThumbnail
+      parameters:
+        - name: eurl
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Base64エンコードされた画像URL
+      responses:
+        "200":
+          description: サムネイル画像
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/jpg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/bmp:
+              schema:
+                type: string
+                format: binary
+            image/avif:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: URL不正またはBase64フォーマットエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: サムネイルが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "502":
+          description: スクレイピングサービスエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "504":
+          description: リクエストタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+    post:
+      tags: [WebPage]
+      summary: サムネイル取得（POST）
+      description: URLを直接指定してサムネイル画像を取得する
+      operationId: postThumbnail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string
+              description: 画像URL
+      responses:
+        "200":
+          description: サムネイル画像
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/jpg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+            image/gif:
+              schema:
+                type: string
+                format: binary
+            image/bmp:
+              schema:
+                type: string
+                format: binary
+            image/avif:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: URL不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "404":
+          description: サムネイルが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "502":
+          description: スクレイピングサービスエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "504":
+          description: リクエストタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NyaApiResponse"
+
+  # ============================================================
+  # Liveness
+  # ============================================================
+  /alive:
+    get:
+      tags: [System]
+      summary: ヘルスチェック
+      description: サービスの稼働確認用エンドポイント
+      operationId: alive
+      responses:
+        "200":
+          description: サービス稼働中
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: alive
+
+components:
+  schemas:
+    # ----------------------------------------------------------
+    # 基本レスポンス
+    # ----------------------------------------------------------
+    NyaApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: 処理結果
+        message:
+          type: string
+          description: メッセージ
+
+    # ----------------------------------------------------------
+    # Book
+    # ----------------------------------------------------------
+    EBook:
+      type: object
+      properties:
+        url:
+          type: string
+          description: BookのURL
+        groupId:
+          type: string
+          description: グループID
+        bookId:
+          type: string
+          description: BookID
+        title:
+          type: string
+          description: タイトル
+        captions:
+          type: object
+          additionalProperties:
+            type: string
+          description: キャプション（言語別）
+        totalPage:
+          type: integer
+          description: 総ページ数
+        tagSet:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: タグセット（NyaTagType -> タグ名リスト）
+        uploadedTime:
+          type: string
+          format: date-time
+          description: アップロード日時
+        pageUrls:
+          type: array
+          items:
+            type: string
+          description: ページ画像URLリスト
+        status:
+          $ref: "#/components/schemas/NyaBookStatus"
+
+    NyaBookStatus:
+      type: string
+      enum: [Unknown, Standby, Downloaded, Downloading, Cancel, DownloadError, SaveError, ShortPage, Shredding, Deleted, WebBook, WebBookInPage]
+      description: Bookのステータス
+
+    BookDeletionJob:
+      type: object
+      required: [jobId, groupId, bookId, disposition, status, createdAtUtc, statusUrl]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+        bookId:
+          type: string
+        disposition:
+          type: string
+          enum: [Logical, Physical]
+        status:
+          type: string
+          enum: [Pending, Running, Succeeded, Failed]
+        createdAtUtc:
+          type: string
+          format: date-time
+        startedAtUtc:
+          type: [string, "null"]
+          format: date-time
+        completedAtUtc:
+          type: [string, "null"]
+          format: date-time
+        failureMessage:
+          type: [string, "null"]
+        statusUrl:
+          type: string
+
+    BookDeletionJobResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BookDeletionJob"
+
+    EBookResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            books:
+              type: array
+              items:
+                $ref: "#/components/schemas/EBook"
+              description: Book一覧
+            tags:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagEntity"
+              description: 関連タグ一覧
+            totalCount:
+              type: integer
+              description: 総件数
+            currentPage:
+              type: integer
+              description: 現在のページ番号
+            totalPage:
+              type: integer
+              description: 総ページ数
+            pageSize:
+              type: integer
+              description: 1ページあたりの件数
+
+    EBookGroupResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            groups:
+              type: array
+              items:
+                $ref: "#/components/schemas/EBookGroup"
+              description: グループ一覧
+            keyTagType:
+              type: string
+              description: グループ化キーのタグタイプ
+            totalGroupCount:
+              type: integer
+              description: 総グループ数
+            currentPage:
+              type: integer
+              description: 現在のページ番号
+            totalPage:
+              type: integer
+              description: 総ページ数
+
+    EBookGroup:
+      type: object
+      properties:
+        keyTagType:
+          type: string
+          description: グループ化キーのタグタイプ
+        keyTagValue:
+          type: string
+          description: グループ化キーのタグ値
+        keyTagDisplayName:
+          type: string
+          description: グループ化キーのタグ表示名（TagAdditionalNameから取得、nullの場合あり）
+        totalBooksCount:
+          type: integer
+          description: グループ内のBook総数
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/EBook"
+          description: グループ内のBook一覧
+
+    BookSearchFilter:
+      type: object
+      properties:
+        tagSet:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: タグフィルター（包含）
+        exclusionTagSet:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: タグフィルター（除外）
+        texts:
+          type: array
+          items:
+            type: string
+          description: 検索テキスト（包含）
+        exclusionTexts:
+          type: array
+          items:
+            type: string
+          description: 検索テキスト（除外）
+        bookGroups:
+          type: array
+          items:
+            type: string
+          description: Bookグループフィルター（包含）
+        exclusionBookGroups:
+          type: array
+          items:
+            type: string
+          description: Bookグループフィルター（除外）
+        bookIds:
+          type: array
+          items:
+            type: string
+          description: BookIDフィルター（包含）
+        exclusionBookIds:
+          type: array
+          items:
+            type: string
+          description: BookIDフィルター（除外）
+        missingTagTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NyaTagType"
+          description: 欠損タグタイプフィルター
+        status:
+          type: array
+          items:
+            $ref: "#/components/schemas/NyaBookStatus"
+          description: ステータスフィルター（包含）
+        exclusionStatus:
+          type: array
+          items:
+            $ref: "#/components/schemas/NyaBookStatus"
+          description: ステータスフィルター（除外）
+        lowerUploadedTime:
+          type: string
+          format: date-time
+          description: アップロード日時下限
+        upperUploadedTime:
+          type: string
+          format: date-time
+          description: アップロード日時上限
+        lowerPageCount:
+          type: integer
+          description: ページ数下限
+        upperPageCount:
+          type: integer
+          description: ページ数上限
+        sortType:
+          type: string
+          enum: [UploadedTime, Title, TotalPage, UpdatedTime]
+          description: ソート種別
+        isAsc:
+          type: boolean
+          description: 昇順フラグ
+        isAnd:
+          type: boolean
+          description: AND検索フラグ
+        limit:
+          type: integer
+          description: 取得件数制限
+        page:
+          type: integer
+          description: ページ番号
+
+    BookTitleUpdateRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          description: 新しいタイトル
+
+    BookTagEditRequest:
+      type: object
+      required: [tagType, tags]
+      properties:
+        tagType:
+          type: string
+          description: タグタイプ（NyaTagType名を文字列で指定）
+        tags:
+          type: array
+          items:
+            type: string
+          description: 追加・削除するタグ名リスト
+
+    # ----------------------------------------------------------
+    # Tag
+    # ----------------------------------------------------------
+    NyaTagType:
+      type: string
+      enum: [Unknown, Parodies, Characters, Categories, Groups, Artists, Tags, Languages]
+      description: タグの種別
+
+    TagEntity:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/NyaTagType"
+        name:
+          type: string
+          description: タグ名
+        count:
+          type: integer
+          description: 使用回数
+        displayName:
+          type: string
+          description: 日本語表示名（TagAdditionalNameから取得、Approved状態のみ。nullの場合あり）
+
+    TagAutocompleteResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            errorCode:
+              type: [string, "null"]
+              description: 機械可読なlegacy互換エラーコード。autocomplete provider利用不能時はatlas_search_unavailable（名称はAtlasに限定されない）
+            tags:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagAutocompleteSuggestion"
+              description: オートコンプリート候補
+            totalCount:
+              type: integer
+              format: int64
+              description: 検索結果の総件数
+            currentPage:
+              type: integer
+              description: 現在のページ番号
+            totalPage:
+              type: integer
+              description: 総ページ数
+            pageSize:
+              type: integer
+              description: 1ページあたりの件数
+
+    TagAutocompleteSuggestion:
+      type: object
+      properties:
+        name:
+          type: string
+          description: タグ名（英語）
+        tagType:
+          type: string
+          description: タグタイプ
+        count:
+          type: integer
+          description: 使用回数
+        displayName:
+          type: string
+          description: 日本語表示名（TagAdditionalNameから取得、nullの場合あり）
+        score:
+          type: number
+          format: double
+          description: 検索providerが計算したrelevanceスコア
+
+    TagSearchFilter:
+      type: object
+      properties:
+        tagTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NyaTagType"
+          description: タグタイプフィルター
+        names:
+          type: array
+          items:
+            type: string
+          description: タグ名フィルター
+        searchType:
+          type: string
+          enum: [Exact, Fuzzy]
+          default: Fuzzy
+          description: 検索タイプ（Exact=完全一致、Fuzzy=部分一致）
+        sortType:
+          type: string
+          enum: [Type, Name, Created, Count]
+          default: Type
+          description: ソート種別（Type=タグタイプ別、Name=名前順、Created=作成日時順、Count=件数順）
+        isAsc:
+          type: boolean
+          description: 昇順フラグ
+        isAnd:
+          type: boolean
+          description: AND検索フラグ
+        limit:
+          type: integer
+          description: 取得件数制限
+        page:
+          type: integer
+          description: ページ番号
+
+    TagResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            tags:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagEntity"
+              description: タグ一覧
+            totalCount:
+              type: integer
+              description: 総件数
+            currentPage:
+              type: integer
+              description: 現在のページ番号
+            totalPage:
+              type: integer
+              description: 総ページ数
+            pageSize:
+              type: integer
+              description: 1ページあたりの件数
+
+    # ----------------------------------------------------------
+    # Download
+    # ----------------------------------------------------------
+    BookDownloadRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: ダウンロード対象のURL
+        priority:
+          type: integer
+          description: 優先度
+        requestedBy:
+          type: string
+          description: リクエスト元の識別子
+
+    BookDownloadStatus:
+      type: object
+      properties:
+        book:
+          $ref: "#/components/schemas/EBook"
+        executionState:
+          $ref: "#/components/schemas/BookDownloadExecutionState"
+        thumbnailUrl:
+          type: string
+          description: サムネイルURL
+        currentPage:
+          type: integer
+          description: 現在のダウンロードページ
+        completedPages:
+          type: integer
+          description: 完了ページ数
+        failedPages:
+          type: integer
+          description: 失敗ページ数
+        priority:
+          type: integer
+          description: 優先度
+        downloadSpeed:
+          type: number
+          description: ダウンロード速度
+        errorMessage:
+          type: string
+          description: エラーメッセージ
+        startedAt:
+          type: string
+          format: date-time
+          description: 開始日時
+        lastUpdated:
+          type: string
+          format: date-time
+          description: 最終更新日時
+        requestedBy:
+          type: string
+          description: リクエスト元
+        hostName:
+          type: string
+          description: ホスト名
+        queuePosition:
+          type: integer
+          description: キュー内の位置
+        queuedAt:
+          type: string
+          format: date-time
+          description: キュー追加日時
+
+    BookDownloadExecutionState:
+      type: string
+      enum: [Queued, Running, Paused, Stopped, Completed, Failed, Cancelled]
+      description: ダウンロード実行状態
+
+    BookDownloadSystemStatus:
+      type: object
+      properties:
+        runningCount:
+          type: integer
+          description: 実行中のダウンロード数
+        queuedCount:
+          type: integer
+          description: キュー待ちのダウンロード数
+        pausedCount:
+          type: integer
+          description: 一時停止中のダウンロード数
+        isSystemRunning:
+          type: boolean
+          description: システム稼働フラグ
+        lastUpdated:
+          type: string
+          format: date-time
+          description: 最終更新日時
+
+    # ----------------------------------------------------------
+    # WebPage / Online
+    # ----------------------------------------------------------
+    OnlineBookPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            onlineBookPage:
+              $ref: "#/components/schemas/OnlineBookPage"
+            books:
+              type: array
+              items:
+                $ref: "#/components/schemas/EBook"
+              description: DB内に存在するBook一覧
+            tags:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagEntity"
+              description: 関連タグ一覧
+            totalCount:
+              type: integer
+              description: 総件数
+            currentPage:
+              type: integer
+              description: 現在のページ番号
+            totalPage:
+              type: integer
+              description: 総ページ数
+            pageSize:
+              type: integer
+              description: 1ページあたりの件数
+
+    OnlineBookResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            onlineBook:
+              $ref: "#/components/schemas/OnlineBook"
+            book:
+              $ref: "#/components/schemas/EBook"
+            tags:
+              type: array
+              items:
+                $ref: "#/components/schemas/TagEntity"
+              description: 関連タグ一覧
+
+    OnlineBook:
+      description: オンラインBook情報（EBookを継承、Status固定=WebBook）
+      allOf:
+        - $ref: "#/components/schemas/EBook"
+        - type: object
+          properties:
+            status:
+              $ref: "#/components/schemas/NyaBookStatus"
+              description: 常にWebBook
+
+    OnlineBookPage:
+      type: object
+      description: オンラインBookページ情報（スクレイピング結果）
+      properties:
+        url:
+          type: string
+          description: ページURL
+        currentPage:
+          type: integer
+          description: 現在のページ番号
+        totalPage:
+          type: integer
+          description: 総ページ数
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnlineBookInPage"
+          description: ページ内のBook一覧
+
+    OnlineBookInPage:
+      type: object
+      description: オンラインBookページ内の個別Book情報
+      properties:
+        url:
+          type: string
+          description: BookのURL
+        groupId:
+          type: string
+          description: グループID
+        bookId:
+          type: string
+          description: BookID
+        title:
+          type: string
+          description: タイトル
+        captions:
+          type: object
+          additionalProperties:
+            type: string
+          description: キャプション（言語別）
+        totalPage:
+          type: integer
+          description: 総ページ数
+        tagSet:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: タグセット（NyaTagType -> タグ名リスト）
+        uploadedTime:
+          type: string
+          format: date-time
+          description: アップロード日時
+        pageUrls:
+          type: array
+          items:
+            type: string
+          description: ページ画像URLリスト
+        status:
+          $ref: "#/components/schemas/NyaBookStatus"
+          description: 常にWebBookInPage
+
+    # ----------------------------------------------------------
+    # Tag Additional Name
+    # ----------------------------------------------------------
+    AdditionalNameStatus:
+      type: string
+      enum: [Pending, Approved]
+      description: タグ表示名の承認ステータス
+
+    AdditionalNameSource:
+      type: string
+      enum: [None, Dictionary, LocalLLM, Manual]
+      description: タグ表示名のソース（生成元）
+
+    TagAdditionalNameDto:
+      type: object
+      properties:
+        name:
+          type: string
+          description: タグ名
+        tagType:
+          $ref: "#/components/schemas/NyaTagType"
+        primaryAdditionalName:
+          type: string
+          description: 主表示名（日本語）
+        status:
+          $ref: "#/components/schemas/AdditionalNameStatus"
+        source:
+          $ref: "#/components/schemas/AdditionalNameSource"
+        candidates:
+          type: array
+          items:
+            type: string
+          description: 表示名候補リスト
+        count:
+          type: integer
+          description: タグ使用回数
+
+    TagAdditionalNameListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagAdditionalNameDto"
+          description: タグ表示名一覧
+        total:
+          type: integer
+          format: int64
+          description: 総件数
+        page:
+          type: integer
+          description: 現在のページ番号
+        limit:
+          type: integer
+          description: 1ページあたりの件数
+
+    TagAdditionalNameBatchGetRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: タグ名
+        tagType:
+          $ref: "#/components/schemas/NyaTagType"
+
+    TagAdditionalNameBatchGetResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagAdditionalNameDto"
+          description: 取得結果
+
+    TagAdditionalNameUpsertRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: タグ名
+        tagType:
+          $ref: "#/components/schemas/NyaTagType"
+        primaryAdditionalName:
+          type: string
+          description: 主表示名（日本語）
+        status:
+          $ref: "#/components/schemas/AdditionalNameStatus"
+        source:
+          $ref: "#/components/schemas/AdditionalNameSource"
+        candidates:
+          type: array
+          items:
+            type: string
+          description: 表示名候補リスト
+
+    TagAdditionalNameUpsertResponse:
+      type: object
+      properties:
+        created:
+          type: integer
+          description: 新規作成件数
+        updated:
+          type: integer
+          description: 更新件数
+
+    # ----------------------------------------------------------
+    # Maintenance
+    # ----------------------------------------------------------
+    MaintenanceActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: 操作成功フラグ
+        message:
+          type: string
+          description: 結果メッセージ
+        runId:
+          type: [string, "null"]
+          description: 実行ID（409レスポンス時に返却）
+
+    MaintenanceStatusResponse:
+      type: object
+      properties:
+        isRunning:
+          type: boolean
+          description: メンテナンスが実行中か
+        isProcessingBook:
+          type: boolean
+          description: 現在Bookを処理中か
+        currentRunId:
+          type: [string, "null"]
+          description: 現在の実行ID（未実行時はnull）
+        processedBooks:
+          type: integer
+          description: 現在の処理済みBook数
+        isThrottled:
+          type: boolean
+          description: CPUスロットリングで一時停止中か
+        cpuUsage:
+          type: number
+          format: double
+          description: 現在のCPU使用率（%）
+        lastExecutionTime:
+          type: [string, "null"]
+          format: date-time
+          description: 前回実行日時
+        nextExecutionTime:
+          type: [string, "null"]
+          format: date-time
+          description: 次回実行予定日時
+        lastExecutionResult:
+          type: [string, "null"]
+          description: 前回実行結果サマリー
+
+    MaintenanceRunMoEntity:
+      type: object
+      properties:
+        runId:
+          type: string
+          description: 実行ID（例：20260328-001）
+        status:
+          $ref: "#/components/schemas/MaintenanceRunStatus"
+        totalBooks:
+          type: integer
+          description: 対象Book総数
+        processedBooks:
+          type: integer
+          description: 処理済みBook数
+        results:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/CheckSummary"
+          description: チェック別集計結果
+        enabledChecks:
+          type: array
+          items:
+            type: string
+          description: 有効化されたチェック名リスト
+        startedAt:
+          type: string
+          format: date-time
+          description: 実行開始日時
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+          description: 実行完了日時
+
+    CheckSummary:
+      type: object
+      properties:
+        ok:
+          type: integer
+        warning:
+          type: integer
+        error:
+          type: integer
+        skipped:
+          type: integer
+        repaired:
+          type: integer
+
+    MaintenanceRunIssuesResponse:
+      type: object
+      properties:
+        run:
+          $ref: "#/components/schemas/MaintenanceRunMoEntity"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceTaskMoEntity"
+
+    MaintenanceTaskMoEntity:
+      type: object
+      properties:
+        runId:
+          type: string
+          description: 所属する実行ID
+        bookId:
+          type: [string, "null"]
+          description: 対象BookId（null=ディレクトリ起点チェック）
+        groupId:
+          type: [string, "null"]
+          description: 対象GroupId
+        status:
+          $ref: "#/components/schemas/MaintenanceTaskStatus"
+        checkResults:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/CheckResultDetail"
+          description: チェック別詳細結果
+        startedAt:
+          type: string
+          format: date-time
+          description: 処理開始日時
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+          description: 処理完了日時
+
+    CheckResultDetail:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/CheckResultStatus"
+        message:
+          type: [string, "null"]
+          description: 結果メッセージ
+        targetPages:
+          type: [array, "null"]
+          items:
+            type: integer
+          description: 対象ページ番号
+        processedCount:
+          type: [integer, "null"]
+          description: 処理済みページ数
+        issuePages:
+          type: [object, "null"]
+          additionalProperties:
+            type: string
+          description: 問題ページ番号と理由
+        directoryPath:
+          type: [string, "null"]
+          description: ディレクトリパス
+
+    MaintenanceRunStatus:
+      type: string
+      enum: [Running, Completed, Cancelled, Interrupted, Error]
+      description: メンテナンス実行ステータス
+
+    MaintenanceTaskStatus:
+      type: string
+      enum: [Processing, Ok, Skipped, Repaired, Warning, Error, Interrupted]
+      description: タスクステータス（値の昇順が深刻度順）
+
+    CheckResultStatus:
+      type: string
+      enum: [Ok, Repaired, Skipped, Warning, Error]
+      description: 個別チェック結果ステータス
+
+    # ----------------------------------------------------------
+    # Enums (additional)
+    # ----------------------------------------------------------
+    BookGroupSortType:
+      type: string
+      enum: [BookCount, TagName]
+      description: グループ検索のソート種別（BookCount=グループ内Book数、TagName=タグ名）
+
+    # ----------------------------------------------------------
+    # Dashboard data contracts
+    # ----------------------------------------------------------
+    DashboardSummaryResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        dataStore:
+          $ref: "#/components/schemas/DataStoreSummary"
+        mongoDb:
+          oneOf:
+            - $ref: "#/components/schemas/MongoSummary"
+            - type: "null"
+          description: 旧MongoDB互換の概要情報
+        dataFolder:
+          $ref: "#/components/schemas/DataFolderSummary"
+        downloads:
+          $ref: "#/components/schemas/DownloadsSummary"
+        webPilot:
+          $ref: "#/components/schemas/WebPilotSummary"
+        imageWorker:
+          $ref: "#/components/schemas/ImageWorkerSummary"
+        maintenance:
+          $ref: "#/components/schemas/MaintenanceSummary"
+        cache:
+          $ref: "#/components/schemas/CacheSummary"
+        logs:
+          $ref: "#/components/schemas/LogsSummary"
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+
+    DataStoreObservationAvailability:
+      type: string
+      enum: [Available, NotApplicable, Unavailable]
+
+    DataStoreSummary:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        isConnected:
+          type: boolean
+        providerVersion:
+          type: [string, "null"]
+        storeName:
+          type: [string, "null"]
+        availability:
+          $ref: "#/components/schemas/DataStoreObservationAvailability"
+        diagnosticCode:
+          type: [string, "null"]
+
+    DataStoreDiagnosticsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        isConnected:
+          type: boolean
+        providerVersion:
+          type: [string, "null"]
+        storeName:
+          type: [string, "null"]
+        availability:
+          $ref: "#/components/schemas/DataStoreObservationAvailability"
+        diagnosticCode:
+          type: [string, "null"]
+        error:
+          type: [string, "null"]
+        topology:
+          $ref: "#/components/schemas/DataStoreTopologyDto"
+        resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataStoreResourceDto"
+        statistics:
+          oneOf:
+            - $ref: "#/components/schemas/DataStoreStatisticsDto"
+            - type: "null"
+
+    DataStoreTopologyDto:
+      type: object
+      properties:
+        availability:
+          $ref: "#/components/schemas/DataStoreObservationAvailability"
+        state:
+          type: [string, "null"]
+        diagnosticCode:
+          type: [string, "null"]
+
+    DataStoreResourceDto:
+      type: object
+      properties:
+        name:
+          type: [string, "null"]
+        recordCount:
+          type: integer
+          format: int64
+        sizeBytes:
+          type: integer
+          format: int64
+        indexCount:
+          type: integer
+        availability:
+          $ref: "#/components/schemas/DataStoreObservationAvailability"
+        diagnosticCode:
+          type: [string, "null"]
+        indexes:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataStoreIndexDto"
+
+    DataStoreIndexDto:
+      type: object
+      properties:
+        name:
+          type: [string, "null"]
+        definition:
+          type: [string, "null"]
+        isUnique:
+          type: boolean
+        availability:
+          $ref: "#/components/schemas/DataStoreObservationAvailability"
+        diagnosticCode:
+          type: [string, "null"]
+
+    DataStoreStatisticsDto:
+      type: object
+      properties:
+        bookCount:
+          type: integer
+          format: int64
+        tagCount:
+          type: integer
+          format: int64
+        observedAt:
+          type: string
+          format: date-time
+        indexCount:
+          type: integer
+        dataSizeBytes:
+          type: integer
+          format: int64
+        storeName:
+          type: [string, "null"]
+        availableStoreNames:
+          type: array
+          items:
+            type: string
+
+    MongoSummary:
+      type: object
+      properties:
+        isConnected:
+          type: boolean
+        serverVersion:
+          type: [string, "null"]
+        databaseName:
+          type: [string, "null"]
+
+    DataFolderSummary:
+      type: object
+      properties:
+        isAvailable:
+          type: boolean
+        freeBytes:
+          type: [integer, "null"]
+          format: int64
+        totalBytes:
+          type: [integer, "null"]
+          format: int64
+
+    DownloadsSummary:
+      type: object
+      properties:
+        runningCount:
+          type: integer
+        queuedCount:
+          type: integer
+        failedRecentCount:
+          type: integer
+
+    WebPilotSummary:
+      type: object
+      properties:
+        isConfigured:
+          type: boolean
+        lastTestStatus:
+          type: [string, "null"]
+
+    ImageWorkerSummary:
+      type: object
+      properties:
+        isConfigured:
+          type: boolean
+        lastTestStatus:
+          type: [string, "null"]
+
+    MaintenanceSummary:
+      type: object
+      properties:
+        lastExecutionTime:
+          type: [string, "null"]
+          format: date-time
+        nextExecutionTime:
+          type: [string, "null"]
+          format: date-time
+        isRunning:
+          type: boolean
+        issuesCount:
+          type: integer
+
+    CacheSummary:
+      type: object
+      properties:
+        sizeBytes:
+          type: integer
+          format: int64
+        entryCount:
+          type: integer
+        hitRate:
+          type: number
+          format: double
+
+    LogsSummary:
+      type: object
+      properties:
+        errors24h:
+          type: integer
+        warnings24h:
+          type: integer
+
+    DashboardLogsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        latestSequence:
+          type: integer
+          format: int64
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardLogEntryDto"
+
+    DashboardLogEntryDto:
+      type: object
+      properties:
+        sequence:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: [string, "null"]
+        category:
+          type: [string, "null"]
+        message:
+          type: [string, "null"]
+        exception:
+          type: [string, "null"]
+
+    DataFolderResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        path:
+          type: [string, "null"]
+        exists:
+          type: boolean
+        isWritable:
+          type: boolean
+        totalBytes:
+          type: [integer, "null"]
+          format: int64
+        freeBytes:
+          type: [integer, "null"]
+          format: int64
+        usedBytes:
+          type: [integer, "null"]
+          format: int64
+        usageRatio:
+          type: [number, "null"]
+          format: double
+        error:
+          type: [string, "null"]
+
+    CacheMetricsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        sizeBytes:
+          type: integer
+          format: int64
+        entryCount:
+          type: integer
+        hitCount:
+          type: integer
+          format: int64
+        missCount:
+          type: integer
+          format: int64
+        hitRate:
+          type: number
+          format: double
+        evictionCount:
+          type: integer
+          format: int64
+        lastClearedAt:
+          type: [string, "null"]
+          format: date-time
+        strategy:
+          type: [string, "null"]
+        clearStatus:
+          $ref: "#/components/schemas/CacheClearStatusResponse"
+
+    CacheClearState:
+      type: string
+      enum: [Idle, Running, Completed, Failed]
+
+    CacheClearStatusResponse:
+      type: object
+      properties:
+        runId:
+          type: [string, "null"]
+        state:
+          $ref: "#/components/schemas/CacheClearState"
+        totalEntries:
+          type: integer
+        processedEntries:
+          type: integer
+        deletedEntries:
+          type: integer
+        failedEntries:
+          type: integer
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        error:
+          type: [string, "null"]
+
+    CacheClearStartResponse:
+      type: object
+      properties:
+        started:
+          type: boolean
+        message:
+          type: [string, "null"]
+        status:
+          $ref: "#/components/schemas/CacheClearStatusResponse"
+
+    DownloadsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        running:
+          type: array
+          items:
+            $ref: "#/components/schemas/DownloadJobDto"
+        queued:
+          type: array
+          items:
+            $ref: "#/components/schemas/DownloadJobDto"
+        recentFailed:
+          type: array
+          items:
+            $ref: "#/components/schemas/DownloadJobDto"
+
+    DownloadJobDto:
+      type: object
+      properties:
+        jobId:
+          type: [string, "null"]
+        bookId:
+          type: [string, "null"]
+        url:
+          type: [string, "null"]
+        status:
+          type: [string, "null"]
+        progress:
+          type: number
+          format: double
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        failureReason:
+          type: [string, "null"]
+
+    MongoDbDiagnosticsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        isConnected:
+          type: boolean
+        serverVersion:
+          type: [string, "null"]
+        databaseName:
+          type: [string, "null"]
+        replicaSetState:
+          type: [string, "null"]
+        collections:
+          type: array
+          items:
+            $ref: "#/components/schemas/MongoCollectionStatsDto"
+        error:
+          type: [string, "null"]
+
+    MongoCollectionStatsDto:
+      type: object
+      properties:
+        name:
+          type: [string, "null"]
+        documentCount:
+          type: integer
+          format: int64
+        sizeBytes:
+          type: integer
+          format: int64
+        indexCount:
+          type: integer
+        indexes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MongoIndexInfoDto"
+
+    MongoIndexInfoDto:
+      type: object
+      properties:
+        name:
+          type: [string, "null"]
+        keysJson:
+          type: [string, "null"]
+        isUnique:
+          type: boolean
+        isSparse:
+          type: boolean
+
+    DashboardMaintenanceResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        schedule:
+          $ref: "#/components/schemas/MaintenanceScheduleDto"
+        lastExecutionTime:
+          type: [string, "null"]
+          format: date-time
+        nextExecutionTime:
+          type: [string, "null"]
+          format: date-time
+        lastExecutionResult:
+          type: [string, "null"]
+        isRunning:
+          type: boolean
+        currentRunId:
+          type: [string, "null"]
+        currentProcessedBooks:
+          type: integer
+        isThrottled:
+          type: boolean
+        isPaused:
+          type: boolean
+        currentCpuUsage:
+          type: number
+          format: double
+        recentHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceHistoryEntryDto"
+
+    MaintenanceScheduleDto:
+      type: object
+      properties:
+        intervalMinutes:
+          type: [integer, "null"]
+        cpuThreshold:
+          type: [number, "null"]
+          format: double
+        isIntervalOverridden:
+          type: boolean
+        isCpuThresholdOverridden:
+          type: boolean
+        lastModified:
+          type: [string, "null"]
+          format: date-time
+
+    MaintenanceHistoryEntryDto:
+      type: object
+      properties:
+        runId:
+          type: [string, "null"]
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        result:
+          type: [string, "null"]
+        storageSyncMode:
+          type: [string, "null"]
+        processedBooks:
+          type: integer
+        issuesDetected:
+          type: integer
+
+    MaintenanceIssuesResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceIssueDto"
+
+    MaintenanceIssueDto:
+      type: object
+      properties:
+        issueType:
+          type: [string, "null"]
+        target:
+          type: [string, "null"]
+        detail:
+          type: [string, "null"]
+        detectedAt:
+          type: string
+          format: date-time
+        runId:
+          type: [string, "null"]
+
+    MaintenanceScheduleUpdateRequest:
+      type: object
+      properties:
+        intervalMinutes:
+          type: [integer, "null"]
+        cpuThreshold:
+          type: [number, "null"]
+          format: double
+
+    MaintenanceStartRequestDto:
+      type: object
+      properties:
+        mode:
+          oneOf:
+            - $ref: "#/components/schemas/MaintenanceStorageSyncModeDto"
+            - type: "null"
+
+    MaintenanceStorageSyncModeDto:
+      type: string
+      enum: [Quick, Deep]
+
+    MaintenanceTriggerResponse:
+      type: object
+      properties:
+        started:
+          type: boolean
+        runId:
+          type: [string, "null"]
+        message:
+          type: [string, "null"]
+
+    MaintenanceRunDetailResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        run:
+          $ref: "#/components/schemas/MaintenanceRunDto"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaintenanceTaskDto"
+
+    MaintenanceRunDto:
+      type: object
+      properties:
+        runId:
+          type: [string, "null"]
+        status:
+          type: [string, "null"]
+        storageSyncMode:
+          type: [string, "null"]
+        totalBooks:
+          type: integer
+        processedBooks:
+          type: integer
+        results:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/MaintenanceCheckSummaryDto"
+        enabledChecks:
+          type: array
+          items:
+            type: string
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+
+    MaintenanceCheckSummaryDto:
+      type: object
+      properties:
+        ok:
+          type: integer
+        warning:
+          type: integer
+        error:
+          type: integer
+        skipped:
+          type: integer
+        repaired:
+          type: integer
+
+    MaintenanceTaskDto:
+      type: object
+      properties:
+        runId:
+          type: [string, "null"]
+        bookId:
+          type: [string, "null"]
+        groupId:
+          type: [string, "null"]
+        status:
+          type: [string, "null"]
+        checkResults:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/MaintenanceCheckResultDetailDto"
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+
+    MaintenanceCheckResultDetailDto:
+      type: object
+      properties:
+        status:
+          type: [string, "null"]
+        message:
+          type: [string, "null"]
+        targetPages:
+          type: [array, "null"]
+          items:
+            type: integer
+        processedCount:
+          type: [integer, "null"]
+        issuePages:
+          type: [object, "null"]
+          additionalProperties:
+            type: string
+        directoryPath:
+          type: [string, "null"]
+
+    WebPilotConfigResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        baseUrl:
+          type: [string, "null"]
+        isApiKeyConfigured:
+          type: boolean
+        lastModified:
+          type: [string, "null"]
+          format: date-time
+        lastTestResult:
+          oneOf:
+            - $ref: "#/components/schemas/ConnectionTestResult"
+            - type: "null"
+
+    WebPilotConfigUpdateRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: [string, "null"]
+        apiKey:
+          type: [string, "null"]
+
+    ConnectionTestResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        testedAt:
+          type: string
+          format: date-time
+        statusCode:
+          type: [integer, "null"]
+        latencyMs:
+          type: [integer, "null"]
+          format: int64
+        message:
+          type: [string, "null"]
+
+    ImageWorkerConfigResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        baseUrl:
+          type: [string, "null"]
+        isApiKeyConfigured:
+          type: boolean
+        lastModified:
+          type: [string, "null"]
+          format: date-time
+        lastTestResult:
+          oneOf:
+            - $ref: "#/components/schemas/ConnectionTestResult"
+            - type: "null"
+
+    ImageWorkerConfigUpdateRequest:
+      type: object
+      properties:
+        baseUrl:
+          type: [string, "null"]
+        apiKey:
+          type: [string, "null"]
+
+    DomainIntervalsResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        domains:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainIntervalDto"
+
+    DomainIntervalDto:
+      type: object
+      properties:
+        domain:
+          type: [string, "null"]
+        intervalMs:
+          type: integer
+        overrideIntervalMs:
+          type: [integer, "null"]
+        lastRequestAt:
+          type: [string, "null"]
+          format: date-time
+
+    DomainIntervalsUpdateRequest:
+      type: object
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainIntervalUpdateItem"
+
+    DomainIntervalUpdateItem:
+      type: object
+      properties:
+        domain:
+          type: [string, "null"]
+        intervalMs:
+          type: [integer, "null"]
+
+    WebBookCacheBookDto:
+      type: object
+      properties:
+        groupId:
+          type: [string, "null"]
+        bookId:
+          type: [string, "null"]
+        url:
+          type: [string, "null"]
+        title:
+          type: [string, "null"]
+        captions:
+          type: object
+          additionalProperties:
+            type: string
+        totalPage:
+          type: integer
+        tagSet:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        uploadedTime:
+          type: string
+          format: date-time
+        pageUrls:
+          type: array
+          items:
+            type: string
+        thumbnailUrl:
+          type: [string, "null"]
+        sourcePageUrl:
+          type: [string, "null"]
+        firstCachedAt:
+          type: string
+          format: date-time
+        lastSyncedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        syncError:
+          type: [string, "null"]
+        autoDownloadEvaluatedAt:
+          type: [string, "null"]
+          format: date-time
+        autoDownloadMatched:
+          type: boolean
+        autoDownloadReason:
+          type: [string, "null"]
+        autoDownloadEnqueuedAt:
+          type: [string, "null"]
+          format: date-time
+
+    WebBookCacheSearchRequest:
+      type: object
+      properties:
+        keyword:
+          type: [string, "null"]
+        groupIds:
+          type: array
+          items:
+            type: string
+        bookIds:
+          type: array
+          items:
+            type: string
+        lowerUploadedTime:
+          type: [string, "null"]
+          format: date-time
+        upperUploadedTime:
+          type: [string, "null"]
+          format: date-time
+        maxPageCount:
+          type: [integer, "null"]
+        page:
+          type: integer
+          default: 1
+          minimum: 1
+        limit:
+          type: [integer, "null"]
+          default: 50
+        isAsc:
+          type: boolean
+          default: false
+
+    WebBookCacheSearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: true
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebBookCacheBookDto"
+        totalCount:
+          type: integer
+          format: int64
+        totalPage:
+          type: integer
+        currentPage:
+          type: integer
+        pageSize:
+          type: integer
+
+    WebBookCacheConfigDto:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        intervalMinutes:
+          type: integer
+          default: 60
+        initialLookbackDays:
+          type: integer
+          default: 7
+        maxPagesPerRun:
+          type: integer
+          default: 20
+        maxDetailsPerRun:
+          type: integer
+          default: 200
+        sites:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebBookCacheSiteConfigDto"
+        autoDownload:
+          $ref: "#/components/schemas/WebBookAutoDownloadConfigDto"
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+        updatedBy:
+          type: [string, "null"]
+
+    WebBookCacheSiteConfigDto:
+      type: object
+      properties:
+        groupId:
+          type: [string, "null"]
+        enabled:
+          type: boolean
+        startUrl:
+          type: [string, "null"]
+        intervalMinutes:
+          type: [integer, "null"]
+        maxPagesPerRun:
+          type: [integer, "null"]
+        maxDetailsPerRun:
+          type: [integer, "null"]
+        domainIntervalMilliseconds:
+          type: [integer, "null"]
+
+    WebBookAutoDownloadConfigDto:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        conditionMode:
+          type: string
+          default: All
+        maxPageCount:
+          type: integer
+          default: 200
+        maxAutoDownloadsPerRun:
+          type: integer
+          default: 10
+        maxAutoDownloadsPerDay:
+          type: integer
+          default: 50
+        minFreeDiskGb:
+          type: number
+          format: double
+          default: 20
+        allowedGroupIds:
+          type: array
+          items:
+            type: string
+        excludedTags:
+          type: array
+          items:
+            type: string
+
+    WebBookCacheConfigResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        config:
+          $ref: "#/components/schemas/WebBookCacheConfigDto"
+        hasRuntimeOverride:
+          type: boolean
+
+    WebBookCacheValidationResponse:
+      type: object
+      properties:
+        isValid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+
+    WebBookCacheStatusResponse:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        isRunning:
+          type: boolean
+        lastStartedAt:
+          type: [string, "null"]
+          format: date-time
+        lastFinishedAt:
+          type: [string, "null"]
+          format: date-time
+        nextRunAt:
+          type: [string, "null"]
+          format: date-time
+        currentSite:
+          type: [string, "null"]
+        pagesLoaded:
+          type: integer
+        detailsLoaded:
+          type: integer
+        createdCount:
+          type: integer
+        updatedCount:
+          type: integer
+        autoDownloadMatchedCount:
+          type: integer
+        autoDownloadEnqueuedCount:
+          type: integer
+        lastError:
+          type: [string, "null"]
+
+    WebBookCacheSyncRequest:
+      type: object
+      properties:
+        groupId:
+          type: [string, "null"]
+        force:
+          type: boolean
+
+    WebBookCacheSyncStartResponse:
+      type: object
+      properties:
+        started:
+          type: boolean
+        message:
+          type: [string, "null"]
+        status:
+          $ref: "#/components/schemas/WebBookCacheStatusResponse"
+
+    WebBookCacheSiteTestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: [string, "null"]
+        bookCount:
+          type: integer
+        currentPage:
+          type: integer
+        totalPage:
+          type: integer
+
+    BackupTriggerResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Created, Skipped]
+        backupDirectory:
+          type: [string, "null"]
+
+    NyaApiResponseDashboardSummaryResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DashboardSummaryResponse"
+
+    NyaApiResponseBackupTriggerResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/BackupTriggerResponse"
+
+    NyaApiResponseDataStoreDiagnosticsResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DataStoreDiagnosticsResponse"
+
+    NyaApiResponseMongoDbDiagnosticsResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MongoDbDiagnosticsResponse"
+
+    NyaApiResponseDataFolderResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DataFolderResponse"
+
+    NyaApiResponseDashboardLogsResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DashboardLogsResponse"
+
+    NyaApiResponseCacheMetricsResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/CacheMetricsResponse"
+
+    NyaApiResponseCacheClearStartResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/CacheClearStartResponse"
+
+    NyaApiResponseDownloadsResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DownloadsResponse"
+
+    NyaApiResponseDomainIntervalsResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DomainIntervalsResponse"
+
+    NyaApiResponseWebPilotConfigResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebPilotConfigResponse"
+
+    NyaApiResponseImageWorkerConfigResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ImageWorkerConfigResponse"
+
+    NyaApiResponseConnectionTestResult:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ConnectionTestResult"
+
+    NyaApiResponseDashboardMaintenanceResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/DashboardMaintenanceResponse"
+
+    NyaApiResponseMaintenanceIssuesResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MaintenanceIssuesResponse"
+
+    NyaApiResponseMaintenanceTriggerResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MaintenanceTriggerResponse"
+
+    NyaApiResponseMaintenanceActionResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MaintenanceActionResponse"
+
+    NyaApiResponseMaintenanceRunDetailResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/MaintenanceRunDetailResponse"
+
+    NyaApiResponseWebBookCacheBookDto:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebBookCacheBookDto"
+
+    NyaApiResponseWebBookCacheConfigResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebBookCacheConfigResponse"
+
+    NyaApiResponseWebBookCacheValidationResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebBookCacheValidationResponse"
+
+    NyaApiResponseWebBookCacheStatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebBookCacheStatusResponse"
+
+    NyaApiResponseWebBookCacheSyncStartResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebBookCacheSyncStartResponse"
+
+    NyaApiResponseWebBookCacheSiteTestResponse:
+      allOf:
+        - $ref: "#/components/schemas/NyaApiResponse"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/WebBookCacheSiteTestResponse"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: APIキー認証（localhost以外のアクセスに必要）
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Book
+    description: Book検索・取得・削除
+  - name: Tag
+    description: タグ検索
+  - name: TagAdditionalName
+    description: タグ日本語表示名（AdditionalName）管理
+  - name: Download
+    description: Bookダウンロード管理
+  - name: Maintenance
+    description: Bookデータメンテナンス（整合性チェック・修復）
+  - name: WebPage
+    description: Webスクレイピング・オンラインBook取得
+  - name: System
+    description: システム情報・ヘルスチェック

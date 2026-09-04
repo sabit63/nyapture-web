@@ -1,11 +1,9 @@
 import {
-  CircleAlert,
-  CircleCheck,
-  CircleHelp,
-  LoaderCircle,
+  FileText,
   Radio,
   Settings,
 } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
 
 import { AppShell } from './app/AppShell'
 import { Dashboard } from './components/Dashboard'
@@ -13,7 +11,7 @@ import { DownloadManager } from './components/DownloadManager'
 import { useSnackbar } from './components/Snackbar'
 import { IconButton } from './components/ui'
 import { SearchHeader, SearchPage, useSearchController } from './features/search'
-import { useApiSettings } from './features/settings'
+import { API_CONNECTION_STATE_LABELS, useApiSettings } from './features/settings'
 import { AppOverlays } from './features/shell/AppOverlays'
 import { useAppShellController } from './features/shell/useAppShellController'
 import { BookViewerRoute, resolveBookViewerRoute } from './features/viewer/BookViewerRoute'
@@ -29,9 +27,31 @@ function App() {
   const isDownloadManager = currentPath === '/download/book'
   const isDashboard = currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')
   const viewerRoute = isBookViewer ? resolveBookViewerRoute(window.location.search) : undefined
+  const navigateBack = () => {
+    try {
+      const referrer = document.referrer ? new URL(document.referrer) : null
+      const safeReferrer = referrer
+        && referrer.origin === window.location.origin
+        && referrer.pathname !== '/book/viewer'
+      if (safeReferrer && window.history.length > 1) {
+        window.history.back()
+        return
+      }
+    } catch {
+      // Fall through to the stable search destination when the referrer is malformed.
+    }
+    window.location.assign('/search')
+  }
   const { notice, notify, dismiss } = useSnackbar()
   const shellController = useAppShellController()
   const apiSettingsController = useApiSettings(notify)
+  const [bookViewerDetailsOpen, setBookViewerDetailsOpen] = useState(false)
+  const [bookViewerReady, setBookViewerReady] = useState(false)
+  const bookViewerDetailsTriggerRef = useRef<HTMLButtonElement>(null)
+  const handleBookViewerReadyChange = useCallback((ready: boolean) => {
+    setBookViewerReady(ready)
+    if (!ready) setBookViewerDetailsOpen(false)
+  }, [])
   const realtimeEnabled = isLibrarySearch || isWebSearch || isDownloadManager
   const hubConnectionState = useBookDownloadHubConnection(realtimeEnabled, apiSettingsController.apiRevision)
   const searchController = useSearchController({
@@ -43,54 +63,28 @@ function App() {
     hubConnectionState,
     notify,
   })
-  const apiStatus = apiSettingsController.activeConnectionState === 'error'
-    ? 'error'
-    : apiSettingsController.activeConnectionState === 'pending'
-      ? 'loading'
-      : apiSettingsController.activeConnectionState === 'success'
-        ? 'connected'
-        : 'unknown'
-  const ConnectionIcon = apiStatus === 'error'
-    ? CircleAlert
-    : apiStatus === 'loading'
-      ? LoaderCircle
-      : apiStatus === 'connected'
-        ? CircleCheck
-        : CircleHelp
-  const connectionLabel = apiStatus === 'error'
-    ? 'API接続エラー'
-    : apiStatus === 'loading'
-      ? 'API接続中'
-      : apiStatus === 'connected'
-        ? 'API接続済み'
-        : 'API接続未確認'
-  const realtimeIsStale = searchController.searchSyncFreshness === 'stale'
-    || hubConnectionState === 'disconnected'
-    || hubConnectionState === 'error'
-  const realtimeStatusClass = hubConnectionState === 'connected' && !realtimeIsStale
-    ? searchController.searchSyncFreshness === 'syncing' ? 'loading' : 'connected'
-    : hubConnectionState === 'connecting' || hubConnectionState === 'reconnecting'
-      ? 'loading'
-      : hubConnectionState === 'error'
-        ? 'error'
-        : realtimeIsStale
-          ? 'stale'
-          : 'unknown'
-  const realtimeConnectionLabel = hubConnectionState === 'connected'
-    ? searchController.searchSyncFreshness === 'syncing'
-      ? 'Book Statusを同期中'
-      : searchController.searchSyncFreshness === 'stale'
-        ? 'リアルタイム接続済み。Status表示が古い可能性があります'
-        : 'Book Statusリアルタイム接続済み'
-    : hubConnectionState === 'connecting'
-      ? 'Book Statusリアルタイム接続中'
-      : hubConnectionState === 'reconnecting'
-        ? 'Book Statusを再接続中。表示が古い可能性があります'
-        : hubConnectionState === 'error'
-          ? 'Book Statusリアルタイム接続エラー。表示が古い可能性があります'
-          : hubConnectionState === 'disconnected'
-            ? 'Book Statusリアルタイム切断。表示が古い可能性があります'
-            : 'Book Statusリアルタイム接続待機中'
+  const apiConnectionState = apiSettingsController.activeConnectionState
+  const realtimeConnectionLabel = !realtimeEnabled
+    ? '対象外（この画面では不要）'
+    : hubConnectionState === 'connected'
+      ? searchController.searchSyncFreshness === 'syncing'
+        ? '接続済み（同期中）'
+        : searchController.searchSyncFreshness === 'stale'
+          ? '接続済み（同期が古い可能性あり）'
+          : '接続済み'
+      : hubConnectionState === 'connecting'
+        ? '接続中'
+        : hubConnectionState === 'reconnecting'
+          ? '再接続中'
+          : hubConnectionState === 'error'
+            ? '接続エラー'
+            : hubConnectionState === 'disconnected'
+              ? '切断'
+              : '接続待機中'
+  const connectionStatus = apiConnectionState === 'success'
+    ? !realtimeEnabled || hubConnectionState === 'connected' ? 'connected' : 'warning'
+    : 'error'
+  const connectionLabel = `API: ${API_CONNECTION_STATE_LABELS[apiConnectionState]}、リアルタイム: ${realtimeConnectionLabel}`
 
   return (
     <AppShell
@@ -99,6 +93,7 @@ function App() {
       onOpenDrawer={shellController.openDrawer}
       onCloseDrawer={shellController.closeDrawer}
       onNavigate={shellController.onNavigate}
+      onBack={isBookViewer ? navigateBack : undefined}
       menuButtonRef={shellController.menuButtonRef}
       headerCenter={isDashboard ? (
         <span aria-hidden="true" />
@@ -107,26 +102,33 @@ function App() {
       )}
       headerActions={(
         <>
-          {(isLibrarySearch || isWebSearch) && (
-            <span
-              className={`connection connection--realtime connection--${realtimeStatusClass}`}
-              role="status"
-              aria-label={realtimeConnectionLabel}
-              aria-live="polite"
-              data-realtime-state={hubConnectionState}
-              data-sync-freshness={searchController.searchSyncFreshness}
-            >
-              <Radio className="connection__icon" aria-hidden="true" />
-            </span>
-          )}
           <span
-            className={`connection connection--${apiStatus}`}
+            className={`connection connection--${connectionStatus}`}
             role="status"
             aria-label={connectionLabel}
             aria-live="polite"
+            data-api-state={apiConnectionState}
+            data-realtime-state={hubConnectionState}
+            data-realtime-enabled={realtimeEnabled}
+            data-sync-freshness={searchController.searchSyncFreshness}
           >
-            <ConnectionIcon className="connection__icon" aria-hidden="true" />
+            <Radio className="connection__icon" aria-hidden="true" />
           </span>
+          {isBookViewer && (
+            <IconButton
+              ref={bookViewerDetailsTriggerRef}
+              size="default"
+              type="button"
+              aria-label="Book情報を表示"
+              aria-haspopup="dialog"
+              aria-expanded={bookViewerDetailsOpen}
+              aria-controls="book-viewer-details"
+              disabled={!bookViewerReady}
+              onClick={() => setBookViewerDetailsOpen(true)}
+            >
+              <FileText size={18} aria-hidden="true" />
+            </IconButton>
+          )}
           <IconButton
             ref={apiSettingsController.apiSettingsTriggerRef}
             className="api-settings-trigger"
@@ -152,6 +154,12 @@ function App() {
           route={viewerRoute}
           apiRevision={apiSettingsController.apiRevision}
           onTagSearch={searchController.searchByTag}
+          onTagSearchDestinationRequest={searchController.openTagSearchDestination}
+          tagDisplayNameOverrides={searchController.tagDisplayNameOverrides}
+          detailsOpen={bookViewerDetailsOpen}
+          onDetailsOpenChange={setBookViewerDetailsOpen}
+          detailsTriggerRef={bookViewerDetailsTriggerRef}
+          onReadyChange={handleBookViewerReadyChange}
         />
       ) : (
         <SearchPage controller={searchController} />

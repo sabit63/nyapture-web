@@ -2,12 +2,12 @@ import {
   CalendarDays,
   Check,
   Download,
-  Files,
   RefreshCw,
   Trash2,
   X,
 } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
+import type { MouseEvent } from 'react'
 
 import type { ApiBookCardModel } from '../api'
 import { requestBlob } from '../api'
@@ -29,6 +29,7 @@ export type BookCardProps = {
   selected: boolean
   onToggle: () => void
   onTagSearch: (tag: BookTag) => void
+  onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   isDownloadCandidate?: boolean
   isWebSearch: boolean
   onDelete?: (trigger: HTMLButtonElement) => void
@@ -42,6 +43,7 @@ export function BookCard({
   selected,
   onToggle,
   onTagSearch,
+  onTagSearchDestinationRequest,
   isDownloadCandidate = false,
   isWebSearch,
   onDelete,
@@ -72,6 +74,12 @@ export function BookCard({
       ? `${book.title}はダウンロード中`
       : `${book.title}をダウンロード`
 
+  const handleThumbnailClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!selectMode) return
+    event.preventDefault()
+    onToggle()
+  }
+
   const openTagsDialog = () => setTagsOpen(true)
 
   return (
@@ -82,12 +90,14 @@ export function BookCard({
         reloadKey={thumbnailReloadKey}
         alt={`${book.title}の表紙`}
         linkHref={viewerUrl}
-        linkAriaLabel={`${book.title}を閲覧`}
+        linkAriaLabel={`${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
         linkTabIndex={selectMode ? -1 : undefined}
+        linkOnClick={selectMode ? handleThumbnailClick : undefined}
         fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
         fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
         variant={book.cover}
       >
+        <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>
         <BookStatusBadge status={book.status} />
         {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
         {selectMode ? (
@@ -141,11 +151,21 @@ export function BookCard({
       </Thumbnail>
       <div className="book-card__body">
         <div className="book-card__title-row">
+          <time className="book-card__uploaded-time" dateTime={book.uploadedTime}>
+            <CalendarDays size={11} aria-hidden="true" />
+            {formatDisplayDate(book.uploadedTime)}
+          </time>
           <h3><a href={viewerUrl}>{book.title}</a></h3>
         </div>
         <div className="book-tags" aria-label="主要タグ">
           {inlineTags.map((tag) => (
-            <TagChip key={`${tag.type}:${tag.name}`} tag={tag} size="compact" onClick={() => onTagSearch(tag)} />
+            <TagChip
+              key={`${tag.type}:${tag.name}`}
+              tag={tag}
+              size="compact"
+              onClick={() => onTagSearch(tag)}
+              onSearchDestinationRequest={onTagSearchDestinationRequest}
+            />
           ))}
           {hiddenTagCount > 0 && (
             <Button
@@ -160,10 +180,6 @@ export function BookCard({
               +{hiddenTagCount}
             </Button>
           )}
-        </div>
-        <div className="book-card__meta">
-          <span><Files size={13} aria-hidden="true" />{book.totalPage}ページ</span>
-          <time dateTime={book.uploadedTime}><CalendarDays size={13} aria-hidden="true" />{formatDisplayDate(book.uploadedTime)}</time>
         </div>
       </div>
       <Dialog
@@ -206,6 +222,7 @@ export function BookCard({
                           tag={tag}
                           size="default"
                           title={tag.displayName && tag.displayName !== tag.name ? tag.name : undefined}
+                          onSearchDestinationRequest={onTagSearchDestinationRequest}
                           onClick={() => {
                             requestClose('submit')
                             onTagSearch(tag)

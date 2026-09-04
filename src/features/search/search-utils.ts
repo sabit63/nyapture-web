@@ -71,12 +71,19 @@ export const criteriaHasValues = (criteria: SearchCriteria) => Boolean(
   criteria.text.trim() || criteria.tags.length || criteria.dateFrom || criteria.dateTo || criteria.pagesMin || criteria.pagesMax,
 )
 
-export const createSearchUrl = (criteria: SearchCriteria, hitomiAppend?: HitomiAppend) => {
-  const isHitomiSearch = window.location.pathname === '/hitomila/search'
+export type SearchDestination = 'library' | 'hitomi'
+
+export const createSearchUrlForDestination = (
+  criteria: SearchCriteria,
+  options: { destination: SearchDestination; hitomiAppend?: HitomiAppend; origin?: string },
+): URL => {
+  const isHitomiSearch = options.destination === 'hitomi'
   const pathname = isHitomiSearch ? '/hitomila/search' : '/search'
-  const url = new URL(pathname, window.location.origin)
+  const url = new URL(pathname, options.origin ?? window.location.origin)
   const text = criteria.text.trim()
-  const tags = criteria.tags
+  const tags = isHitomiSearch
+    ? criteria.tags.filter((tag, index, all) => !isJapaneseLanguageTag(tag) || all.findIndex(isJapaneseLanguageTag) === index)
+    : criteria.tags
   if (text) url.searchParams.set('q', text)
   tags.forEach((tag) => url.searchParams.append('tag', `${tag.type}:${tag.name}`))
   if (isHitomiSearch && !tags.some(isJapaneseLanguageTag)) url.searchParams.set('japanese', 'off')
@@ -85,9 +92,36 @@ export const createSearchUrl = (criteria: SearchCriteria, hitomiAppend?: HitomiA
   if (criteria.dateTo) url.searchParams.set('dateTo', criteria.dateTo)
   if (criteria.pagesMin) url.searchParams.set('pagesMin', criteria.pagesMin)
   if (criteria.pagesMax) url.searchParams.set('pagesMax', criteria.pagesMax)
-  if (isHitomiSearch) url.searchParams.set('append', hitomiAppend ?? 'Normal')
+  if (isHitomiSearch) url.searchParams.set('append', options.hitomiAppend ?? 'Normal')
   url.searchParams.set('page', '1')
   return url
+}
+
+export const createTagSearchDestinationUrls = (
+  tag: BookTag,
+  options: {
+    hitomiAppend?: HitomiAppend
+    japaneseLanguageEnabled?: boolean
+    origin?: string
+  } = {},
+) => {
+  const resolvedTag = resolveTag(tag)
+  const hitomiTags = [resolvedTag]
+  if ((options.japaneseLanguageEnabled ?? true) && !isJapaneseLanguageTag(resolvedTag)) {
+    hitomiTags.push(JAPANESE_LANGUAGE_TAG)
+  }
+
+  return {
+    library: createSearchUrlForDestination({ ...emptyCriteria(), tags: [resolvedTag] }, {
+      destination: 'library',
+      origin: options.origin,
+    }),
+    hitomi: createSearchUrlForDestination({ ...emptyCriteria(), tags: hitomiTags }, {
+      destination: 'hitomi',
+      hitomiAppend: options.hitomiAppend,
+      origin: options.origin,
+    }),
+  }
 }
 
 export const sameTag = (left: BookTag, right: BookTag) => left.type === right.type && left.name.toLocaleLowerCase() === right.name.toLocaleLowerCase()

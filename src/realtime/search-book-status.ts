@@ -12,6 +12,29 @@ export type SearchBookStatusApplyResult = {
   changed: boolean
 }
 
+/**
+ * Completion notifications are authoritative even when their embedded book
+ * snapshot was captured before the final status was persisted. Keep the
+ * event's identity and metadata while exposing the terminal book state to
+ * search cards.
+ */
+export const normalizeSearchBookDownloadStatus = (
+  status: BookDownloadStatus,
+  isCompletionEvent = false,
+) => {
+  const isCompleted = isCompletionEvent || status.executionState === 'Completed'
+  if (!isCompleted || !status.book) return status
+
+  return {
+    ...status,
+    executionState: 'Completed' as const,
+    book: {
+      ...status.book,
+      status: 'Downloaded' as const,
+    },
+  }
+}
+
 const normalizedIdentity = (value: string | null | undefined) => value?.trim() ?? ''
 
 const timestampValue = (value: string | null | undefined) => {
@@ -64,38 +87,46 @@ export const applySearchBookDownloadStatus = (
   status: BookDownloadStatus,
   versions: SearchBookStatusVersionMap,
 ): SearchBookStatusApplyResult => {
-  if (!isNyaBookStatus(status.book?.status)) {
+  const normalizedStatus = normalizeSearchBookDownloadStatus(status)
+  if (!isNyaBookStatus(normalizedStatus.book?.status)) {
     return { books, accepted: false, changed: false }
   }
 
-  const index = findMatchingBookIndex(books, status)
+  const index = findMatchingBookIndex(books, normalizedStatus)
   if (index < 0) return { books, accepted: false, changed: false }
 
   const matchedKey = getApiBookIdentityKey(books[index])
-    ?? getDownloadStatusIdentityKey(status)
+    ?? getDownloadStatusIdentityKey(normalizedStatus)
   if (!matchedKey) return { books, accepted: false, changed: false }
 
-  const nextTimestamp = timestampValue(status.lastUpdated)
+  const nextTimestamp = timestampValue(normalizedStatus.lastUpdated)
   const currentTimestamp = versions.get(matchedKey)
+  if (currentTimestamp !== undefined && nextTimestamp !== undefined && nextTimestamp < currentTimestamp) {
+    return { books, matchedKey, accepted: false, changed: false }
+  }
+
+  const currentBook = books[index]
+  const isCompletion = normalizedStatus.executionState === 'Completed'
   if (
     currentTimestamp !== undefined
     && nextTimestamp !== undefined
-    && nextTimestamp <= currentTimestamp
+    && nextTimestamp === currentTimestamp
+    && !isCompletion
   ) {
     return { books, matchedKey, accepted: false, changed: false }
   }
+
   if (nextTimestamp !== undefined) versions.set(matchedKey, nextTimestamp)
 
-  const currentBook = books[index]
-  const downloadedThumbnailRequest = status.book.status === 'Downloaded'
+  const downloadedThumbnailRequest = normalizedStatus.book.status === 'Downloaded'
     ? createBookPageThumbnailRequest(
-      status.book.groupId ?? currentBook.apiGroupId,
-      status.book.bookId ?? currentBook.apiBookId,
-      status.book.totalPage ?? currentBook.totalPage,
+      normalizedStatus.book.groupId ?? currentBook.apiGroupId,
+      normalizedStatus.book.bookId ?? currentBook.apiBookId,
+      normalizedStatus.book.totalPage ?? currentBook.totalPage,
     )
     : undefined
   const thumbnailReloadKey = downloadedThumbnailRequest
-    ? `downloaded:${status.lastUpdated ?? 'current'}`
+    ? `downloaded:${normalizedStatus.lastUpdated ?? 'current'}`
     : currentBook.thumbnailReloadKey
   const shouldRefreshThumbnail = downloadedThumbnailRequest !== undefined && (
     currentBook.status !== 'Downloaded'
@@ -103,14 +134,14 @@ export const applySearchBookDownloadStatus = (
     || currentBook.thumbnailReloadKey !== thumbnailReloadKey
   )
 
-  if (currentBook.status === status.book.status && !shouldRefreshThumbnail) {
+  if (currentBook.status === normalizedStatus.book.status && !shouldRefreshThumbnail) {
     return { books, matchedKey, accepted: true, changed: false }
   }
 
   const next = [...books]
   next[index] = {
     ...currentBook,
-    status: status.book.status,
+    status: normalizedStatus.book.status,
     ...(downloadedThumbnailRequest ? {
       thumbnailRequest: downloadedThumbnailRequest,
       thumbnailReloadKey,
