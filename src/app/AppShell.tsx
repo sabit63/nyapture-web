@@ -1,0 +1,106 @@
+import { Menu, X } from 'lucide-react'
+import { type ReactNode, type RefObject } from 'react'
+
+import nyaIcon from '../assets/icon.png'
+import { IconButton } from '../components/ui/IconButton'
+import { isNavigationItemActive, navigationGroups } from './navigation'
+
+export type AppShellProps = {
+  currentPath: string
+  drawerOpen: boolean
+  onOpenDrawer: () => void
+  onCloseDrawer: () => void
+  onNavigate: () => void
+  menuButtonRef: RefObject<HTMLButtonElement | null>
+  headerCenter: ReactNode
+  headerActions: ReactNode
+  children: ReactNode
+}
+
+export function AppShell({
+  currentPath,
+  drawerOpen,
+  onOpenDrawer,
+  onCloseDrawer,
+  onNavigate,
+  menuButtonRef,
+  headerCenter,
+  headerActions,
+  children,
+}: AppShellProps) {
+  return (
+    <div className="app-shell">
+      <a className="skip-link" href="#main-content">本文へ移動</a>
+
+      <header className="topbar">
+        <div className="topbar__brand">
+          <IconButton
+            ref={menuButtonRef}
+            className="menu-button"
+            aria-label="ナビゲーションを開く"
+            aria-expanded={drawerOpen}
+            aria-controls="primary-navigation"
+            onClick={onOpenDrawer}
+          >
+            <Menu size={20} aria-hidden="true" />
+          </IconButton>
+          <a className="brand" href="/search" aria-label="Nyapture ホーム">
+            <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
+            <span className="brand__name">Nyapture</span>
+          </a>
+        </div>
+
+        {headerCenter}
+
+        <div className="topbar__actions">
+          {headerActions}
+        </div>
+      </header>
+
+      <button className="drawer-scrim" type="button" aria-label="ナビゲーションを閉じる" onClick={onCloseDrawer} />
+
+      <aside id="primary-navigation" className={`drawer ${drawerOpen ? 'drawer--open' : ''}`} aria-label="メインナビゲーション">
+        <div className="drawer__mobile-head">
+          <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
+          <span>Nyapture</span>
+          <IconButton aria-label="ナビゲーションを閉じる" onClick={onCloseDrawer}>
+            <X size={19} aria-hidden="true" />
+          </IconButton>
+        </div>
+        <nav>
+          {navigationGroups.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <h2>{group.label}</h2>
+              <ul>
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  const itemIsActive = isNavigationItemActive(item, currentPath)
+                  return (
+                    <li key={item.label}>
+                      {item.href ? (
+                        <a href={item.href} className={`nav-item ${itemIsActive ? 'nav-item--active' : ''}`} aria-current={itemIsActive ? 'page' : undefined} onClick={onNavigate}>
+                          <Icon size={18} />
+                          <span>{item.label}</span>
+                        </a>
+                      ) : (
+                        <button className="nav-item" type="button" aria-label={`${item.label}（準備中）`} disabled>
+                          <Icon size={18} />
+                          <span>{item.label}</span>
+                          <span className="nav-item__soon">Soon</span>
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      <main id="main-content" className="main-content" tabIndex={-1}>
+        {children}
+      </main>
+    </div>
+  )
+}

@@ -1,22 +1,16 @@
 import {
   ArrowDown,
   ArrowUp,
-  CalendarDays,
   Check,
   CircleAlert,
   CircleCheck,
   CircleHelp,
   ChevronDown,
-  Download,
   Eraser,
-  Files,
-  Gauge,
-  Globe2,
+  Eye,
+  EyeOff,
   LoaderCircle,
   ListChecks,
-  ListFilter,
-  Menu,
-  PlugZap,
   Radio,
   RefreshCw,
   Save,
@@ -26,9 +20,10 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 
 import {
+  API_PROXY_PROTOCOLS,
   ApiError,
   DEFAULT_API_SETTINGS,
   autocompleteTags,
@@ -38,6 +33,7 @@ import {
   configureApi,
   deleteBook,
   downloadWebBookCacheBook,
+  loadPersistedDisplaySettings,
   getBook,
   getBookDeletionJob,
   getErrorMessage,
@@ -49,22 +45,26 @@ import {
   mapOnlineBookToCard,
   mapWebCacheBookToCard,
   loadPersistedApiSettings,
+  normalizeDisplaySettings,
   requestBlob,
   savePersistedApiSettings,
+  savePersistedDisplaySettings,
   searchBooks as searchBooksApi,
   startBookDownload,
   testApiConnection as testApiConnectionRequest,
   validateApiSettings,
 } from './api'
-import type { ApiBookCardModel, ApiSettings, ApiSettingsErrors } from './api'
-import nyaIcon from './assets/icon.png'
-import { BookStatusBadge } from './components/BookStatusBadge'
+import type { ApiBookCardModel, ApiProxyProtocol, ApiSettings, ApiSettingsErrors, DisplaySettings } from './api'
+import { AppShell } from './app/AppShell'
+import { BookCard } from './components/BookCard'
 import { BookViewerPage } from './components/BookViewerPage'
 import { Dashboard } from './components/Dashboard'
 import { DownloadManager } from './components/DownloadManager'
 import { Snackbar, useSnackbar } from './components/Snackbar'
 import { TagChip } from './components/TagChip'
 import { Thumbnail } from './components/Thumbnail'
+import { Button } from './components/ui/Button'
+import { StatePanel } from './components/ui/StatePanel'
 import { getTagLabel, HITOMI_APPENDS, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from './models'
 import type { BookCardModel, BookDeletionJob, BookDeletionJobStatus, BookDownloadStatus, BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType } from './models'
 import { bookDownloadHubClient } from './realtime/book-download-hub'
@@ -74,6 +74,8 @@ import {
   getDownloadStatusIdentityKey,
 } from './realtime/search-book-status'
 import { useBookDownloadHubConnection } from './realtime/use-book-download-hub'
+import './components/search-dialogs.css'
+import './components/search-page.css'
 
 const parseTagParam = (value: string | null): BookTag | null => {
   if (!value) return null
@@ -391,31 +393,6 @@ const validateCriteria = (criteria: SearchCriteria) => {
   return errors
 }
 
-const formatDisplayDate = (uploadedTime: string) => uploadedTime.slice(0, 16).replace('T', ' ').replaceAll('-', '/')
-
-const navGroups = [
-  {
-    label: 'ライブラリ',
-    items: [
-      { label: '検索', icon: Search, href: '/search' },
-      { label: '未タグ検索', icon: ListFilter },
-    ],
-  },
-  {
-    label: 'オンライン',
-    items: [
-      { label: 'Hitomi', icon: Globe2, href: '/hitomila/search' },
-      { label: 'ダウンロード', icon: Download, href: '/download/book' },
-    ],
-  },
-  {
-    label: 'システム',
-    items: [
-      { label: 'Dashboard', icon: Gauge, href: '/dashboard' },
-    ],
-  },
-]
-
 function App() {
   const currentPath = window.location.pathname
   const isWebSearch = currentPath === '/hitomila/search'
@@ -455,9 +432,14 @@ function App() {
     return configureApi(persisted)
   })
   const [apiSettingsDraft, setApiSettingsDraft] = useState<ApiSettings>(() => ({ ...apiSettings }))
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadPersistedDisplaySettings())
+  const [displaySettingsDraft, setDisplaySettingsDraft] = useState<DisplaySettings>(() => ({ ...displaySettings }))
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false)
+  const [apiSettingsExpanded, setApiSettingsExpanded] = useState(true)
   const [apiSettingsErrors, setApiSettingsErrors] = useState<ApiSettingsErrors>({})
   const [apiSettingsSaveError, setApiSettingsSaveError] = useState('')
+  const [apiKeyVisible, setApiKeyVisible] = useState(false)
+  const [editKeyVisible, setEditKeyVisible] = useState(false)
   const [draftConnectionState, setDraftConnectionState] = useState<ApiConnectionState>('idle')
   const [draftConnectionError, setDraftConnectionError] = useState('')
   const [deleteDialogBooks, setDeleteDialogBooks] = useState<ApiBookCardModel[]>([])
@@ -473,7 +455,7 @@ function App() {
   const [searchError, setSearchError] = useState('')
   const [resultPage, setResultPage] = useState(() => parsePageParam(new URLSearchParams(window.location.search).get('page')))
   const [totalResultPages, setTotalResultPages] = useState(1)
-  const [paginationPageCount, setPaginationPageCount] = useState(() => window.innerWidth <= 860 ? 5 : 7)
+  const [paginationPageCount, setPaginationPageCount] = useState(() => window.innerWidth < 880 ? 5 : 7)
   const [viewerBook, setViewerBook] = useState<ApiBookCardModel>()
   const [viewerState, setViewerState] = useState<BookViewerRouteState>(() => viewerRoute?.state === 'ready' ? 'loading' : 'missing')
   const [viewerError, setViewerError] = useState('')
@@ -655,7 +637,16 @@ function App() {
   }, [drawerOpen])
 
   useEffect(() => {
-    const updatePaginationPageCount = () => setPaginationPageCount(window.innerWidth <= 860 ? 5 : 7)
+    const desktopQuery = window.matchMedia('(min-width: 880px)')
+    const closeOverlayDrawer = (event: MediaQueryListEvent) => {
+      if (event.matches) setDrawerOpen(false)
+    }
+    desktopQuery.addEventListener('change', closeOverlayDrawer)
+    return () => desktopQuery.removeEventListener('change', closeOverlayDrawer)
+  }, [])
+
+  useEffect(() => {
+    const updatePaginationPageCount = () => setPaginationPageCount(window.innerWidth < 880 ? 5 : 7)
     window.addEventListener('resize', updatePaginationPageCount)
     return () => window.removeEventListener('resize', updatePaginationPageCount)
   }, [])
@@ -923,13 +914,19 @@ function App() {
   }
 
   const openApiSettings = () => {
-    setApiSettingsDraft({ ...apiSettings })
+    const nextDraft = { ...apiSettings }
+    clearDraftConnectionCheck()
+    setApiKeyVisible(false)
+    setEditKeyVisible(false)
+    setApiSettingsExpanded(true)
+    setApiSettingsDraft(nextDraft)
+    setDisplaySettingsDraft({ ...displaySettings })
     setApiSettingsErrors({})
     setApiSettingsSaveError('')
-    setDraftConnectionState('idle')
     const dialog = apiSettingsDialogRef.current
     if (dialog && !dialog.open) dialog.showModal()
     setApiSettingsOpen(true)
+    void testApiConnection(nextDraft)
   }
 
   const clearDraftConnectionCheck = () => {
@@ -941,6 +938,8 @@ function App() {
 
   const closeApiSettings = () => {
     clearDraftConnectionCheck()
+    setApiKeyVisible(false)
+    setEditKeyVisible(false)
     const dialog = apiSettingsDialogRef.current
     if (dialog?.open) {
       dialog.close()
@@ -950,8 +949,8 @@ function App() {
     }
   }
 
-  const testApiConnection = async () => {
-    const { normalized, errors } = validateApiSettings(apiSettingsDraft)
+  const testApiConnection = async (settings: ApiSettings = apiSettingsDraft) => {
+    const { normalized, errors } = validateApiSettings(settings)
     setApiSettingsErrors(errors)
     if (!normalized) return
 
@@ -963,6 +962,7 @@ function App() {
     draftConnectionAbortRef.current = controller
     try {
       await testApiConnectionRequest(normalized, controller.signal)
+      if (controller.signal.aborted) return
       setDraftConnectionState('success')
     } catch (error) {
       if (controller.signal.aborted) return
@@ -978,18 +978,22 @@ function App() {
     const { normalized, errors } = validateApiSettings(apiSettingsDraft)
     setApiSettingsErrors(errors)
     if (!normalized) return
+    const normalizedDisplaySettings = normalizeDisplaySettings(displaySettingsDraft)
 
     try {
       savePersistedApiSettings(normalized)
+      savePersistedDisplaySettings(normalizedDisplaySettings)
     } catch {
-      setApiSettingsSaveError('API設定を端末へ保存できませんでした。ブラウザのストレージ設定を確認してください。')
+      setApiSettingsSaveError('設定を端末へ保存できませんでした。ブラウザのストレージ設定を確認してください。')
       return
     }
 
     clearDraftConnectionCheck()
     configureApi(normalized)
+    setDisplaySettings(normalizedDisplaySettings)
     setApiSettings(normalized)
     setApiSettingsDraft(normalized)
+    setDisplaySettingsDraft(normalizedDisplaySettings)
     announceActiveConnectionRef.current = 'save'
     setApiRevision((current) => current + 1)
     closeApiSettings()
@@ -1358,32 +1362,17 @@ function App() {
   }, [deleteDialogThumbnailRequest])
 
   return (
-    <div className="app-shell">
-      <a className="skip-link" href="#main-content">本文へ移動</a>
-
-      <header className="topbar">
-        <div className="topbar__brand">
-          <button
-            ref={menuButtonRef}
-            className="icon-button menu-button"
-            type="button"
-            aria-label="ナビゲーションを開く"
-            aria-expanded={drawerOpen}
-            aria-controls="primary-navigation"
-            onClick={() => setDrawerOpen(true)}
-          >
-            <Menu size={20} aria-hidden="true" />
-          </button>
-          <a className="brand" href="/search" aria-label="Nyapture ホーム">
-            <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
-            <span className="brand__name">Nyapture</span>
-          </a>
-        </div>
-
-        {isDashboard ? (
-          <span aria-hidden="true" />
-        ) : (
-          <form className="quick-search" role="search" onSubmit={submitSearch}>
+    <AppShell
+      currentPath={currentPath}
+      drawerOpen={drawerOpen}
+      onOpenDrawer={() => setDrawerOpen(true)}
+      onCloseDrawer={closeDrawer}
+      onNavigate={() => setDrawerOpen(false)}
+      menuButtonRef={menuButtonRef}
+      headerCenter={isDashboard ? (
+        <span aria-hidden="true" />
+      ) : (
+        <form className="quick-search" role="search" onSubmit={submitSearch}>
           <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : '蔵書'}を検索</label>
           <input
             id="header-search"
@@ -1411,10 +1400,10 @@ function App() {
           >
             <SlidersHorizontal size={17} aria-hidden="true" />
           </button>
-          </form>
-        )}
-
-        <div className="topbar__actions">
+        </form>
+      )}
+      headerActions={(
+        <>
           {(isLibrarySearch || isWebSearch) && (
             <span
               className={`connection connection--realtime connection--${realtimeStatusClass}`}
@@ -1439,7 +1428,7 @@ function App() {
             ref={apiSettingsTriggerRef}
             className="icon-button api-settings-trigger"
             type="button"
-            aria-label="API設定を開く"
+            aria-label="設定を開く"
             aria-haspopup="dialog"
             aria-expanded={apiSettingsOpen}
             aria-controls="api-settings-dialog"
@@ -1447,54 +1436,9 @@ function App() {
           >
             <Settings size={18} aria-hidden="true" />
           </button>
-        </div>
-      </header>
-
-      <button className="drawer-scrim" type="button" aria-label="ナビゲーションを閉じる" onClick={closeDrawer} />
-
-      <aside id="primary-navigation" className={`drawer ${drawerOpen ? 'drawer--open' : ''}`} aria-label="メインナビゲーション">
-        <div className="drawer__mobile-head">
-          <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
-          <span>Nyapture</span>
-          <button className="icon-button" type="button" aria-label="ナビゲーションを閉じる" onClick={closeDrawer}>
-            <X size={19} aria-hidden="true" />
-          </button>
-        </div>
-        <nav>
-        {navGroups.map((group) => (
-            <div className="nav-group" key={group.label}>
-              <h2>{group.label}</h2>
-              <ul>
-                {group.items.map((item) => {
-                  const Icon = item.icon
-                  const itemHref = 'href' in item ? item.href : undefined
-                  const itemIsActive = itemHref === '/dashboard'
-                    ? isDashboard
-                    : itemHref === currentPath
-                  return (
-                    <li key={item.label}>
-                      {itemHref ? (
-                        <a href={itemHref} className={`nav-item ${itemIsActive ? 'nav-item--active' : ''}`} aria-current={itemIsActive ? 'page' : undefined} onClick={() => setDrawerOpen(false)}>
-                          <Icon size={18} />
-                          <span>{item.label}</span>
-                        </a>
-                      ) : (
-                        <button className="nav-item" type="button" aria-label={`${item.label}（準備中）`} disabled>
-                          <Icon size={18} />
-                          <span>{item.label}</span>
-                          <span className="nav-item__soon">Soon</span>
-                        </button>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ))}
-        </nav>
-      </aside>
-
-      <main id="main-content" className="main-content" tabIndex={-1}>
+        </>
+      )}
+    >
         {isDownloadManager ? (
           <DownloadManager apiRevision={apiRevision} hubConnectionState={hubConnectionState} />
         ) : (
@@ -1651,15 +1595,22 @@ function App() {
           )}
 
           {searchState === 'error' && (
-            <div className="empty-state" role="alert">
-              <strong>検索結果を取得できませんでした</strong>
-              <span>{searchError}</span>
-              <button className="button button--secondary" type="button" disabled={isSearchLoading} onClick={refresh}>再試行</button>
-            </div>
+            <StatePanel
+              title="検索結果を取得できませんでした"
+              description={searchError}
+              tone="danger"
+              role="alert"
+              action={<Button disabled={isSearchLoading} onClick={refresh}>再試行</Button>}
+            />
           )}
 
           <div className={`results-stage ${isSearchLoading && visibleBooks.length === 0 ? 'results-stage--loading-empty' : ''} ${showSearchLoader ? 'results-stage--loading-visible' : ''}`}>
-            <div className="book-grid" aria-busy={isSearchLoading} inert={isSearchLoading ? true : undefined}>
+            <div
+              className="book-grid"
+              style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}
+              aria-busy={isSearchLoading}
+              inert={isSearchLoading ? true : undefined}
+            >
               {visibleBooks.map((book) => {
                 const bookKey = getBookIdentityKey(book)
                 return (
@@ -1693,10 +1644,10 @@ function App() {
           </div>
 
           {searchState === 'success' && visibleBooks.length === 0 && (
-            <div className="empty-state" role="status">
-              <Search size={24} aria-hidden="true" />
-              <strong>{hasCriteria ? `条件に一致する${isWebSearch ? 'Web検索結果' : '蔵書'}がありません` : `${isWebSearch ? 'Web検索結果' : '蔵書'}はありません`}</strong>
-            </div>
+            <StatePanel
+              title={hasCriteria ? `条件に一致する${isWebSearch ? 'Web検索結果' : '蔵書'}がありません` : `${isWebSearch ? 'Web検索結果' : '蔵書'}はありません`}
+              icon={<Search size={24} />}
+            />
           )}
 
           {visibleBooks.length > 0 && totalResultPages > 1 && (
@@ -1719,7 +1670,7 @@ function App() {
         <dialog
           ref={advancedDialogRef}
           id="advanced-search-dialog"
-          className="advanced-dialog"
+          className="ui-dialog advanced-dialog"
           aria-labelledby="advanced-search-title"
           onCancel={(event) => {
             event.preventDefault()
@@ -1931,7 +1882,7 @@ function App() {
         <dialog
           ref={apiSettingsDialogRef}
           id="api-settings-dialog"
-          className="advanced-dialog api-settings-dialog"
+          className="ui-dialog advanced-dialog api-settings-dialog"
           aria-labelledby="api-settings-title"
           onCancel={(event) => {
             event.preventDefault()
@@ -1946,6 +1897,8 @@ function App() {
             draftConnectionAbortRef.current?.abort()
             draftConnectionAbortRef.current = null
             setDraftConnectionState('idle')
+            setApiKeyVisible(false)
+            setEditKeyVisible(false)
             setApiSettingsOpen(false)
             window.requestAnimationFrame(() => apiSettingsTriggerRef.current?.focus())
           }}
@@ -1966,119 +1919,279 @@ function App() {
           <form ref={apiSettingsPanelRef} className="advanced-dialog__panel api-settings-dialog__panel" noValidate onSubmit={saveApiSettings}>
             <header className="advanced-dialog__header">
               <div>
-                <h2 id="api-settings-title">API設定</h2>
+                <h2 id="api-settings-title">設定</h2>
               </div>
               <div className="api-settings-dialog__header-actions">
-                <span
+                <button
                   className={`api-settings__connection-indicator api-settings__connection-indicator--${draftConnectionState}`}
-                  role="status"
+                  type="button"
                   aria-live="polite"
                   aria-atomic="true"
                   aria-label={`API接続状態: ${draftConnectionStatusLabel}`}
+                  title="接続確認"
+                  disabled={draftConnectionState === 'pending'}
+                  onClick={() => { void testApiConnection() }}
                 >
                   <span className="api-settings__connection-indicator-dot" aria-hidden="true" />
-                  <span className={draftConnectionState === 'pending' ? 'sr-only' : undefined}>{draftConnectionStatusLabel}</span>
-                </span>
-                <button className="icon-button" type="button" aria-label="API設定を閉じる" onClick={closeApiSettings}>
+                  <span>{draftConnectionStatusLabel}</span>
+                </button>
+                <button className="icon-button" type="button" aria-label="設定を閉じる" onClick={closeApiSettings}>
                   <X size={19} aria-hidden="true" />
                 </button>
               </div>
             </header>
 
             <div className="advanced-dialog__body">
-              <section className="advanced-dialog__field">
-                <label htmlFor="api-settings-url">APIのURL</label>
-                <input
-                  id="api-settings-url"
-                  type="url"
-                  required
-                  value={apiSettingsDraft.apiUrl}
-                  placeholder="http://localhost:5270"
-                  autoComplete="url"
-                  aria-invalid={Boolean(apiSettingsErrors.apiUrl)}
-                  aria-describedby={apiSettingsErrors.apiUrl ? 'api-settings-url-error' : undefined}
-                  onChange={(event) => {
-                    clearDraftConnectionCheck()
-                    setApiSettingsSaveError('')
-                    setApiSettingsDraft((current) => ({ ...current, apiUrl: event.target.value }))
-                    setApiSettingsErrors((current) => ({ ...current, apiUrl: undefined }))
-                  }}
-                />
-                {apiSettingsErrors.apiUrl && <p id="api-settings-url-error" className="advanced-field-error" role="alert">{apiSettingsErrors.apiUrl}</p>}
+              <details
+                className="api-settings-dialog__section api-settings-dialog__section--expandable"
+                aria-labelledby="api-settings-section-title"
+                open={apiSettingsExpanded}
+                onToggle={(event) => setApiSettingsExpanded(event.currentTarget.open)}
+              >
+                <summary id="api-settings-section-title" className="api-settings-dialog__section-heading">
+                  <span>API</span>
+                  <ChevronDown size={15} aria-hidden="true" />
+                </summary>
+                <div className="api-settings-dialog__content">
+                  <section className="advanced-dialog__field">
+                    <label htmlFor="api-settings-url">URL</label>
+                    <input
+                      id="api-settings-url"
+                      type="url"
+                      required
+                      value={apiSettingsDraft.apiUrl}
+                      placeholder="http://localhost:5270"
+                      autoComplete="url"
+                      aria-invalid={Boolean(apiSettingsErrors.apiUrl)}
+                      aria-describedby={apiSettingsErrors.apiUrl ? 'api-settings-url-error' : undefined}
+                      onChange={(event) => {
+                        clearDraftConnectionCheck()
+                        setApiSettingsSaveError('')
+                        setApiSettingsDraft((current) => ({ ...current, apiUrl: event.target.value }))
+                        setApiSettingsErrors((current) => ({ ...current, apiUrl: undefined }))
+                      }}
+                    />
+                    {apiSettingsErrors.apiUrl && <p id="api-settings-url-error" className="advanced-field-error" role="alert">{apiSettingsErrors.apiUrl}</p>}
+                  </section>
+
+                  <section className="advanced-dialog__field">
+                    <label htmlFor="api-settings-timeout">タイムアウト</label>
+                    <input
+                      id="api-settings-timeout"
+                      type="number"
+                      required
+                      min="1"
+                      max="3600"
+                      step="1"
+                      inputMode="numeric"
+                      value={apiSettingsDraft.timeoutSeconds}
+                      aria-invalid={Boolean(apiSettingsErrors.timeoutSeconds)}
+                      aria-describedby={apiSettingsErrors.timeoutSeconds ? 'api-settings-timeout-error' : undefined}
+                      onChange={(event) => {
+                        clearDraftConnectionCheck()
+                        setApiSettingsSaveError('')
+                        setApiSettingsDraft((current) => ({ ...current, timeoutSeconds: Number(event.target.value) }))
+                        setApiSettingsErrors((current) => ({ ...current, timeoutSeconds: undefined }))
+                      }}
+                    />
+                    {apiSettingsErrors.timeoutSeconds && <p id="api-settings-timeout-error" className="advanced-field-error" role="alert">{apiSettingsErrors.timeoutSeconds}</p>}
+                  </section>
+
+                  <fieldset className="api-settings__key-group">
+                    <legend>APIキー</legend>
+                    <section className="advanced-dialog__field">
+                      <label htmlFor="api-settings-api-key">APIKey</label>
+                      <div className="api-settings__secret-input">
+                        <input
+                          id="api-settings-api-key"
+                          type={apiKeyVisible ? 'text' : 'password'}
+                          value={apiSettingsDraft.apiKey}
+                          autoComplete="new-password"
+                          onChange={(event) => {
+                            clearDraftConnectionCheck()
+                            setApiSettingsSaveError('')
+                            setApiSettingsDraft((current) => ({ ...current, apiKey: event.target.value }))
+                          }}
+                        />
+                        <button
+                          className="icon-button api-settings__secret-toggle"
+                          type="button"
+                          aria-label={apiKeyVisible ? 'APIKeyを非表示' : 'APIKeyを表示'}
+                          aria-pressed={apiKeyVisible}
+                          onClick={() => setApiKeyVisible((current) => !current)}
+                        >
+                          {apiKeyVisible
+                            ? <EyeOff size={17} aria-hidden="true" />
+                            : <Eye size={17} aria-hidden="true" />}
+                        </button>
+                      </div>
+                    </section>
+
+                    <section className="advanced-dialog__field">
+                      <label htmlFor="api-settings-edit-key">EditKey</label>
+                      <div className="api-settings__secret-input">
+                        <input
+                          id="api-settings-edit-key"
+                          type={editKeyVisible ? 'text' : 'password'}
+                          value={apiSettingsDraft.editKey}
+                          autoComplete="new-password"
+                          onChange={(event) => {
+                            clearDraftConnectionCheck()
+                            setApiSettingsSaveError('')
+                            setApiSettingsDraft((current) => ({ ...current, editKey: event.target.value }))
+                          }}
+                        />
+                        <button
+                          className="icon-button api-settings__secret-toggle"
+                          type="button"
+                          aria-label={editKeyVisible ? 'EditKeyを非表示' : 'EditKeyを表示'}
+                          aria-pressed={editKeyVisible}
+                          onClick={() => setEditKeyVisible((current) => !current)}
+                        >
+                          {editKeyVisible
+                            ? <EyeOff size={17} aria-hidden="true" />
+                            : <Eye size={17} aria-hidden="true" />}
+                        </button>
+                      </div>
+                    </section>
+                  </fieldset>
+                </div>
+              </details>
+
+              <section className="api-settings-dialog__section" aria-labelledby="proxy-settings-section-title" hidden>
+                <div className="api-settings-dialog__section-heading">
+                  <input
+                    className="api-settings__proxy-toggle"
+                    type="checkbox"
+                    checked={apiSettingsDraft.proxy.enabled}
+                    aria-label="Proxyを有効化"
+                    onChange={(event) => {
+                      clearDraftConnectionCheck()
+                      setApiSettingsSaveError('')
+                      setApiSettingsDraft((current) => ({
+                        ...current,
+                        proxy: { ...current.proxy, enabled: event.target.checked },
+                      }))
+                      setApiSettingsErrors((current) => ({
+                        ...current,
+                        proxyEnabled: undefined,
+                        proxyProtocol: undefined,
+                        proxyServerAddress: undefined,
+                        proxyPort: undefined,
+                      }))
+                    }}
+                  />
+                  <h3 id="proxy-settings-section-title">Proxy</h3>
+                </div>
+                <div className="api-settings__proxy-grid">
+                  <section className="advanced-dialog__field">
+                    <label htmlFor="api-settings-proxy-protocol">Protocol</label>
+                    <select
+                      id="api-settings-proxy-protocol"
+                      value={apiSettingsDraft.proxy.protocol}
+                      disabled={!apiSettingsDraft.proxy.enabled}
+                      aria-invalid={Boolean(apiSettingsErrors.proxyProtocol)}
+                      aria-describedby={apiSettingsErrors.proxyProtocol ? 'api-settings-proxy-protocol-error' : undefined}
+                      onChange={(event) => {
+                        clearDraftConnectionCheck()
+                        setApiSettingsSaveError('')
+                        setApiSettingsDraft((current) => ({
+                          ...current,
+                          proxy: { ...current.proxy, protocol: event.target.value as ApiProxyProtocol },
+                        }))
+                        setApiSettingsErrors((current) => ({ ...current, proxyProtocol: undefined }))
+                      }}
+                    >
+                      {API_PROXY_PROTOCOLS.map((protocol) => <option key={protocol} value={protocol}>{protocol}</option>)}
+                    </select>
+                    {apiSettingsErrors.proxyProtocol && <p id="api-settings-proxy-protocol-error" className="advanced-field-error" role="alert">{apiSettingsErrors.proxyProtocol}</p>}
+                  </section>
+
+                  <section className="advanced-dialog__field">
+                    <label htmlFor="api-settings-proxy-server-address">Server Address</label>
+                    <input
+                      id="api-settings-proxy-server-address"
+                      type="text"
+                      value={apiSettingsDraft.proxy.serverAddress}
+                      disabled={!apiSettingsDraft.proxy.enabled}
+                      autoComplete="off"
+                      aria-invalid={Boolean(apiSettingsErrors.proxyServerAddress)}
+                      aria-describedby={apiSettingsErrors.proxyServerAddress ? 'api-settings-proxy-server-address-error' : undefined}
+                      onChange={(event) => {
+                        clearDraftConnectionCheck()
+                        setApiSettingsSaveError('')
+                        setApiSettingsDraft((current) => ({
+                          ...current,
+                          proxy: { ...current.proxy, serverAddress: event.target.value },
+                        }))
+                        setApiSettingsErrors((current) => ({ ...current, proxyServerAddress: undefined }))
+                      }}
+                    />
+                    {apiSettingsErrors.proxyServerAddress && <p id="api-settings-proxy-server-address-error" className="advanced-field-error" role="alert">{apiSettingsErrors.proxyServerAddress}</p>}
+                  </section>
+
+                  <section className="advanced-dialog__field">
+                    <label htmlFor="api-settings-proxy-port">Port</label>
+                    <input
+                      id="api-settings-proxy-port"
+                      type="number"
+                      min="1"
+                      max="65535"
+                      step="1"
+                      inputMode="numeric"
+                      value={apiSettingsDraft.proxy.port ?? ''}
+                      disabled={!apiSettingsDraft.proxy.enabled}
+                      aria-invalid={Boolean(apiSettingsErrors.proxyPort)}
+                      aria-describedby={apiSettingsErrors.proxyPort ? 'api-settings-proxy-port-error' : undefined}
+                      onChange={(event) => {
+                        clearDraftConnectionCheck()
+                        setApiSettingsSaveError('')
+                        setApiSettingsDraft((current) => ({
+                          ...current,
+                          proxy: {
+                            ...current.proxy,
+                            port: event.target.value === '' ? null : Number(event.target.value),
+                          },
+                        }))
+                        setApiSettingsErrors((current) => ({ ...current, proxyPort: undefined }))
+                      }}
+                    />
+                    {apiSettingsErrors.proxyPort && <p id="api-settings-proxy-port-error" className="advanced-field-error" role="alert">{apiSettingsErrors.proxyPort}</p>}
+                  </section>
+                </div>
               </section>
 
-              <section className="advanced-dialog__field">
-                <label htmlFor="api-settings-api-key">APIKey（任意）</label>
-                <input
-                  id="api-settings-api-key"
-                  type="password"
-                  value={apiSettingsDraft.apiKey}
-                  autoComplete="new-password"
-                  onChange={(event) => {
-                    clearDraftConnectionCheck()
-                    setApiSettingsSaveError('')
-                    setApiSettingsDraft((current) => ({ ...current, apiKey: event.target.value }))
-                  }}
-                />
-              </section>
-
-              <section className="advanced-dialog__field">
-                <label htmlFor="api-settings-edit-key">EditKey（任意）</label>
-                <input
-                  id="api-settings-edit-key"
-                  type="password"
-                  value={apiSettingsDraft.editKey}
-                  autoComplete="new-password"
-                  onChange={(event) => {
-                    clearDraftConnectionCheck()
-                    setApiSettingsSaveError('')
-                    setApiSettingsDraft((current) => ({ ...current, editKey: event.target.value }))
-                  }}
-                />
-              </section>
-
-              <section className="advanced-dialog__field">
-                <label htmlFor="api-settings-timeout">タイムアウト秒数</label>
-                <input
-                  id="api-settings-timeout"
-                  type="number"
-                  required
-                  min="1"
-                  max="3600"
-                  step="1"
-                  inputMode="numeric"
-                  value={apiSettingsDraft.timeoutSeconds}
-                  aria-invalid={Boolean(apiSettingsErrors.timeoutSeconds)}
-                  aria-describedby={apiSettingsErrors.timeoutSeconds ? 'api-settings-timeout-error' : undefined}
-                  onChange={(event) => {
-                    clearDraftConnectionCheck()
-                    setApiSettingsSaveError('')
-                    setApiSettingsDraft((current) => ({ ...current, timeoutSeconds: Number(event.target.value) }))
-                    setApiSettingsErrors((current) => ({ ...current, timeoutSeconds: undefined }))
-                  }}
-                />
-                {apiSettingsErrors.timeoutSeconds && <p id="api-settings-timeout-error" className="advanced-field-error" role="alert">{apiSettingsErrors.timeoutSeconds}</p>}
+              <section className="api-settings-dialog__section" aria-labelledby="display-settings-section-title">
+                <h3 id="display-settings-section-title">表示設定</h3>
+                <section className="advanced-dialog__field">
+                  <select
+                    id="display-settings-thumbnail-columns"
+                    value={displaySettingsDraft.thumbnailColumns}
+                    aria-label="サムネイル列数"
+                    onChange={(event) => {
+                      setApiSettingsSaveError('')
+                      setDisplaySettingsDraft((current) => ({
+                        ...current,
+                        thumbnailColumns: Number(event.target.value) as DisplaySettings['thumbnailColumns'],
+                      }))
+                    }}
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                  </select>
+                </section>
               </section>
 
               {draftConnectionState === 'error' && (
-                <p className="advanced-field-error" role="alert">{draftConnectionError}</p>
+                <p className="advanced-field-error api-settings-dialog__body-error" role="alert">{draftConnectionError}</p>
               )}
-              {apiSettingsSaveError && <p className="advanced-field-error" role="alert">{apiSettingsSaveError}</p>}
+              {apiSettingsSaveError && <p className="advanced-field-error api-settings-dialog__body-error" role="alert">{apiSettingsSaveError}</p>}
             </div>
 
             <footer className="advanced-dialog__footer api-settings-dialog__footer">
-              <button
-                className="button button--ghost api-settings-dialog__action"
-                type="button"
-                aria-label="接続確認"
-                title="接続確認"
-                disabled={draftConnectionState === 'pending'}
-                onClick={testApiConnection}
-              >
-                {draftConnectionState === 'pending'
-                  ? <LoaderCircle className="api-settings-dialog__action-icon api-settings-dialog__action-icon--spinning" size={18} aria-hidden="true" />
-                  : <PlugZap className="api-settings-dialog__action-icon" size={18} aria-hidden="true" />}
-              </button>
               <button
                 className="button button--danger-ghost api-settings-dialog__action"
                 type="button"
@@ -2100,7 +2213,7 @@ function App() {
         <dialog
           ref={deleteDialogRef}
           id="library-delete-dialog"
-          className="delete-dialog"
+          className="ui-dialog delete-dialog"
           aria-labelledby="delete-dialog-title"
           aria-describedby="delete-dialog-description"
           onCancel={(event) => {
@@ -2215,188 +2328,7 @@ function App() {
         </dialog>
 
         <Snackbar notice={notice} onDismiss={dismiss} />
-      </main>
-    </div>
+    </AppShell>
   )
 }
-
-function BookCard({
-  book,
-  selectMode,
-  selected,
-  onToggle,
-  onTagSearch,
-  isDownloadCandidate = false,
-  isWebSearch,
-  onDelete,
-  onRefresh,
-  onDownload,
-}: {
-  book: BookCardModel
-  selectMode: boolean
-  selected: boolean
-  onToggle: () => void
-  onTagSearch: (tag: BookTag) => void
-  isDownloadCandidate?: boolean
-  isWebSearch: boolean
-  onDelete?: (trigger: HTMLButtonElement) => void
-  onRefresh?: () => void
-  onDownload?: () => void
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const tagsPanelRef = useRef<HTMLDivElement>(null)
-  const tagsPointerStartedOutsideRef = useRef(false)
-  const tagsTriggerRef = useRef<HTMLButtonElement>(null)
-  const thumbnailRequest = (book as ApiBookCardModel).thumbnailRequest
-  const thumbnailReloadKey = (book as ApiBookCardModel).thumbnailReloadKey
-  const sourceLabel = book.sourceLabel?.trim() || undefined
-  const loadThumbnail = useCallback((signal: AbortSignal) => {
-    if (!thumbnailRequest) return Promise.reject(new Error('Thumbnail request is unavailable'))
-    return requestBlob(thumbnailRequest.path, { query: thumbnailRequest.query, headers: { Accept: 'image/*' }, signal })
-  }, [thumbnailRequest])
-  const inlineTags = [
-    ...book.tags.filter((tag) => tag.type === 'Artists'),
-    ...book.tags.filter((tag) => tag.type === 'Groups'),
-  ].slice(0, 2)
-  const hiddenTagCount = Math.max(0, book.tags.length - inlineTags.length)
-  const viewerUrl = `/book/viewer?id=${encodeURIComponent(book.bookId)}&gid=${encodeURIComponent(book.groupId)}`
-  const downloadDisabled = book.status === 'Downloaded' || book.status === 'Downloading'
-  const downloadLabel = book.status === 'Downloaded'
-    ? `${book.title}はダウンロード済み`
-    : book.status === 'Downloading'
-      ? `${book.title}はダウンロード中`
-      : `${book.title}をダウンロード`
-
-  const openTagsDialog = () => dialogRef.current?.showModal()
-  const closeTagsDialog = () => dialogRef.current?.close()
-
-  return (
-    <article className={`book-card ${selected ? 'book-card--selected' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`} data-book-status={book.status}>
-      <Thumbnail
-        src={book.thumbnailUrl}
-        load={thumbnailRequest ? loadThumbnail : undefined}
-        reloadKey={thumbnailReloadKey}
-        alt={`${book.title}の表紙`}
-        linkHref={viewerUrl}
-        linkAriaLabel={`${book.title}を閲覧`}
-        linkTabIndex={selectMode ? -1 : undefined}
-        fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
-        fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
-        variant={book.cover}
-      >
-        <BookStatusBadge status={book.status} />
-        {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
-        {selectMode ? (
-          <button className="card-select" type="button" aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`} aria-pressed={selected} onClick={onToggle}>
-            {selected && <Check size={15} />}
-          </button>
-        ) : isWebSearch ? (
-          <div className="card-actions" aria-label={`${book.title}の操作`}>
-            <button className="card-action" type="button" aria-label={`${book.title}を再読み込み`} onClick={() => onRefresh?.()}>
-              <RefreshCw size={16} aria-hidden="true" />
-            </button>
-            <button className="card-action" type="button" aria-label={downloadLabel} disabled={downloadDisabled} onClick={() => onDownload?.()}>
-              <Download size={16} aria-hidden="true" />
-            </button>
-          </div>
-        ) : (
-          <button className="card-action card-action--delete" type="button" aria-label={`${book.title}を削除`} onClick={(event) => onDelete?.(event.currentTarget)}>
-            <Trash2 size={17} aria-hidden="true" />
-          </button>
-        )}
-      </Thumbnail>
-      <div className="book-card__body">
-        <div className="book-card__title-row">
-          <h3><a href={viewerUrl}>{book.title}</a></h3>
-        </div>
-        <div className="book-tags" aria-label="主要タグ">
-          {inlineTags.map((tag) => (
-            <TagChip key={`${tag.type}:${tag.name}`} tag={tag} size="compact" onClick={() => onTagSearch(tag)} />
-          ))}
-          {hiddenTagCount > 0 && (
-            <button
-              ref={tagsTriggerRef}
-              className="tag-overflow"
-              type="button"
-              aria-label={`${book.title}の残り${hiddenTagCount}件のタグを表示`}
-              onClick={openTagsDialog}
-            >
-              +{hiddenTagCount}
-            </button>
-          )}
-        </div>
-        <div className="book-card__meta">
-          <span><Files size={13} aria-hidden="true" />{book.totalPage}ページ</span>
-          <time dateTime={book.uploadedTime}><CalendarDays size={13} aria-hidden="true" />{formatDisplayDate(book.uploadedTime)}</time>
-        </div>
-      </div>
-      <dialog
-        ref={dialogRef}
-        className="tags-dialog"
-        aria-labelledby={`tags-dialog-title-${book.bookId}`}
-        onClose={() => tagsTriggerRef.current?.focus()}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault()
-            closeTagsDialog()
-          }
-        }}
-        onPointerDown={(event) => {
-          const panel = tagsPanelRef.current
-          if (!panel) return
-          const rect = panel.getBoundingClientRect()
-          tagsPointerStartedOutsideRef.current = event.clientX < rect.left
-            || event.clientX > rect.right
-            || event.clientY < rect.top
-            || event.clientY > rect.bottom
-        }}
-        onClick={(event) => {
-          if (event.target === event.currentTarget && tagsPointerStartedOutsideRef.current) closeTagsDialog()
-          tagsPointerStartedOutsideRef.current = false
-        }}
-      >
-        <div ref={tagsPanelRef} className="tags-dialog__panel">
-          <header className="tags-dialog__header">
-            <div>
-              <span>タグ一覧</span>
-              <h2 id={`tags-dialog-title-${book.bookId}`}>{book.title}</h2>
-            </div>
-            <button className="icon-button" type="button" aria-label="タグ一覧を閉じる" onClick={closeTagsDialog}>
-              <X size={19} aria-hidden="true" />
-            </button>
-          </header>
-          <div className="tags-dialog__body">
-            {TAG_TYPE_ORDER.map((type) => {
-              const tags = book.tags.filter((tag) => tag.type === type)
-              if (!tags.length) return null
-              return (
-                <section className="tags-dialog__group" key={type} aria-labelledby={`tags-${book.bookId}-${type}`}>
-                  <div className="tags-dialog__group-heading">
-                    <h3 id={`tags-${book.bookId}-${type}`}>{TAG_TYPE_LABELS[type]}</h3>
-                    <span>{tags.length}</span>
-                  </div>
-                  <div className="tags-dialog__chips">
-                    {tags.map((tag) => (
-                      <TagChip
-                        key={`${tag.type}:${tag.name}`}
-                        tag={tag}
-                        size="default"
-                        title={tag.displayName && tag.displayName !== tag.name ? tag.name : undefined}
-                        onClick={() => {
-                          closeTagsDialog()
-                          onTagSearch(tag)
-                        }}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
-          </div>
-        </div>
-      </dialog>
-    </article>
-  )
-}
-
 export default App

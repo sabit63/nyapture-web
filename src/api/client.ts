@@ -6,23 +6,49 @@
  * reads or writes browser storage implicitly.
  */
 
-export const DEFAULT_API_SETTINGS = {
-  apiUrl: 'http://localhost:5270',
-  apiKey: '',
-  editKey: '',
-  timeoutSeconds: 30,
-} as const
+export const API_PROXY_PROTOCOLS = ['HTTP', 'HTTPS', 'SOCKS5'] as const
+
+export type ApiProxyProtocol = typeof API_PROXY_PROTOCOLS[number]
+
+export type ApiProxySettings = {
+  enabled: boolean
+  protocol: ApiProxyProtocol
+  serverAddress: string
+  port: number | null
+}
 
 export type ApiSettings = {
   apiUrl: string
   apiKey: string
   editKey: string
   timeoutSeconds: number
+  proxy: ApiProxySettings
+}
+
+export type ApiSettingsInput = Omit<Partial<ApiSettings>, 'proxy'> & {
+  proxy?: Partial<ApiProxySettings> | null
+}
+
+export const DEFAULT_API_SETTINGS: ApiSettings = {
+  apiUrl: 'http://localhost:5270',
+  apiKey: '',
+  editKey: '',
+  timeoutSeconds: 30,
+  proxy: {
+    enabled: false,
+    protocol: 'HTTP',
+    serverAddress: '',
+    port: null,
+  },
 }
 
 export type ApiSettingsErrors = {
   apiUrl?: string
   timeoutSeconds?: string
+  proxyEnabled?: string
+  proxyProtocol?: string
+  proxyServerAddress?: string
+  proxyPort?: string
 }
 
 export type ApiSettingsValidation = {
@@ -59,7 +85,12 @@ const ERROR_MESSAGES: Record<ApiErrorCategory, string> = {
   unknown: 'APIリクエストに失敗しました。',
 }
 
-let activeSettings: ApiSettings = { ...DEFAULT_API_SETTINGS }
+const cloneApiSettings = (settings: ApiSettings): ApiSettings => ({
+  ...settings,
+  proxy: { ...settings.proxy },
+})
+
+let activeSettings: ApiSettings = cloneApiSettings(DEFAULT_API_SETTINGS)
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null
@@ -67,6 +98,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
 
 const asNonEmptyString = (value: unknown) => (
   typeof value === 'string' && value.trim() ? value.trim() : undefined
+)
+
+export const isApiProxyProtocol = (value: unknown): value is ApiProxyProtocol => (
+  typeof value === 'string' && API_PROXY_PROTOCOLS.some((protocol) => protocol === value)
 )
 
 /** Normalize and validate an API base URL without retaining query/hash data. */
@@ -86,19 +121,28 @@ export const normalizeApiUrl = (value: string): string | null => {
 }
 
 const settingsFrom = (
-  settings: Partial<ApiSettings> = {},
+  settings: ApiSettingsInput = {},
   base: ApiSettings = activeSettings,
-): ApiSettings => ({
-  apiUrl: typeof settings.apiUrl === 'string' ? settings.apiUrl : base.apiUrl,
-  apiKey: typeof settings.apiKey === 'string' ? settings.apiKey : base.apiKey,
-  editKey: typeof settings.editKey === 'string' ? settings.editKey : base.editKey,
-  timeoutSeconds: typeof settings.timeoutSeconds === 'number'
-    ? settings.timeoutSeconds
-    : base.timeoutSeconds,
-})
+): ApiSettings => {
+  const proxy = settings.proxy === null ? DEFAULT_API_SETTINGS.proxy : settings.proxy
+  return {
+    apiUrl: typeof settings.apiUrl === 'string' ? settings.apiUrl : base.apiUrl,
+    apiKey: typeof settings.apiKey === 'string' ? settings.apiKey : base.apiKey,
+    editKey: typeof settings.editKey === 'string' ? settings.editKey : base.editKey,
+    timeoutSeconds: typeof settings.timeoutSeconds === 'number'
+      ? settings.timeoutSeconds
+      : base.timeoutSeconds,
+    proxy: {
+      enabled: typeof proxy?.enabled === 'boolean' ? proxy.enabled : base.proxy.enabled,
+      protocol: proxy?.protocol ?? base.proxy.protocol,
+      serverAddress: typeof proxy?.serverAddress === 'string' ? proxy.serverAddress : base.proxy.serverAddress,
+      port: proxy?.port === null || typeof proxy?.port === 'number' ? proxy.port : base.proxy.port,
+    },
+  }
+}
 
 /** Validate settings while retaining secret values only in the returned settings object. */
-export const validateApiSettings = (settings: Partial<ApiSettings>): ApiSettingsValidation => {
+export const validateApiSettings = (settings: ApiSettingsInput): ApiSettingsValidation => {
   const errors: ApiSettingsErrors = {}
   const apiUrl = normalizeApiUrl(settings.apiUrl ?? '')
   if (!apiUrl) errors.apiUrl = 'http:// または https:// で始まる有効なURLを入力してください。'
@@ -108,13 +152,51 @@ export const validateApiSettings = (settings: Partial<ApiSettings>): ApiSettings
     errors.timeoutSeconds = 'タイムアウト秒数は1〜3600の整数で入力してください。'
   }
 
+  const next = settingsFrom(settings)
+  const proxyInput = settings.proxy as unknown
+  if (proxyInput !== undefined && proxyInput !== null && (!isRecord(proxyInput)
+    || ('enabled' in proxyInput && typeof proxyInput.enabled !== 'boolean'))) {
+    errors.proxyEnabled = 'Proxy設定が無効です。'
+  }
+
+  const { enabled, protocol, port } = next.proxy
+  const serverAddress = next.proxy.serverAddress.trim()
+  if (enabled) {
+    if (isRecord(proxyInput)) {
+      if ('protocol' in proxyInput && !isApiProxyProtocol(proxyInput.protocol)) {
+        errors.proxyProtocol = 'Protocolを選択してください。'
+      }
+      if ('serverAddress' in proxyInput && typeof proxyInput.serverAddress !== 'string') {
+        errors.proxyServerAddress = 'Server Addressを入力してください。'
+      }
+      if ('port' in proxyInput && proxyInput.port !== null && typeof proxyInput.port !== 'number') {
+        errors.proxyPort = 'Portは1〜65535の整数で入力してください。'
+      }
+    }
+    if (!isApiProxyProtocol(protocol)) errors.proxyProtocol = 'Protocolを選択してください。'
+
+    const hasServerAddress = serverAddress.length > 0
+    const hasPort = port !== null
+    if (!hasServerAddress) errors.proxyServerAddress = 'Server Addressを入力してください。'
+    if (!hasPort) errors.proxyPort = 'Portを入力してください。'
+    if (hasPort && (!Number.isInteger(port) || port < 1 || port > 65535)) {
+      errors.proxyPort = 'Portは1〜65535の整数で入力してください。'
+    }
+  }
+
   if (Object.keys(errors).length > 0) return { normalized: null, errors }
-  const next = settingsFrom({ ...settings, apiUrl: apiUrl ?? undefined })
-  return { normalized: next, errors }
+  return {
+    normalized: {
+      ...next,
+      apiUrl: apiUrl ?? next.apiUrl,
+      proxy: { ...next.proxy, serverAddress },
+    },
+    errors,
+  }
 }
 
 /** Normalize settings, throwing a redacted validation error for invalid input. */
-export const normalizeApiSettings = (settings: Partial<ApiSettings> = {}): ApiSettings => {
+export const normalizeApiSettings = (settings: ApiSettingsInput = {}): ApiSettings => {
   const result = validateApiSettings(settingsFrom(settings))
   if (!result.normalized) {
     throw new ApiError('API設定が無効です。', { category: 'validation' })
@@ -123,16 +205,16 @@ export const normalizeApiSettings = (settings: Partial<ApiSettings> = {}): ApiSe
 }
 
 /** Configure the singleton client. Settings are kept in memory for this page only. */
-export const configureApi = (settings: Partial<ApiSettings>): ApiSettings => {
+export const configureApi = (settings: ApiSettingsInput): ApiSettings => {
   const next = normalizeApiSettings(settingsFrom(settings))
-  activeSettings = next
+  activeSettings = cloneApiSettings(next)
   apiClient.configure(activeSettings)
-  return { ...activeSettings }
+  return cloneApiSettings(activeSettings)
 }
 
 export const configureApiSettings = configureApi
 
-export const getApiSettings = (): ApiSettings => ({ ...activeSettings })
+export const getApiSettings = (): ApiSettings => cloneApiSettings(activeSettings)
 
 const redactSecrets = (value: string): string => {
   let redacted = value
@@ -272,15 +354,15 @@ const isAbortLike = (error: unknown) => (
 export class ApiClient {
   private settings: ApiSettings
 
-  constructor(settings: Partial<ApiSettings> = {}) {
+  constructor(settings: ApiSettingsInput = {}) {
     this.settings = normalizeApiSettings(settingsFrom(settings))
   }
 
   getSettings() {
-    return { ...this.settings }
+    return cloneApiSettings(this.settings)
   }
 
-  configure(settings: Partial<ApiSettings>) {
+  configure(settings: ApiSettingsInput) {
     this.settings = normalizeApiSettings(settingsFrom(settings, this.settings))
     return this.getSettings()
   }
@@ -388,24 +470,24 @@ export const defaultApiClient = apiClient
 export const requestJson = <T>(
   path: string,
   options?: ApiRequestOptions,
-  settingsOverride?: Partial<ApiSettings>,
+  settingsOverride?: ApiSettingsInput,
 ) => (settingsOverride ? new ApiClient(settingsOverride) : apiClient).requestJson<T>(path, options)
 
 export const requestText = (
   path: string,
   options?: ApiRequestOptions,
-  settingsOverride?: Partial<ApiSettings>,
+  settingsOverride?: ApiSettingsInput,
 ) => (settingsOverride ? new ApiClient(settingsOverride) : apiClient).requestText(path, options)
 
 export const requestBlob = (
   path: string,
   options?: ApiRequestOptions,
-  settingsOverride?: Partial<ApiSettings>,
+  settingsOverride?: ApiSettingsInput,
 ) => (settingsOverride ? new ApiClient(settingsOverride) : apiClient).requestBlob(path, options)
 
 /** Check liveness with a temporary client when settings are supplied. */
 export const testApiConnection = async (
-  settings?: Partial<ApiSettings>,
+  settings?: ApiSettingsInput,
   signal?: AbortSignal,
 ): Promise<string> => {
   const client = settings ? new ApiClient(settings) : apiClient

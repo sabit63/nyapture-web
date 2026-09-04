@@ -1,17 +1,19 @@
 .book-viewer {
-  --book-viewer-page-width: min(100%, 760px);
+  --book-viewer-page-width: min(100%, var(--container-reader));
+  --book-viewer-dock-width: 820px;
+  --book-viewer-sheet-width: 980px;
   position: relative;
   min-height: calc(100vh - var(--topbar-height));
   min-width: 0;
-  padding: 20px 0 0;
+  padding: var(--space-5) 0 0;
   overflow-x: clip;
 }
 
 .book-viewer__back {
   position: fixed;
   z-index: 25;
-  top: calc(var(--topbar-height) + 14px);
-  left: calc(var(--drawer-width) + clamp(14px, 2vw, 28px));
+  top: calc(var(--topbar-height) + var(--space-4));
+  left: var(--layout-page-gutter);
   width: 38px;
   height: 38px;
   display: grid;
@@ -36,7 +38,7 @@
 .book-viewer__reader {
   width: var(--book-viewer-page-width);
   margin: 0 auto;
-  padding: 0 0 calc(124px + env(safe-area-inset-bottom));
+  padding: calc(var(--space-12) + var(--layout-control-gap)) var(--layout-control-gap) calc(124px + env(safe-area-inset-bottom));
   scroll-padding-bottom: calc(124px + env(safe-area-inset-bottom));
 }
 
@@ -44,7 +46,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: var(--space-3);
 }
 
 .book-viewer--route-loading .book-viewer__page {
@@ -54,7 +56,7 @@
 }
 
 .book-viewer__page {
-  width: min(100%, 760px);
+  width: var(--book-viewer-page-width);
   margin: 0;
   padding: 0;
   border: 0;
@@ -118,8 +120,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 11px;
-  padding: 24px;
+  gap: var(--space-3);
+  padding: var(--space-6);
   background: #2a2a35;
   color: #bbbaca;
   font-size: .76rem;
@@ -131,9 +133,9 @@
 .book-viewer__page-error button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--layout-control-gap);
   min-height: 34px;
-  padding: 6px 11px;
+  padding: var(--layout-tight-gap) var(--space-3);
   border: 1px solid #57576a;
   border-radius: 7px;
   background: #20202a;
@@ -153,8 +155,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 28px;
+  gap: var(--layout-control-gap);
+  padding: var(--space-8);
   border: 1px dashed #4a4a5a;
   border-radius: 10px;
   background: #252530;
@@ -169,7 +171,7 @@
 .book-viewer__scroll-top {
   position: fixed;
   z-index: 27;
-  right: clamp(14px, 2vw, 28px);
+  right: var(--layout-page-gutter);
   bottom: calc(88px + env(safe-area-inset-bottom));
   width: 38px;
   height: 38px;
@@ -197,9 +199,9 @@
   z-index: 35;
   right: 0;
   bottom: 0;
-  left: var(--drawer-width);
+  left: 0;
   min-width: 0;
-  padding: 10px clamp(14px, 2vw, 28px) calc(10px + env(safe-area-inset-bottom));
+  padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom));
   border-top: 1px solid #4a4a5a;
   background: #1b1b26ed;
   box-shadow: 0 -12px 30px #08081038;
@@ -208,12 +210,12 @@
 }
 
 .book-viewer__dock-inner {
-  width: min(100%, 820px);
+  width: min(100%, var(--book-viewer-dock-width));
   min-height: 42px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 12px;
+  gap: var(--layout-control-gap);
   margin: 0 auto;
 }
 
@@ -262,8 +264,8 @@
   top: auto;
   right: 0;
   bottom: 0;
-  left: var(--drawer-width);
-  width: min(980px, calc(100vw - var(--drawer-width) - 32px));
+  left: 0;
+  width: min(var(--book-viewer-sheet-width), calc(100vw - var(--space-8)));
   max-width: none;
   max-height: min(90vh, 760px);
   margin: 0 auto;
@@ -298,8 +300,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 15px 16px 14px 20px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--border-subtle);
   background: #21212b;
 }
@@ -313,7 +315,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 1rem;
+  font-size: .96rem;
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -323,8 +325,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 24px clamp(18px, 4vw, 48px) 32px;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-4) var(--space-6);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -336,7 +338,7 @@
   align-items: center;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px 12px;
+  gap: var(--space-2) var(--space-3);
   margin: 0 auto;
 }
 
@@ -346,7 +348,7 @@
   flex: 0 1 auto;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .book-viewer__details-meta-group--left {
@@ -364,9 +366,9 @@
   height: 30px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--layout-tight-gap);
   max-width: 100%;
-  padding: 5px 9px;
+  padding: var(--space-2);
   overflow: hidden;
   border: 1px solid #ffffff35;
   border-radius: 7px;
@@ -402,25 +404,25 @@
 
 .book-viewer__tag-group {
   min-width: 0;
-  padding-top: 17px;
+  padding-top: var(--space-4);
 }
 
 .book-viewer__tag-group + .book-viewer__tag-group {
-  margin-top: 3px;
+  margin-top: var(--layout-tight-gap);
   border-top: 1px solid #ffffff08;
 }
 
 .book-viewer__tag-group-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 9px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .book-viewer__tag-group-heading h3 {
   margin: 0;
   color: #c9c9d7;
-  font-size: .9rem;
+  font-size: .88rem;
   font-weight: 700;
 }
 
@@ -429,7 +431,7 @@
   height: 20px;
   display: inline-grid;
   place-items: center;
-  padding: 0 6px;
+  padding: 0 var(--space-2);
   border: 1px solid #56566a;
   border-radius: 999px;
   background: #3b3b4a;
@@ -446,7 +448,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 7px;
+  gap: var(--space-2);
 }
 
 @keyframes book-viewer-skeleton {
@@ -457,27 +459,34 @@
   from { opacity: 0; transform: translateY(12px); }
 }
 
-@media (max-width: 860px) {
-  .book-viewer__back { left: 14px; }
-  .book-viewer__dock { left: 0; }
-  .book-viewer__details-dialog { left: 0; width: calc(100% - 20px); }
-  .book-viewer__reader { padding-top: 58px; }
+@media (min-width: 640px) {
+  .book-viewer__reader {
+    padding-top: 0;
+    padding-right: 0;
+    padding-left: 0;
+  }
+  .book-viewer__pages { gap: var(--space-5); }
+  .book-viewer__dock { padding-right: var(--layout-page-gutter); padding-left: var(--layout-page-gutter); }
+  .book-viewer__dock-inner { gap: var(--space-3); }
+  .book-viewer__dock-title { font-size: .9rem; }
+  .book-viewer__details-dialog { width: min(var(--book-viewer-sheet-width), calc(100vw - var(--space-8))); }
+  .book-viewer__details-body {
+    gap: var(--layout-section-gap);
+    padding: var(--space-6) var(--layout-page-gutter) var(--space-8);
+  }
+  .book-viewer__details-header { padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5); }
+  .book-viewer__details-header h2 { font-size: 1rem; }
+  .book-viewer__tag-group-heading h3 { font-size: .9rem; }
+  .book-viewer__tag-chips { gap: var(--space-2); }
 }
 
-@media (max-width: 560px) {
-  .book-viewer { padding-inline: 0; }
-  .book-viewer__reader { width: 100%; padding-right: 10px; padding-left: 10px; }
-  .book-viewer__pages { gap: 12px; }
-  .book-viewer__scroll-top { right: 12px; }
-  .book-viewer__dock { padding-right: 10px; padding-left: 10px; }
-  .book-viewer__dock-inner { gap: 8px; }
-  .book-viewer__dock-title { font-size: .84rem; }
-  .book-viewer__details-body { gap: 20px; padding: 20px 14px 28px; }
-  .book-viewer__details-header { padding-inline: 14px 10px; }
-  .book-viewer__details-header h2 { font-size: .96rem; }
-  .book-viewer__details-body { gap: 20px; }
-  .book-viewer__tag-group-heading h3 { font-size: .88rem; }
-  .book-viewer__tag-chips { gap: 7px; }
+@media (min-width: 880px) {
+  .book-viewer__back { left: calc(var(--shell-content-offset) + var(--layout-page-gutter)); }
+  .book-viewer__dock { left: var(--shell-content-offset); }
+  .book-viewer__details-dialog {
+    left: var(--shell-content-offset);
+    width: min(var(--book-viewer-sheet-width), calc(100vw - var(--shell-content-offset) - var(--space-8)));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

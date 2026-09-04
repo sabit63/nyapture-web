@@ -131,10 +131,6 @@ const useModalDialog = (open: boolean) => {
   return ref
 }
 
-const isForbidden = (error: unknown) => (
-  error instanceof ApiError && error.status === 403
-)
-
 const createController = (set: Set<AbortController>) => {
   const controller = new AbortController()
   set.add(controller)
@@ -407,6 +403,7 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
   const [scheduleStatus, setScheduleStatus] = useState<MutationStatus>('idle')
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [action, setAction] = useState<MaintenanceAction>(null)
+  const [actionStatus, setActionStatus] = useState<MutationStatus>('idle')
   const [actionMessage, setActionMessage] = useState<string | null>(null)
   const [runMode, setRunMode] = useState<MaintenanceStorageSyncMode | null>(null)
   const [expandedRun, setExpandedRun] = useState<string | null>(null)
@@ -449,6 +446,7 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
     if (action) return
     const controller = createController(controllers.current)
     setAction(kind)
+    setActionStatus('pending')
     setActionMessage(null)
     try {
       const response = kind === 'cancel'
@@ -457,10 +455,14 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
           ? await pauseMaintenance(controller.signal)
           : await resumeMaintenance(controller.signal)
       if (controller.signal.aborted) return
+      setActionStatus('success')
       setActionMessage(response.message ?? '完了')
       setReload((current) => current + 1)
     } catch (requestError: unknown) {
-      if (!isAbort(requestError, controller.signal)) setActionMessage(mutationError(requestError))
+      if (!isAbort(requestError, controller.signal)) {
+        setActionStatus('error')
+        setActionMessage(mutationError(requestError))
+      }
     } finally {
       releaseController(controllers.current, controller)
       if (!controller.signal.aborted) setAction(null)
@@ -473,14 +475,19 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
     setRunMode(null)
     const controller = createController(controllers.current)
     setAction('run')
+    setActionStatus('pending')
     setActionMessage(null)
     try {
       const response = await startMaintenance(mode, controller.signal)
       if (controller.signal.aborted) return
+      setActionStatus('success')
       setActionMessage(response.data?.message ?? '開始済み')
       setReload((current) => current + 1)
     } catch (requestError: unknown) {
-      if (!isAbort(requestError, controller.signal)) setActionMessage(mutationError(requestError))
+      if (!isAbort(requestError, controller.signal)) {
+        setActionStatus('error')
+        setActionMessage(mutationError(requestError))
+      }
     } finally {
       releaseController(controllers.current, controller)
       if (!controller.signal.aborted) setAction(null)
@@ -559,7 +566,7 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
           <button className="dashboard-detail__button" type="button" onClick={() => setRunMode('Deep')} disabled={pending || running}><Play size={14} aria-hidden="true" />Deep</button>
           <button className="dashboard-detail__button dashboard-detail__button--danger" type="button" onClick={() => void mutate('cancel')} disabled={pending || !running}><X size={14} aria-hidden="true" />Cancel</button>
           {paused ? <button className="dashboard-detail__button" type="button" onClick={() => void mutate('resume')} disabled={pending || !running}><Play size={14} aria-hidden="true" />Resume</button> : <button className="dashboard-detail__button" type="button" onClick={() => void mutate('pause')} disabled={pending || !running}><Pause size={14} aria-hidden="true" />Pause</button>}
-          <ActionFeedback status={pending ? 'pending' : actionMessage ? (isForbidden({ status: 403 }) ? 'error' : 'success') : 'idle'} message={actionMessage} />
+          <ActionFeedback status={actionStatus} message={actionMessage} />
         </div>
       </DetailSection>
       <DetailSection title="スケジュール">

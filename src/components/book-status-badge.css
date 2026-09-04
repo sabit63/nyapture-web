@@ -33,13 +33,13 @@
 .book-status-badge {
   position: absolute;
   z-index: 3;
-  top: 9px;
-  left: 9px;
+  top: var(--space-2);
+  left: var(--space-2);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--layout-tight-gap);
   max-width: calc(100% - 54px);
-  padding: 5px 8px;
+  padding: var(--space-1) var(--space-2);
   overflow: hidden;
   border: 1px solid #ffffff35;
   border-radius: 6px;

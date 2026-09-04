@@ -1,0 +1,124 @@
+.icon-button {
+  width: 38px;
+  height: 38px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.icon-button:hover {
+  border-color: #ffffff0b;
+  background: #ffffff0a;
+  color: var(--color-text);
+}
+
+.icon-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.button {
+  min-height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.button--secondary {
+  border-color: var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.button--secondary:hover:not(:disabled) {
+  border-color: #525263;
+  background: var(--color-surface-hover);
+}
+
+.button--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.button--ghost:hover:not(:disabled),
+.button--ghost.is-active {
+  background: #ffffff0a;
+  color: var(--color-text);
+}
+
+.button--primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.button--primary:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+}
+
+.button--danger-ghost {
+  border-color: #87424b;
+  background: transparent;
+  color: #ff9aa5;
+}
+
+.button--danger-ghost:hover:not(:disabled) {
+  border-color: #b95261;
+  background: #b9526118;
+  color: #ffc0c7;
+}
+
+.ui-dialog {
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-floating);
+}
+
+.ui-dialog::backdrop {
+  background: #090910ba;
+  backdrop-filter: blur(3px);
+}
+
+.ui-dialog[open] {
+  animation: ui-dialog-in var(--duration-fast) ease-out;
+}
+
+@keyframes ui-dialog-in {
+  from { opacity: 0; transform: translateY(var(--space-2)) scale(.985); }
+}
+
+@keyframes ui-spin {
+  to { transform: rotate(360deg); }
+}

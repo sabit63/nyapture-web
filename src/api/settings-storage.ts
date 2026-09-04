@@ -1,19 +1,33 @@
 import {
   DEFAULT_API_SETTINGS,
+  isApiProxyProtocol,
   normalizeApiSettings,
   validateApiSettings,
 } from './client'
-import type { ApiSettings } from './client'
+import type { ApiProxySettings, ApiSettings } from './client'
 
 export const API_SETTINGS_STORAGE_KEY = 'nyapture.api-settings.v1'
-const API_SETTINGS_STORAGE_VERSION = 1
+const API_SETTINGS_STORAGE_VERSION = 3
 
-type PersistedApiSettings = {
-  version: typeof API_SETTINGS_STORAGE_VERSION
+type PersistedApiSettingsBase = {
   apiUrl: string
   apiKey: string
   editKey: string
   timeoutSeconds: number
+}
+
+type PersistedApiSettingsV1 = PersistedApiSettingsBase & {
+  version: 1
+}
+
+type PersistedApiSettingsV2 = PersistedApiSettingsBase & {
+  version: 2
+  proxy: Omit<ApiProxySettings, 'enabled'>
+}
+
+type PersistedApiSettings = PersistedApiSettingsBase & {
+  version: typeof API_SETTINGS_STORAGE_VERSION
+  proxy: ApiProxySettings
 }
 
 /** A storage operation failed without exposing any API credentials. */
@@ -24,7 +38,10 @@ export class ApiSettingsStorageError extends Error {
   }
 }
 
-const defaultApiSettings = (): ApiSettings => ({ ...DEFAULT_API_SETTINGS })
+const defaultApiSettings = (): ApiSettings => ({
+  ...DEFAULT_API_SETTINGS,
+  proxy: { ...DEFAULT_API_SETTINGS.proxy },
+})
 
 const getLocalStorage = (): Storage | null => {
   if (typeof globalThis === 'undefined') return null
@@ -40,13 +57,40 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 )
 
-const isPersistedApiSettings = (value: unknown): value is PersistedApiSettings => (
-  isRecord(value)
-  && value.version === API_SETTINGS_STORAGE_VERSION
-  && typeof value.apiUrl === 'string'
+const hasPersistedApiSettingsFields = (value: Record<string, unknown>) => (
+  typeof value.apiUrl === 'string'
   && typeof value.apiKey === 'string'
   && typeof value.editKey === 'string'
   && typeof value.timeoutSeconds === 'number'
+)
+
+const isPersistedApiSettingsV1 = (value: unknown): value is PersistedApiSettingsV1 => (
+  isRecord(value)
+  && value.version === 1
+  && hasPersistedApiSettingsFields(value)
+)
+
+const hasPersistedProxyFields = (value: Record<string, unknown>) => (
+  isRecord(value.proxy)
+  && isApiProxyProtocol(value.proxy.protocol)
+  && typeof value.proxy.serverAddress === 'string'
+  && (value.proxy.port === null || typeof value.proxy.port === 'number')
+)
+
+const isPersistedApiSettingsV2 = (value: unknown): value is PersistedApiSettingsV2 => (
+  isRecord(value)
+  && value.version === 2
+  && hasPersistedApiSettingsFields(value)
+  && hasPersistedProxyFields(value)
+)
+
+const isPersistedApiSettings = (value: unknown): value is PersistedApiSettings => (
+  isRecord(value)
+  && value.version === API_SETTINGS_STORAGE_VERSION
+  && hasPersistedApiSettingsFields(value)
+  && hasPersistedProxyFields(value)
+  && isRecord(value.proxy)
+  && typeof value.proxy.enabled === 'boolean'
 )
 
 const removeInvalidRecord = (storage: Storage) => {
@@ -82,12 +126,28 @@ export const loadPersistedApiSettings = (): ApiSettings => {
     return defaultApiSettings()
   }
 
-  if (!isPersistedApiSettings(parsed)) {
+  if (!isPersistedApiSettings(parsed) && !isPersistedApiSettingsV2(parsed) && !isPersistedApiSettingsV1(parsed)) {
     removeInvalidRecord(storage)
     return defaultApiSettings()
   }
 
-  const result = validateApiSettings(parsed)
+  const result = validateApiSettings(isPersistedApiSettingsV1(parsed)
+    ? {
+        apiUrl: parsed.apiUrl,
+        apiKey: parsed.apiKey,
+        editKey: parsed.editKey,
+        timeoutSeconds: parsed.timeoutSeconds,
+        proxy: DEFAULT_API_SETTINGS.proxy,
+      }
+    : isPersistedApiSettingsV2(parsed)
+      ? {
+          ...parsed,
+          proxy: {
+            ...parsed.proxy,
+            enabled: parsed.proxy.serverAddress.trim().length > 0 && parsed.proxy.port !== null,
+          },
+        }
+      : parsed)
   if (!result.normalized) {
     removeInvalidRecord(storage)
     return defaultApiSettings()

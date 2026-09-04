@@ -3,6 +3,7 @@ export {
   ApiError,
   apiClient,
   defaultApiClient,
+  API_PROXY_PROTOCOLS,
   DEFAULT_API_SETTINGS,
   configureApi,
   configureApiSettings,
@@ -11,6 +12,7 @@ export {
   getApiErrorUserMessage,
   getErrorMessage,
   imageDescriptorToUrl,
+  isApiProxyProtocol,
   normalizeApiSettings,
   normalizeApiUrl,
   requestBlob,
@@ -28,6 +30,19 @@ export {
   savePersistedApiSettings,
 } from './settings-storage'
 
+export {
+  DEFAULT_THUMBNAIL_COLUMNS,
+  DISPLAY_SETTINGS_STORAGE_KEY,
+  DisplaySettingsStorageError,
+  MAX_THUMBNAIL_COLUMNS,
+  MIN_THUMBNAIL_COLUMNS,
+  isThumbnailColumnCount,
+  loadPersistedDisplaySettings,
+  normalizeDisplaySettings,
+  normalizeThumbnailColumnCount,
+  savePersistedDisplaySettings,
+} from './display-settings-storage'
+
 export type {
   ApiErrorCategory,
   ApiErrorOptions,
@@ -35,10 +50,18 @@ export type {
   ApiQuery,
   ApiQueryValue,
   ApiRequestOptions,
+  ApiProxyProtocol,
+  ApiProxySettings,
   ApiSettings,
   ApiSettingsErrors,
+  ApiSettingsInput,
   ApiSettingsValidation,
 } from './client'
+
+export type {
+  DisplaySettings,
+  ThumbnailColumnCount,
+} from './display-settings-storage'
 
 export * from './books'
 export * from './endpoints'

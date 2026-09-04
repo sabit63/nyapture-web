@@ -1,0 +1,121 @@
+:root {
+  --color-primary: #c1339e;
+  --color-primary-hover: #d248b0;
+  --color-primary-soft: #c1339e1e;
+  --color-on-primary: #fff;
+  --color-background: #1f1f29;
+  --color-background-deep: #191922;
+  --color-surface: #242430;
+  --color-surface-raised: #2a2a37;
+  --color-surface-hover: #30303e;
+  --color-appbar: #18202ef5;
+  --color-drawer: #1f222d;
+  --color-border: #393947;
+  --color-border-subtle: #30303c;
+  --color-text: #eeeef4;
+  --color-text-muted: #a7a7b6;
+  --color-text-dim: #9696a8;
+  --color-focus: #7fb9ff;
+  --color-info: #4c9be8;
+  --color-success: #45b95d;
+  --color-warning: #e0a83b;
+  --color-danger: #ef4d5f;
+
+  --font-family-sans: "Noto Sans JP", system-ui, sans-serif;
+  --font-size-label-sm: .6875rem;
+  --font-size-label-md: .75rem;
+  --font-size-body-sm: .75rem;
+  --font-size-body-md: .875rem;
+  --font-size-heading-sm: 1rem;
+  --font-size-heading-md: 1.25rem;
+  --font-size-heading-lg: 1.75rem;
+
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --container-wide: 1520px;
+  --container-standard: 1360px;
+  --container-reader: 760px;
+
+  --layout-page-gutter: 16px;
+  --layout-page-block-start: 24px;
+  --layout-page-block-end: 32px;
+  --layout-section-gap: 24px;
+  --layout-grid-gap: 16px;
+  --layout-control-gap: 8px;
+  --layout-tight-gap: 4px;
+  --shell-content-offset: 0px;
+
+  --radius-none: 0;
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 15px;
+  --radius-full: 9999px;
+
+  --control-height-sm: 36px;
+  --control-height-md: 40px;
+  --shadow-raised: 0 12px 30px #08081040;
+  --shadow-floating: 0 28px 80px #050509a8;
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+
+  --drawer-width: 268px;
+  --topbar-height: 56px;
+
+  /* Compatibility aliases while page styles migrate to semantic names. */
+  --background: var(--color-background);
+  --background-deep: var(--color-background-deep);
+  --surface: var(--color-surface);
+  --surface-raised: var(--color-surface-raised);
+  --surface-hover: var(--color-surface-hover);
+  --appbar: var(--color-appbar);
+  --drawer: var(--color-drawer);
+  --border: var(--color-border);
+  --border-subtle: var(--color-border-subtle);
+  --text: var(--color-text);
+  --text-muted: var(--color-text-muted);
+  --text-dim: var(--color-text-dim);
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  --primary-soft: var(--color-primary-soft);
+  --tertiary: #d75a29;
+  --info: var(--color-info);
+  --success: var(--color-success);
+  --warning: var(--color-warning);
+  --danger: var(--color-danger);
+  --focus: var(--color-focus);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --layout-page-gutter: 24px;
+    --layout-page-block-end: 40px;
+  }
+}
+
+@media (min-width: 880px) {
+  :root {
+    --layout-page-gutter: 32px;
+    --layout-page-block-start: 32px;
+    --layout-page-block-end: 48px;
+    --shell-content-offset: 224px;
+    --drawer-width: 224px;
+    --topbar-height: 64px;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --layout-page-gutter: 40px;
+    --shell-content-offset: 248px;
+    --drawer-width: 248px;
+  }
+}
