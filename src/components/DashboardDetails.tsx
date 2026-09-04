@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  CloudDownload,
   Database,
   FolderOpen,
   Image,
@@ -13,21 +12,19 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import {
-  DataFolderDetails,
-  DataStoreDetails,
-  DownloadsDetails,
-  LogsDetails,
-} from './DashboardReadDetails'
-import {
   CacheDetails,
   MaintenanceDetails,
   ServiceDetails,
 } from './DashboardActionDetails'
+import {
+  DataFolderDetails,
+  LogsDetails,
+  MongoDbDetails,
+} from './DashboardReadDetails'
 import './dashboard-details.css'
 
 export type DashboardDetailRoute =
-  | 'downloads'
-  | 'datastore'
+  | 'mongodb'
   | 'datafolder'
   | 'webpilot'
   | 'image-worker'
@@ -35,14 +32,10 @@ export type DashboardDetailRoute =
   | 'cache'
   | 'logs'
 
-type RouteMeta = {
-  title: string
-  icon: LucideIcon
-}
+type RouteMeta = { title: string; icon: LucideIcon }
 
 const ROUTE_META: Record<DashboardDetailRoute, RouteMeta> = {
-  downloads: { title: 'Downloads', icon: CloudDownload },
-  datastore: { title: 'Data Store', icon: Database },
+  mongodb: { title: 'MongoDB', icon: Database },
   datafolder: { title: 'DataFolder', icon: FolderOpen },
   webpilot: { title: 'WebPilot', icon: Server },
   'image-worker': { title: 'ImageWorker', icon: Image },
@@ -65,26 +58,13 @@ export function DashboardDetails({ route, apiRevision }: DashboardDetailsProps) 
   return (
     <section className="dashboard-detail" aria-labelledby="dashboard-detail-title">
       <header className="dashboard-detail__header">
-        <a className="dashboard-detail__icon-button" href="/dashboard" aria-label="Dashboardへ戻る">
-          <ArrowLeft size={18} aria-hidden="true" />
-        </a>
-        <span className="dashboard-detail__route-icon" aria-hidden="true">
-          <Icon size={22} />
-        </span>
+        <a className="dashboard-detail__icon-button" href="/dashboard" aria-label="Dashboardへ戻る"><ArrowLeft size={18} aria-hidden="true" /></a>
+        <span className="dashboard-detail__route-icon" aria-hidden="true"><Icon size={22} /></span>
         <h1 id="dashboard-detail-title">{meta.title}</h1>
-        <button
-          className="dashboard-detail__icon-button dashboard-detail__refresh"
-          type="button"
-          aria-label="更新"
-          onClick={() => setRefreshRevision((revision) => revision + 1)}
-        >
-          <RefreshCw size={17} aria-hidden="true" />
-        </button>
+        <button className="dashboard-detail__icon-button dashboard-detail__refresh" type="button" aria-label="更新" onClick={() => setRefreshRevision((revision) => revision + 1)}><RefreshCw size={17} aria-hidden="true" /></button>
       </header>
-
       <div className="dashboard-detail__body">
-        {route === 'downloads' && <DownloadsDetails apiRevision={detailRevision} />}
-        {route === 'datastore' && <DataStoreDetails apiRevision={detailRevision} />}
+        {route === 'mongodb' && <MongoDbDetails apiRevision={detailRevision} />}
         {route === 'datafolder' && <DataFolderDetails apiRevision={detailRevision} />}
         {route === 'webpilot' && <ServiceDetails service="webpilot" apiRevision={detailRevision} />}
         {route === 'image-worker' && <ServiceDetails service="image-worker" apiRevision={detailRevision} />}

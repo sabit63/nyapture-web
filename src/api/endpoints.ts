@@ -13,7 +13,7 @@ import type {
 } from '../models'
 import { requestBlob, requestJson } from './client'
 
-export type ApiEnvelope<T> = NyaApiResponse & { data?: T }
+type EndpointApiEnvelope<T> = NyaApiResponse & { data?: T }
 
 export type WebBookCacheBookDto = {
   groupId?: string | null
@@ -110,7 +110,7 @@ export const searchWebBookCache = (filter: WebBookCacheSearchRequest, signal?: A
 )
 
 export const getWebBookCacheBook = (groupId: string, bookId: string, signal?: AbortSignal) => (
-  requestJson<ApiEnvelope<WebBookCacheBookDto>>(`/api/web-cache/${segment(groupId)}/${segment(bookId)}`, { signal })
+  requestJson<EndpointApiEnvelope<WebBookCacheBookDto>>(`/api/web-cache/${segment(groupId)}/${segment(bookId)}`, { signal })
 )
 
 export const downloadWebBookCacheBook = (groupId: string, bookId: string, signal?: AbortSignal) => (
@@ -127,17 +127,6 @@ export const getWebBookContent = (url: string, signal?: AbortSignal) => (
 
 export const getWebPageContent = (url: string, signal?: AbortSignal) => (
   requestJson<OnlineBookPageResponse>('/api/web/page', { method: 'POST', body: url, signal })
-)
-
-export const getDashboardSummary = <T>(signal?: AbortSignal) => (
-  requestJson<ApiEnvelope<T>>('/api/dashboard/summary', { signal })
-)
-
-export const getDashboardLogs = <T>(since = 0, signal?: AbortSignal) => (
-  requestJson<ApiEnvelope<T>>('/api/dashboard/logs', {
-    query: { since, minLevel: 'Warning' },
-    signal,
-  })
 )
 
 export const getDownloadStatuses = (signal?: AbortSignal) => (
@@ -174,12 +163,4 @@ export const updateDownloadPriority = (request: BookDownloadRequest, signal?: Ab
 
 export const startBookDownload = (request: BookDownloadRequest, signal?: AbortSignal) => (
   requestJson<NyaApiResponse>('/api/download/start', { method: 'POST', body: request, auth: 'edit', signal })
-)
-
-export const retryDashboardDownloadJob = (jobId: string, signal?: AbortSignal) => (
-  requestJson<NyaApiResponse>(`/api/dashboard/downloads/${segment(jobId)}/retry`, {
-    method: 'POST',
-    auth: 'edit',
-    signal,
-  })
 )

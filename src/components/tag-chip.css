@@ -1,5 +1,5 @@
-[data-tag-type='Artists'] { --tag-color: #F0A3D7; --tag-accent: #A3307D; }
-[data-tag-type='Groups'] { --tag-color: #9ED0EA; --tag-accent: #236B8E; }
+[data-tag-type='Artists'] { --tag-color: #9ED0EA; --tag-accent: #236B8E; }
+[data-tag-type='Groups'] { --tag-color: #F0A3D7; --tag-accent: #A3307D; }
 [data-tag-type='Parodies'] { --tag-color: #F3BA72; --tag-accent: #94580E; }
 [data-tag-type='Characters'] { --tag-color: #C4B2FF; --tag-accent: #5C43A5; }
 [data-tag-type='Categories'] { --tag-color: #75D6CC; --tag-accent: #16736B; }

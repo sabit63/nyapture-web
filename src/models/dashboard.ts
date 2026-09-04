@@ -1,7 +1,9 @@
 /**
- * Dashboard detail contracts.  The API intentionally leaves most response
- * properties optional so the viewer can render partial diagnostics while a
- * provider is unavailable.
+ * TypeScript representations of the Nya Dashboard REST contracts.
+ *
+ * The API returns all dashboard responses in a NyaApiResponse envelope.  The
+ * properties remain optional/nullable so an individual diagnostic section can
+ * be unavailable without preventing the rest of the dashboard from rendering.
  */
 
 export type DashboardApiResponse<T> = {
@@ -10,54 +12,95 @@ export type DashboardApiResponse<T> = {
   data?: T | null
 }
 
-export type DataStoreObservationAvailability = 'Available' | 'Unavailable' | 'NotSupported' | string
+// ───────── Summary ─────────
 
-export type DataStoreIndexDto = {
-  name?: string | null
-  definition?: string | null
-  isUnique?: boolean | null
-  availability?: DataStoreObservationAvailability | null
-  diagnosticCode?: string | null
+export type MongoSummary = {
+  isConnected?: boolean | null
+  serverVersion?: string | null
+  databaseName?: string | null
 }
 
-export type DataStoreResourceDto = {
-  name?: string | null
-  recordCount?: number | null
+export type DataFolderSummary = {
+  isAvailable?: boolean | null
+  freeBytes?: number | null
+  totalBytes?: number | null
+}
+
+export type DownloadsSummary = {
+  runningCount?: number | null
+  queuedCount?: number | null
+  failedRecentCount?: number | null
+}
+
+export type WebPilotSummary = {
+  isConfigured?: boolean | null
+  lastTestStatus?: string | null
+}
+
+export type ImageWorkerSummary = {
+  isConfigured?: boolean | null
+  lastTestStatus?: string | null
+}
+
+export type MaintenanceSummary = {
+  lastExecutionTime?: string | null
+  nextExecutionTime?: string | null
+  isRunning?: boolean | null
+  issuesCount?: number | null
+}
+
+export type CacheSummary = {
   sizeBytes?: number | null
-  indexCount?: number | null
-  availability?: DataStoreObservationAvailability | null
-  diagnosticCode?: string | null
-  indexes?: DataStoreIndexDto[] | null
+  entryCount?: number | null
+  hitRate?: number | null
 }
 
-export type DataStoreTopologyDto = {
-  availability?: DataStoreObservationAvailability | null
-  state?: string | null
-  diagnosticCode?: string | null
+export type LogsSummary = {
+  errors24h?: number | null
+  warnings24h?: number | null
 }
 
-export type DataStoreStatisticsDto = {
-  bookCount?: number | null
-  tagCount?: number | null
-  observedAt?: string | null
-  indexCount?: number | null
-  dataSizeBytes?: number | null
-  storeName?: string | null
-  availableStoreNames?: string[] | null
+export type DashboardSummaryResponse = {
+  generatedAt?: string | null
+  mongoDb?: MongoSummary | null
+  dataFolder?: DataFolderSummary | null
+  downloads?: DownloadsSummary | null
+  webPilot?: WebPilotSummary | null
+  imageWorker?: ImageWorkerSummary | null
+  maintenance?: MaintenanceSummary | null
+  cache?: CacheSummary | null
+  logs?: LogsSummary | null
+  errors?: Record<string, string> | null
 }
 
-export type DataStoreDiagnosticsResponse = {
+// ───────── MongoDB ─────────
+
+export type MongoDbDiagnosticsResponse = {
   generatedAt?: string | null
   isConnected?: boolean | null
-  providerVersion?: string | null
-  storeName?: string | null
-  availability?: DataStoreObservationAvailability | null
-  diagnosticCode?: string | null
+  serverVersion?: string | null
+  databaseName?: string | null
+  replicaSetState?: string | null
+  collections?: MongoCollectionStatsDto[] | null
   error?: string | null
-  topology?: DataStoreTopologyDto | null
-  resources?: DataStoreResourceDto[] | null
-  statistics?: DataStoreStatisticsDto | null
 }
+
+export type MongoCollectionStatsDto = {
+  name?: string | null
+  documentCount?: number | null
+  sizeBytes?: number | null
+  indexCount?: number | null
+  indexes?: MongoIndexInfoDto[] | null
+}
+
+export type MongoIndexInfoDto = {
+  name?: string | null
+  keysJson?: string | null
+  isUnique?: boolean | null
+  isSparse?: boolean | null
+}
+
+// ───────── DataFolder / Downloads ─────────
 
 export type DataFolderResponse = {
   generatedAt?: string | null
@@ -71,12 +114,15 @@ export type DataFolderResponse = {
   error?: string | null
 }
 
+/** Download progress is a fraction in the inclusive range 0..1. */
+export type DownloadProgress = number
+
 export type DownloadJobDto = {
   jobId?: string | null
   bookId?: string | null
   url?: string | null
   status?: string | null
-  progress?: number | null
+  progress?: DownloadProgress | null
   startedAt?: string | null
   finishedAt?: string | null
   failureReason?: string | null
@@ -110,6 +156,16 @@ export type DomainIntervalsUpdateRequest = {
   updates: DomainIntervalUpdateItem[]
 }
 
+// ───────── External service configuration ─────────
+
+export type ConnectionTestResult = {
+  success?: boolean | null
+  testedAt?: string | null
+  statusCode?: number | null
+  latencyMs?: number | null
+  message?: string | null
+}
+
 export type WebPilotConfigResponse = {
   generatedAt?: string | null
   baseUrl?: string | null
@@ -121,14 +177,6 @@ export type WebPilotConfigResponse = {
 export type WebPilotConfigUpdateRequest = {
   baseUrl?: string | null
   apiKey?: string | null
-}
-
-export type ConnectionTestResult = {
-  success?: boolean | null
-  testedAt?: string | null
-  statusCode?: number | null
-  latencyMs?: number | null
-  message?: string | null
 }
 
 export type ImageWorkerConfigResponse = {
@@ -143,6 +191,8 @@ export type ImageWorkerConfigUpdateRequest = {
   baseUrl?: string | null
   apiKey?: string | null
 }
+
+// ───────── Maintenance ─────────
 
 export type MaintenanceScheduleDto = {
   intervalMinutes?: number | null
@@ -191,14 +241,14 @@ export type MaintenanceIssuesResponse = {
 }
 
 export type MaintenanceScheduleUpdateRequest = {
-  intervalMinutes: number | null
-  cpuThreshold: number | null
+  intervalMinutes?: number | null
+  cpuThreshold?: number | null
 }
 
 export type MaintenanceStorageSyncMode = 'Quick' | 'Deep'
 
 export type MaintenanceStartRequestDto = {
-  mode: MaintenanceStorageSyncMode | null
+  mode?: MaintenanceStorageSyncMode | null
 }
 
 export type MaintenanceTriggerResponse = {
@@ -210,7 +260,6 @@ export type MaintenanceTriggerResponse = {
 export type MaintenanceActionResponse = {
   success?: boolean | null
   message?: string | null
-  runId?: string | null
 }
 
 export type MaintenanceCheckSummaryDto = {
@@ -258,19 +307,7 @@ export type MaintenanceRunDetailResponse = {
   tasks?: MaintenanceTaskDto[] | null
 }
 
-export type CacheClearState = 'Idle' | 'Running' | 'Completed' | 'Failed' | string
-
-export type CacheClearStatusResponse = {
-  runId?: string | null
-  state?: CacheClearState | null
-  totalEntries?: number | null
-  processedEntries?: number | null
-  deletedEntries?: number | null
-  failedEntries?: number | null
-  startedAt?: string | null
-  finishedAt?: string | null
-  error?: string | null
-}
+// ───────── Cache / Logs ─────────
 
 export type CacheMetricsResponse = {
   generatedAt?: string | null
@@ -282,13 +319,6 @@ export type CacheMetricsResponse = {
   evictionCount?: number | null
   lastClearedAt?: string | null
   strategy?: string | null
-  clearStatus?: CacheClearStatusResponse | null
-}
-
-export type CacheClearStartResponse = {
-  started?: boolean | null
-  message?: string | null
-  status?: CacheClearStatusResponse | null
 }
 
 export type DashboardLogEntryDto = {
@@ -306,4 +336,11 @@ export type DashboardLogsResponse = {
   entries?: DashboardLogEntryDto[] | null
 }
 
-export type DashboardLogLevel = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical' | 'None'
+export type DashboardLogLevel =
+  | 'Trace'
+  | 'Debug'
+  | 'Information'
+  | 'Warning'
+  | 'Error'
+  | 'Critical'
+  | 'None'

@@ -929,7 +929,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dashboard__skeleton {
+  .dashboard__skeleton,
+  .dashboard__summary-value-skeleton {
     animation: none;
     background: #383747;
   }
@@ -942,4 +943,62 @@
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
   }
+}
+
+.dashboard__summary-card {
+  position: relative;
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+
+.dashboard__summary-card:hover,
+.dashboard__summary-card:focus-visible {
+  border-color: #8b5b88;
+  background: #292735;
+  color: inherit;
+}
+
+.dashboard__summary-card:focus-visible,
+.dashboard__refresh-button:focus-visible,
+.dashboard__retry-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.dashboard__summary-card:hover { transform: translateY(-1px); }
+.dashboard__summary-card .dashboard__card-heading { padding-right: var(--space-5); }
+.dashboard__summary-card-body { display: grid; gap: var(--space-1); margin-top: var(--space-5); padding-right: var(--space-4); }
+.dashboard__summary-card-body strong { color: #f5f3fa; font-size: 1.05rem; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.dashboard__summary-card-body span { overflow: hidden; color: var(--text-muted); font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard__summary-value-skeleton {
+  width: min(118px, 80%);
+  height: 1.32rem;
+  display: block;
+  overflow: hidden;
+  border-radius: 5px;
+  background: linear-gradient(100deg, #383747 20%, #50465a 45%, #383747 70%);
+  background-size: 200% 100%;
+  animation: dashboard-skeleton-shimmer 1.55s ease-in-out infinite;
+}
+.dashboard__summary-loading-label { color: var(--text-dim); }
+.dashboard__summary-card-chevron { position: absolute; right: var(--space-3); bottom: var(--space-3); color: var(--text-dim); }
+.dashboard__card-error { display: flex; align-items: flex-start; gap: var(--space-1); margin: var(--space-3) var(--space-4) 0 0; color: #ffc1c9; font-size: .64rem; line-height: 1.4; }
+.dashboard__card-error svg { flex: 0 0 auto; margin-top: 1px; }
+.dashboard__section-heading p { margin: var(--space-1) 0 0; color: var(--text-muted); font-size: .68rem; }
+
+.dashboard__loading-card {
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+@media (min-width: 1200px) {
+  .dashboard__summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
