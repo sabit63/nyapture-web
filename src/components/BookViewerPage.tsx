@@ -6,9 +6,14 @@ import {
   ImageOff,
   RotateCcw,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, RefObject, SyntheticEvent } from 'react'
 import { getBookPageBlob } from '../api'
+import {
+  BookPageLoader,
+  getBookPageRequestWidth,
+  INITIAL_BOOK_PAGE_SNAPSHOT,
+} from '../features/viewer/book-page-loading'
 import type { BookCardModel, BookTag, NyaTagType } from '../models'
 import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
 import { BookStatusBadge } from './BookStatusBadge'
@@ -27,8 +32,6 @@ export type BookViewerPageProps = {
   onRetry?: () => void
   onTagSearch: (tag: BookTag) => void
 }
-
-type PagePhase = 'loading' | 'loaded' | 'error'
 
 const PAGE_WIDTH = 1000
 const PAGE_HEIGHT = 1400
@@ -184,6 +187,47 @@ function BookViewerReady({
   const pointerStartedOutsideRef = useRef(false)
   const activeEntriesRef = useRef<Map<Element, IntersectionObserverEntry>>(new Map())
   const centerEntriesRef = useRef<Map<Element, IntersectionObserverEntry>>(new Map())
+  const pageLoader = useMemo(() => new BookPageLoader({
+    totalPages,
+    loadPage: (pageNumber, width, signal) => getBookPageBlob({
+      groupId: book.groupId,
+      bookId: book.bookId,
+      page: pageNumber,
+      width,
+      format: 'webp',
+      fallbackToOriginal: false,
+    }, signal),
+  }), [book.bookId, book.groupId, totalPages])
+
+  useEffect(() => pageLoader.attach(), [pageLoader])
+
+  useEffect(() => {
+    const reader = readerRef.current
+    if (!reader) return
+    let frame: number | undefined
+    const measure = () => {
+      frame = undefined
+      pageLoader.setRequestWidth(getBookPageRequestWidth(
+        reader.getBoundingClientRect().width,
+        window.devicePixelRatio,
+      ))
+    }
+    const scheduleMeasure = () => {
+      if (frame !== undefined) return
+      frame = window.requestAnimationFrame(measure)
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined'
+      ? undefined
+      : new ResizeObserver(scheduleMeasure)
+    observer?.observe(reader)
+    window.addEventListener('resize', scheduleMeasure, { passive: true })
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', scheduleMeasure)
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+    }
+  }, [pageLoader])
 
   useEffect(() => {
     const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 420)
@@ -207,13 +251,18 @@ function BookViewerReady({
       const candidate = pickClosestEntry(centerEntries)
       if (!candidate) return
       const pageNumber = getPageNumber(candidate.target)
-      if (pageNumber > 0 && activeEntries.has(candidate.target)) setCurrentPage(pageNumber)
+      if (pageNumber > 0 && activeEntries.has(candidate.target)) {
+        setCurrentPage(pageNumber)
+        pageLoader.setCurrentPage(pageNumber)
+      }
     }
 
     const activeObserver = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
+        const pageNumber = getPageNumber(entry.target)
         if (entry.isIntersecting) activeEntries.set(entry.target, entry)
         else activeEntries.delete(entry.target)
+        if (pageNumber > 0) pageLoader.setVisible(pageNumber, entry.isIntersecting)
       })
       updateFromCenter()
     }, { threshold: [0, 0.1, 0.5, 1] })
@@ -240,7 +289,156 @@ function BookViewerReady({
       activeEntries.clear()
       centerEntries.clear()
     }
-  }, [bookIdentity, totalPages])
+  }, [bookIdentity, pageLoader, totalPages])
+
+  useEffect(() => {
+    const reader = readerRef.current
+    if (!reader || totalPages === 0 || typeof IntersectionObserver === 'undefined') return
+    const pageElements = Array.from(reader.querySelectorAll<HTMLElement>('[data-page-number]'))
+    let loadObserver: IntersectionObserver | undefined
+    let retentionObserver: IntersectionObserver | undefined
+    let frame: number | undefined
+    let observedViewportHeight = 0
+
+    const observeRanges = () => {
+      frame = undefined
+      const viewportHeight = Math.max(1, Math.round(window.innerHeight))
+      if (viewportHeight === observedViewportHeight && loadObserver && retentionObserver) return
+      observedViewportHeight = viewportHeight
+      loadObserver?.disconnect()
+      retentionObserver?.disconnect()
+      loadObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          const pageNumber = getPageNumber(entry.target)
+          if (pageNumber > 0) pageLoader.setLoadRange(pageNumber, entry.isIntersecting)
+        })
+      }, { rootMargin: `${viewportHeight * 2}px 0px`, threshold: 0 })
+      retentionObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          const pageNumber = getPageNumber(entry.target)
+          if (pageNumber > 0) pageLoader.setRetentionRange(pageNumber, entry.isIntersecting)
+        })
+      }, { rootMargin: `${viewportHeight * 3}px 0px`, threshold: 0 })
+      pageElements.forEach((pageElement) => {
+        loadObserver?.observe(pageElement)
+        retentionObserver?.observe(pageElement)
+      })
+    }
+    const scheduleRanges = () => {
+      if (frame !== undefined) return
+      frame = window.requestAnimationFrame(observeRanges)
+    }
+
+    observeRanges()
+    window.addEventListener('resize', scheduleRanges, { passive: true })
+    return () => {
+      loadObserver?.disconnect()
+      retentionObserver?.disconnect()
+      window.removeEventListener('resize', scheduleRanges)
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+    }
+  }, [bookIdentity, pageLoader, totalPages])
+
+  useEffect(() => {
+    const reader = readerRef.current
+    if (!reader || totalPages === 0 || typeof IntersectionObserver !== 'undefined') return
+    const pageElements = Array.from(reader.querySelectorAll<HTMLElement>('[data-page-number]'))
+    type PageRange = { start: number; end: number } | null
+    let visibleRange: PageRange = null
+    let loadRange: PageRange = null
+    let retentionRange: PageRange = null
+    let frame: number | undefined
+
+    const findRange = (margin: number): PageRange => {
+      const minimum = -margin
+      const maximum = window.innerHeight + margin
+      let low = 0
+      let high = pageElements.length
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2)
+        if (pageElements[middle].getBoundingClientRect().bottom < minimum) low = middle + 1
+        else high = middle
+      }
+      const start = low
+      low = start
+      high = pageElements.length
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2)
+        if (pageElements[middle].getBoundingClientRect().top <= maximum) low = middle + 1
+        else high = middle
+      }
+      const end = low - 1
+      return start <= end && start < pageElements.length
+        ? { start: start + 1, end: end + 1 }
+        : null
+    }
+
+    const updateRange = (
+      previous: PageRange,
+      next: PageRange,
+      update: (pageNumber: number, inRange: boolean) => void,
+    ) => {
+      if (previous) {
+        for (let pageNumber = previous.start; pageNumber <= previous.end; pageNumber += 1) {
+          if (!next || pageNumber < next.start || pageNumber > next.end) update(pageNumber, false)
+        }
+      }
+      if (next) {
+        for (let pageNumber = next.start; pageNumber <= next.end; pageNumber += 1) {
+          if (!previous || pageNumber < previous.start || pageNumber > previous.end) update(pageNumber, true)
+        }
+      }
+    }
+
+    const updateFallbackRanges = () => {
+      frame = undefined
+      const viewportHeight = Math.max(1, window.innerHeight)
+      const nextVisibleRange = findRange(0)
+      const nextLoadRange = findRange(viewportHeight * 2)
+      const nextRetentionRange = findRange(viewportHeight * 3)
+      updateRange(visibleRange, nextVisibleRange, (pageNumber, inRange) => pageLoader.setVisible(pageNumber, inRange))
+      updateRange(loadRange, nextLoadRange, (pageNumber, inRange) => pageLoader.setLoadRange(pageNumber, inRange))
+      updateRange(retentionRange, nextRetentionRange, (pageNumber, inRange) => pageLoader.setRetentionRange(pageNumber, inRange))
+      visibleRange = nextVisibleRange
+      loadRange = nextLoadRange
+      retentionRange = nextRetentionRange
+
+      const currentCandidates = nextVisibleRange ?? nextLoadRange
+      if (currentCandidates) {
+        const viewportCenter = window.innerHeight / 2
+        let nextCurrentPage = currentCandidates.start
+        let closestDistance = Number.POSITIVE_INFINITY
+        for (let pageNumber = currentCandidates.start; pageNumber <= currentCandidates.end; pageNumber += 1) {
+          const rect = pageElements[pageNumber - 1].getBoundingClientRect()
+          const distance = Math.abs((rect.top + rect.bottom) / 2 - viewportCenter)
+          if (distance < closestDistance) {
+            closestDistance = distance
+            nextCurrentPage = pageNumber
+          }
+        }
+        setCurrentPage(nextCurrentPage)
+        pageLoader.setCurrentPage(nextCurrentPage)
+      }
+    }
+    const scheduleFallbackRanges = () => {
+      if (frame !== undefined) return
+      frame = window.requestAnimationFrame(updateFallbackRanges)
+    }
+
+    const unsubscribeGeometry = pageLoader.subscribeGeometry(scheduleFallbackRanges)
+    window.addEventListener('scroll', scheduleFallbackRanges, { passive: true })
+    window.addEventListener('resize', scheduleFallbackRanges, { passive: true })
+    updateFallbackRanges()
+    return () => {
+      unsubscribeGeometry()
+      window.removeEventListener('scroll', scheduleFallbackRanges)
+      window.removeEventListener('resize', scheduleFallbackRanges)
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+      updateRange(visibleRange, null, (pageNumber, inRange) => pageLoader.setVisible(pageNumber, inRange))
+      updateRange(loadRange, null, (pageNumber, inRange) => pageLoader.setLoadRange(pageNumber, inRange))
+      updateRange(retentionRange, null, (pageNumber, inRange) => pageLoader.setRetentionRange(pageNumber, inRange))
+    }
+  }, [bookIdentity, pageLoader, totalPages])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -311,6 +509,14 @@ function BookViewerReady({
 
   const displayCurrentPage = totalPages > 0 ? currentPage : 0
   const titleId = 'book-viewer-heading'
+  const renderedPages = useMemo(() => Array.from({ length: totalPages }, (_, index) => (
+    <BookViewerPageImage
+      key={`${bookIdentity}:${index + 1}`}
+      bookTitle={book.title}
+      pageLoader={pageLoader}
+      pageNumber={index + 1}
+    />
+  )), [book.title, bookIdentity, pageLoader, totalPages])
 
   return (
     <section className="book-viewer" aria-labelledby={titleId}>
@@ -329,14 +535,7 @@ function BookViewerReady({
       <section ref={readerRef} className="book-viewer__reader" aria-labelledby={titleId}>
         {totalPages > 0 ? (
           <div className="book-viewer__pages" aria-label={`${totalPages}ページの画像一覧`}>
-            {Array.from({ length: totalPages }, (_, index) => (
-              <BookViewerPageImage
-                key={`${bookIdentity}:${index + 1}`}
-                book={book}
-                bookIdentity={bookIdentity}
-                pageNumber={index + 1}
-              />
-            ))}
+            {renderedPages}
           </div>
         ) : (
           <div className="book-viewer__empty" role="status">
@@ -463,74 +662,94 @@ function BookViewerReady({
   )
 }
 
-function BookViewerPageImage({
-  book,
-  bookIdentity,
+const BookViewerPageImage = memo(function BookViewerPageImage({
+  bookTitle,
+  pageLoader,
   pageNumber,
 }: {
-  book: BookCardModel
-  bookIdentity: string
+  bookTitle: string
+  pageLoader: BookPageLoader
   pageNumber: number
 }) {
-  const [phase, setPhase] = useState<PagePhase>('loading')
-  const [retryCount, setRetryCount] = useState(0)
-  const [pageUrl, setPageUrl] = useState<string>()
+  const subscribe = useCallback(
+    (listener: () => void) => pageLoader.subscribe(pageNumber, listener),
+    [pageLoader, pageNumber],
+  )
+  const getSnapshot = useCallback(
+    () => pageLoader.getSnapshot(pageNumber),
+    [pageLoader, pageNumber],
+  )
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => INITIAL_BOOK_PAGE_SNAPSHOT)
+  const isBusy = snapshot.phase === 'queued'
+    || snapshot.phase === 'loading'
+    || snapshot.phase === 'decoding'
+    || snapshot.phase === 'retryWaiting'
+  const initialCandidateUrl = snapshot.displayedUrl ? undefined : snapshot.candidateUrl
+  const upgradeCandidateUrl = snapshot.displayedUrl ? snapshot.candidateUrl : undefined
+  const pageLabel = `${bookTitle}の${pageNumber}ページ目`
 
-  useEffect(() => {
-    const controller = new AbortController()
-    let objectUrl: string | undefined
-    setPhase('loading')
-    setPageUrl(undefined)
-    getBookPageBlob({
-      groupId: book.groupId,
-      bookId: book.bookId,
-      page: pageNumber,
-    }, controller.signal)
-      .then((blob) => {
-        if (controller.signal.aborted) return
-        objectUrl = URL.createObjectURL(blob)
-        setPageUrl(objectUrl)
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setPhase('error')
-      })
-
-    return () => {
-      controller.abort()
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [book.bookId, book.groupId, bookIdentity, pageNumber, retryCount])
-
-  const retryPage = () => {
-    setPhase('loading')
-    setRetryCount((current) => current + 1)
+  const candidateLoaded = (event: SyntheticEvent<HTMLImageElement>) => {
+    if (!snapshot.candidateUrl || snapshot.candidateGeneration === undefined) return
+    pageLoader.candidateLoaded(
+      pageNumber,
+      snapshot.candidateGeneration,
+      snapshot.candidateUrl,
+      event.currentTarget.naturalWidth,
+      event.currentTarget.naturalHeight,
+    )
+  }
+  const candidateFailed = () => {
+    if (!snapshot.candidateUrl || snapshot.candidateGeneration === undefined) return
+    pageLoader.candidateFailed(pageNumber, snapshot.candidateGeneration, snapshot.candidateUrl)
   }
 
   return (
     <figure
-      className={`book-viewer__page book-viewer__page--${phase}`}
+      className={`book-viewer__page book-viewer__page--${snapshot.phase} ${snapshot.isUpgrading ? 'is-upgrading' : ''}`}
       data-page-number={pageNumber}
-      aria-busy={phase === 'loading' ? true : undefined}
+      aria-busy={isBusy ? true : undefined}
+      style={{ aspectRatio: snapshot.aspectRatio }}
     >
       <div className="book-viewer__page-frame">
-        {phase === 'loading' && <span className="book-viewer__page-skeleton" aria-hidden="true" />}
-        {pageUrl && (
+        {!snapshot.displayedUrl && isBusy && <span className="book-viewer__page-skeleton" aria-hidden="true" />}
+        {snapshot.displayedUrl && (
           <img
-            src={pageUrl}
-            alt={`${book.title}の${pageNumber}ページ目`}
+            src={snapshot.displayedUrl}
+            alt={pageLabel}
             width={PAGE_WIDTH}
             height={PAGE_HEIGHT}
-            loading="lazy"
             decoding="async"
-            onLoad={() => setPhase('loaded')}
-            onError={() => setPhase('error')}
           />
         )}
-        {phase === 'error' && (
-          <div className="book-viewer__page-error" role="alert">
+        {initialCandidateUrl && (
+          <img
+            src={initialCandidateUrl}
+            alt={pageLabel}
+            width={PAGE_WIDTH}
+            height={PAGE_HEIGHT}
+            decoding="async"
+            onLoad={candidateLoaded}
+            onError={candidateFailed}
+          />
+        )}
+        {upgradeCandidateUrl && (
+          <img
+            className="book-viewer__page-image-probe"
+            src={upgradeCandidateUrl}
+            alt=""
+            width={PAGE_WIDTH}
+            height={PAGE_HEIGHT}
+            decoding="async"
+            aria-hidden="true"
+            onLoad={candidateLoaded}
+            onError={candidateFailed}
+          />
+        )}
+        {snapshot.phase === 'error' && (
+          <div className="book-viewer__page-error" aria-label={`${pageLabel}を読み込めませんでした`}>
             <ImageOff size={27} strokeWidth={1.5} aria-hidden="true" />
             <span>このページを読み込めませんでした</span>
-            <button type="button" onClick={retryPage}>
+            <button type="button" onClick={() => pageLoader.manualRetry(pageNumber)}>
               <RotateCcw size={14} aria-hidden="true" />
               再試行
             </button>
@@ -539,6 +758,6 @@ function BookViewerPageImage({
       </div>
     </figure>
   )
-}
+})
 
 export { BookViewerPage }

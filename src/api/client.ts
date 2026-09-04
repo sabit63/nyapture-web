@@ -318,7 +318,17 @@ const buildUrl = (baseUrl: string, path: string, query?: ApiQuery): string => {
   return url.toString()
 }
 
-const parseTextPayload = async (response: Response): Promise<unknown> => {
+type RequestAbortSource = 'caller' | 'timeout'
+
+const isAbortLike = (error: unknown) => (
+  typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError'
+    || isRecord(error) && error.name === 'AbortError'
+)
+
+const parseTextPayload = async (
+  response: Response,
+  isAborted: () => boolean = () => false,
+): Promise<unknown> => {
   try {
     const text = await response.text()
     if (!text) return undefined
@@ -327,7 +337,10 @@ const parseTextPayload = async (response: Response): Promise<unknown> => {
     } catch {
       return text
     }
-  } catch {
+  } catch (error) {
+    // A failed body read is normally kept tolerant for compatibility, but a
+    // caller/timeout abort must reach the request-level classifier.
+    if (isAborted()) throw error
     return undefined
   }
 }
@@ -343,11 +356,6 @@ const extractResponseMessage = (payload: unknown, response: Response): string =>
 
 const abortError = (message: string, category: ApiErrorCategory, cause?: unknown) => (
   new ApiError(message, { category, cause })
-)
-
-const isAbortLike = (error: unknown) => (
-  typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError'
-    || isRecord(error) && error.name === 'AbortError'
 )
 
 /** A fetch wrapper with shared headers, query encoding, timeout, and redacted errors. */
@@ -371,48 +379,78 @@ export class ApiClient {
     return buildUrl(this.settings.apiUrl, path, query)
   }
 
-  private async request(path: string, options: ApiRequestOptions = {}): Promise<Response> {
+  private async requestAndConsume<T>(
+    path: string,
+    options: ApiRequestOptions,
+    consume: (response: Response, isAborted: () => boolean) => Promise<T>,
+  ): Promise<T> {
     const timeoutSeconds = options.timeoutSeconds ?? this.settings.timeoutSeconds
     if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 3600) {
       throw abortError('タイムアウト設定が無効です。', 'validation')
     }
 
     const controller = new AbortController()
-    let timedOut = false
+    let abortSource: RequestAbortSource | undefined
     let timeoutId: ReturnType<typeof setTimeout> | undefined
     const callerSignal = options.signal
-    const onCallerAbort = () => controller.abort(callerSignal?.reason)
-
     if (callerSignal?.aborted) {
       throw abortError('リクエストがキャンセルされました。', 'unknown', callerSignal.reason)
     }
-    callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
-    timeoutId = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-    }, timeoutSeconds * 1000)
-
-    const headers = new Headers(options.headers)
-    if (!headers.has('Accept')) headers.set('Accept', 'application/json')
-    if (options.body !== undefined) headers.set('Content-Type', 'application/json')
-    if (this.settings.apiKey) headers.set('X-API-Key', this.settings.apiKey)
-    else headers.delete('X-API-Key')
-    if (options.auth === 'edit' && this.settings.editKey) {
-      headers.set('X-Edit-Api-Key', this.settings.editKey)
-    } else headers.delete('X-Edit-Api-Key')
+    let rejectAbort: ((reason?: unknown) => void) | undefined
+    const abortPromise = new Promise<never>((_, reject) => {
+      rejectAbort = reject
+    })
+    const abortWith = (source: RequestAbortSource, reason?: unknown) => {
+      if (abortSource !== undefined) return
+      abortSource = source
+      controller.abort(reason)
+      rejectAbort?.(reason ?? new Error('API request aborted'))
+    }
+    const onCallerAbort = () => abortWith('caller', callerSignal?.reason)
 
     try {
+      callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
+      // An abort can be requested between the initial check and listener
+      // registration. Re-check so that this race is classified as caller-led.
+      if (callerSignal?.aborted) {
+        abortWith('caller', callerSignal.reason)
+        throw abortError('リクエストがキャンセルされました。', 'unknown', callerSignal.reason)
+      }
+
+      timeoutId = setTimeout(() => abortWith('timeout'), timeoutSeconds * 1000)
+
+      const headers = new Headers(options.headers)
+      if (!headers.has('Accept')) headers.set('Accept', 'application/json')
+      if (options.body !== undefined) headers.set('Content-Type', 'application/json')
+      if (this.settings.apiKey) headers.set('X-API-Key', this.settings.apiKey)
+      else headers.delete('X-API-Key')
+      if (options.auth === 'edit' && this.settings.editKey) {
+        headers.set('X-Edit-Api-Key', this.settings.editKey)
+      } else headers.delete('X-Edit-Api-Key')
+
       const url = this.buildUrl(path, options.query)
       const body = options.body === undefined ? undefined : JSON.stringify(options.body)
-      return await fetch(url, {
-        method: options.method ?? 'GET',
-        headers,
-        body,
-        signal: controller.signal,
-      })
+      const response = await Promise.race([
+        fetch(url, {
+          method: options.method ?? 'GET',
+          headers,
+          body,
+          signal: controller.signal,
+        }),
+        abortPromise,
+      ])
+      return await Promise.race([
+        consume(response, () => abortSource !== undefined),
+        abortPromise,
+      ])
     } catch (error) {
+      if (abortSource === 'timeout') {
+        throw abortError('APIリクエストがタイムアウトしました。', 'timeout', error)
+      }
+      if (abortSource === 'caller') {
+        throw abortError('リクエストがキャンセルされました。', 'unknown', error)
+      }
       if (error instanceof ApiError) throw error
-      if (timedOut) throw abortError('APIリクエストがタイムアウトしました。', 'timeout', error)
       if (isAbortLike(error) || callerSignal?.aborted) {
         throw abortError('リクエストがキャンセルされました。', 'unknown', error)
       }
@@ -424,43 +462,47 @@ export class ApiClient {
   }
 
   async requestJson<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-    const response = await this.request(path, options)
-    const payload = await parseTextPayload(response)
-    if (!response.ok) {
-      throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
-        status: response.status,
-        category: categoryForStatus(response.status),
-      })
-    }
-    return payload as T
+    return this.requestAndConsume(path, options, async (response, isAborted) => {
+      const payload = await parseTextPayload(response, isAborted)
+      if (!response.ok) {
+        throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
+          status: response.status,
+          category: categoryForStatus(response.status),
+        })
+      }
+      return payload as T
+    })
   }
 
   async requestText(path: string, options: ApiRequestOptions = {}): Promise<string> {
-    const response = await this.request(path, options)
-    const payload = await parseTextPayload(response)
-    if (!response.ok) {
-      throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
-        status: response.status,
-        category: categoryForStatus(response.status),
-      })
-    }
-    return typeof payload === 'string' ? payload : payload === undefined ? '' : JSON.stringify(payload)
+    return this.requestAndConsume(path, options, async (response, isAborted) => {
+      const payload = await parseTextPayload(response, isAborted)
+      if (!response.ok) {
+        throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
+          status: response.status,
+          category: categoryForStatus(response.status),
+        })
+      }
+      return typeof payload === 'string' ? payload : payload === undefined ? '' : JSON.stringify(payload)
+    })
   }
 
   async requestBlob(path: string, options: ApiRequestOptions = {}): Promise<Blob> {
-    const response = await this.request(path, options)
-    if (!response.ok) {
-      const payload = await parseTextPayload(response)
-      throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
-        status: response.status,
-        category: categoryForStatus(response.status),
-      })
-    }
-    try {
-      return await response.blob()
-    } catch (error) {
-      throw abortError('API応答を読み込めませんでした。', 'unknown', error)
-    }
+    return this.requestAndConsume(path, options, async (response, isAborted) => {
+      if (!response.ok) {
+        const payload = await parseTextPayload(response, isAborted)
+        throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
+          status: response.status,
+          category: categoryForStatus(response.status),
+        })
+      }
+      try {
+        return await response.blob()
+      } catch (error) {
+        if (isAborted()) throw error
+        throw abortError('API応答を読み込めませんでした。', 'unknown', error)
+      }
+    })
   }
 }
 

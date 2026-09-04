@@ -82,7 +82,15 @@ export const getBookDeletionJob = (jobId: string, signal?: AbortSignal) => (
 )
 
 export const getBookPageBlob = (
-  book: { groupId: string; bookId: string; page: number; width?: number; height?: number },
+  book: {
+    groupId: string
+    bookId: string
+    page: number
+    width?: number
+    height?: number
+    format?: 'jpeg' | 'png' | 'webp' | 'avif'
+    fallbackToOriginal?: boolean
+  },
   signal?: AbortSignal,
 ) => requestBlob('/api/book/page', {
   query: {
@@ -92,7 +100,8 @@ export const getBookPageBlob = (
     width: book.width,
     height: book.height,
     strategy: 'balanced',
-    fallback_to_original: true,
+    format: book.format,
+    fallback_to_original: book.fallbackToOriginal ?? true,
   },
   headers: { Accept: 'image/*' },
   signal,

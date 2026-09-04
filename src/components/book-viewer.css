@@ -64,7 +64,11 @@
   contain: layout;
 }
 
+.book-viewer__page--deferred,
+.book-viewer__page--queued,
 .book-viewer__page--loading,
+.book-viewer__page--decoding,
+.book-viewer__page--retryWaiting,
 .book-viewer__page--error {
   aspect-ratio: 5 / 7;
   overflow: hidden;
@@ -85,6 +89,14 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+.book-viewer__page img.book-viewer__page-image-probe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .book-viewer__page-skeleton {
