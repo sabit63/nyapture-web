@@ -19,6 +19,7 @@ import { Button, IconButton, StatePanel } from '../../components/ui'
 import { getBookIdentityKey } from '../library/book-deletion'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
 import type { SearchController } from './useSearchController'
+import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
 
 export type SearchHeaderProps = {
   controller: SearchController
@@ -82,6 +83,7 @@ export function SearchPage({ controller }: SearchPageProps) {
   const {
     isWebSearch,
     criteria,
+    searchResponseTags,
     hitomiAppend,
     hasCriteria,
     searchState,
@@ -119,10 +121,18 @@ export function SearchPage({ controller }: SearchPageProps) {
 
   const isSearchLoading = searchState === 'loading'
   const showSearchLoader = isSearchLoading && searchLoaderVisible
+  useDocumentTitle(formatSearchPageTitle({
+    isWebSearch,
+    isLibrarySearch: controller.isLibrarySearch,
+    criteria,
+    hitomiAppend,
+    resultPage,
+    responseTags: searchResponseTags,
+  }))
 
   return (
     <>
-      <h1 id="page-title" className="sr-only">{isWebSearch ? 'Web検索' : '蔵書検索'}</h1>
+      <h1 id="page-title" className="sr-only">{isWebSearch ? 'Web検索' : '検索'}</h1>
 
       <section className="filter-panel" aria-label="検索条件" hidden={!hasCriteria}>
         <div className="filter-values">

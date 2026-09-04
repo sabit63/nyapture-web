@@ -22,7 +22,7 @@ import {
   applySearchBookDownloadStatuses,
   getDownloadStatusIdentityKey,
 } from '../../realtime/search-book-status'
-import type { BookCardModel, BookDownloadStatus, BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
+import type { BookCardModel, BookDownloadStatus, BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
 import { getTagLabel, HITOMI_APPENDS, TAG_TYPE_ORDER } from '../../models'
 import { getBookIdentityKey, deleteBookAndWait } from '../library/book-deletion'
 import {
@@ -141,6 +141,7 @@ export function useSearchController({
 }: SearchControllerOptions) {
   const [librarySearchBooks, setLibrarySearchBooks] = useState<ApiBookCardModel[]>([])
   const [webSearchResultBooks, setWebSearchResultBooks] = useState<ApiBookCardModel[]>([])
+  const [searchResponseTags, setSearchResponseTags] = useState<TagEntity[]>([])
   const searchResultBooks = isWebSearch ? webSearchResultBooks : librarySearchBooks
   const [criteria, setCriteria] = useState<SearchCriteria>(() => parseCriteriaForRoute(new URLSearchParams(window.location.search), isWebSearch))
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(new URLSearchParams(window.location.search)).text)
@@ -305,6 +306,7 @@ export function useSearchController({
     setSearchSyncFreshness('syncing')
     setSearchError('')
     setSearchLoaderVisible(false)
+    setSearchResponseTags([])
     loadingTimer = window.setTimeout(() => {
       if (!controller.signal.aborted && isCurrentRequest()) setSearchLoaderVisible(true)
     }, 1000)
@@ -332,6 +334,7 @@ export function useSearchController({
             )
           }
           setWebSearchResultBooks(nextBooks)
+          setSearchResponseTags(response.tags ?? [])
           setTotalResultPages(mapped.totalPage)
           setSearchSyncFreshness('fresh')
         } else {
@@ -353,6 +356,7 @@ export function useSearchController({
             )
           }
           setLibrarySearchBooks(nextBooks)
+          setSearchResponseTags(response.tags ?? [])
           setTotalResultPages(Math.max(1, response.totalPage ?? 1))
           setSearchSyncFreshness('fresh')
         }
@@ -848,6 +852,7 @@ export function useSearchController({
     tagCandidates,
     showTagCandidates,
     searchResultBooks,
+    searchResponseTags,
     visibleBooks,
     hasCriteria,
     searchState,

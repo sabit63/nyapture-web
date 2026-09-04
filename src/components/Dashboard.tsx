@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getErrorMessage } from '../api'
+import { useDocumentTitle, formatPageTitle } from '../app/page-title'
 import { getDashboardLogEntries, getDashboardSummary } from '../api/dashboard'
 import type {
   CacheSummary,
@@ -31,7 +32,7 @@ import type {
   WebPilotSummary,
 } from '../models/dashboard'
 import { useVisiblePolling } from '../hooks/use-visible-polling'
-import { DashboardDetails, type DashboardDetailRoute } from './DashboardDetails'
+import { DashboardDetails, getDashboardRouteTitle, type DashboardDetailRoute } from './DashboardDetails'
 import { Button } from './ui'
 import './dashboard.css'
 
@@ -354,6 +355,9 @@ export const resolveDashboardRoute = (path?: string): DashboardRoute => {
 
 export function Dashboard({ path, apiRevision }: DashboardProps) {
   const route = resolveDashboardRoute(path)
+  useDocumentTitle(route === 'home'
+    ? formatPageTitle('Dashboard')
+    : formatPageTitle(getDashboardRouteTitle(route), 'Dashboard'))
   const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null)
   const [logs, setLogs] = useState<DashboardLogsResponse>(EMPTY_LOGS)
   const [summaryStatus, setSummaryStatus] = useState<'idle' | 'loading' | 'refreshing' | 'success' | 'error'>('loading')

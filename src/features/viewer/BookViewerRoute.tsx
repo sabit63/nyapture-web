@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { ApiError, getBook, getErrorMessage, mapEBookToCard } from '../../api'
 import type { ApiBookCardModel } from '../../api'
+import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
 import { BookViewerPage } from '../../components/BookViewerPage'
 import type { BookTag } from '../../models'
 
@@ -40,15 +41,25 @@ export function BookViewerRoute({ route, apiRevision, onTagSearch }: BookViewerR
   const [viewerState, setViewerState] = useState<BookViewerRouteState>(() => route.state === 'ready' ? 'loading' : 'missing')
   const [viewerError, setViewerError] = useState('')
   const [viewerRevision, setViewerRevision] = useState(0)
+  const [viewerBookIdentity, setViewerBookIdentity] = useState('')
+
+  const readyBook = viewerState === 'ready' && viewerBookIdentity === route.identity ? viewerBook : undefined
+  useDocumentTitle(readyBook
+    ? formatPageTitle(readyBook.title, 'Bookビューア')
+    : formatPageTitle('Bookビューア'))
 
   useEffect(() => {
     if (route.state !== 'ready' || !route.groupId || !route.bookId) {
       setViewerState('missing')
+      setViewerBook(undefined)
+      setViewerBookIdentity('')
       return
     }
     const controller = new AbortController()
     setViewerState('loading')
     setViewerError('')
+    setViewerBook(undefined)
+    setViewerBookIdentity('')
     getBook(route.groupId, route.bookId, controller.signal)
       .then((response) => {
         const book = response.books?.[0]
@@ -57,6 +68,7 @@ export function BookViewerRoute({ route, apiRevision, onTagSearch }: BookViewerR
           return
         }
         setViewerBook(mapEBookToCard(book, { context: 'library', entities: response.tags ?? [] }))
+        setViewerBookIdentity(route.identity)
         setViewerState('ready')
       })
       .catch((error) => {

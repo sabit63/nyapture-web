@@ -45,6 +45,8 @@ const ROUTE_META: Record<DashboardDetailRoute, RouteMeta> = {
   logs: { title: 'Logs', icon: ListChecks },
 }
 
+export const getDashboardRouteTitle = (route: DashboardDetailRoute) => ROUTE_META[route].title
+
 export type DashboardDetailsProps = {
   route: DashboardDetailRoute
   apiRevision: number

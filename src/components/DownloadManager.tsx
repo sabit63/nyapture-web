@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { formatPageTitle, useDocumentTitle } from '../app/page-title'
 import {
   ApiError,
   deleteDownloadItem,
@@ -422,6 +423,7 @@ export interface DownloadManagerProps {
 }
 
 export function DownloadManager({ apiRevision, hubConnectionState }: DownloadManagerProps) {
+  useDocumentTitle(formatPageTitle('ダウンロード管理'))
   const [downloads, setDownloads] = useState<DownloadJob[]>([])
   const [systemStatus, setSystemStatus] = useState<BookDownloadSystemStatus | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
