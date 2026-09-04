@@ -29,8 +29,13 @@ export const cloneCriteria = (criteria: SearchCriteria): SearchCriteria => ({
 })
 
 export const normalizeCriteriaForRoute = (criteria: SearchCriteria, isWebSearch: boolean): SearchCriteria => isWebSearch
-  ? { ...criteria, tags: criteria.tags.slice(0, 1), tagMode: 'and' }
+  ? { ...criteria, tagMode: 'and' }
   : criteria
+
+const JAPANESE_LANGUAGE_TAG: BookTag = { type: 'Languages', name: 'japanese' }
+
+const isJapaneseLanguageTag = (tag: BookTag) => tag.type === JAPANESE_LANGUAGE_TAG.type
+  && tag.name.toLocaleLowerCase() === JAPANESE_LANGUAGE_TAG.name
 
 export const parseHitomiAppend = (params: URLSearchParams): HitomiAppend => {
   const value = params.get('append')
@@ -55,6 +60,13 @@ export const parseCriteriaFromUrl = (params: URLSearchParams): SearchCriteria =>
   return criteria
 }
 
+export const parseCriteriaForRoute = (params: URLSearchParams, isWebSearch: boolean): SearchCriteria => {
+  const criteria = normalizeCriteriaForRoute(parseCriteriaFromUrl(params), isWebSearch)
+  if (!isWebSearch || params.get('japanese')?.trim().toLocaleLowerCase() === 'off') return criteria
+  if (criteria.tags.some(isJapaneseLanguageTag)) return criteria
+  return { ...criteria, tags: [...criteria.tags, { ...JAPANESE_LANGUAGE_TAG }] }
+}
+
 export const criteriaHasValues = (criteria: SearchCriteria) => Boolean(
   criteria.text.trim() || criteria.tags.length || criteria.dateFrom || criteria.dateTo || criteria.pagesMin || criteria.pagesMax,
 )
@@ -64,9 +76,10 @@ export const createSearchUrl = (criteria: SearchCriteria, hitomiAppend?: HitomiA
   const pathname = isHitomiSearch ? '/hitomila/search' : '/search'
   const url = new URL(pathname, window.location.origin)
   const text = criteria.text.trim()
-  const tags = isHitomiSearch ? criteria.tags.slice(0, 1) : criteria.tags
+  const tags = criteria.tags
   if (text) url.searchParams.set('q', text)
   tags.forEach((tag) => url.searchParams.append('tag', `${tag.type}:${tag.name}`))
+  if (isHitomiSearch && !tags.some(isJapaneseLanguageTag)) url.searchParams.set('japanese', 'off')
   if (!isHitomiSearch && tags.length && criteria.tagMode === 'or') url.searchParams.set('tagMode', 'or')
   if (criteria.dateFrom) url.searchParams.set('dateFrom', criteria.dateFrom)
   if (criteria.dateTo) url.searchParams.set('dateTo', criteria.dateTo)

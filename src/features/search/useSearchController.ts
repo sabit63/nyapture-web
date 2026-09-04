@@ -5,15 +5,12 @@ import {
   autocompleteTags,
   buildBookSearchFilter,
   buildHitomiSearchUrl,
-  downloadWebBookCacheBook,
   getErrorMessage,
-  getWebBookCacheBook,
   getWebBookContent,
   getWebPageContent,
   mapEBookToCard,
   mapHitomiSearchResponse,
   mapOnlineBookToCard,
-  mapWebCacheBookToCard,
   requestBlob,
   searchBooks as searchBooksApi,
   startBookDownload,
@@ -37,6 +34,7 @@ import {
   HITOMI_SORT_PERIODS,
   normalizeCriteriaForRoute,
   parseCriteriaFromUrl,
+  parseCriteriaForRoute,
   parseHitomiAppend,
   parsePageParam,
   resolveTag,
@@ -66,6 +64,8 @@ type BufferedSearchStatusEvent = {
 type SearchRealtimeBuffer = {
   events: BufferedSearchStatusEvent[]
 }
+
+const JAPANESE_LANGUAGE_TAG: BookTag = { type: 'Languages', name: 'japanese' }
 
 const statusTimestampValue = (status: BookDownloadStatus | undefined) => {
   if (!status?.lastUpdated) return undefined
@@ -142,7 +142,7 @@ export function useSearchController({
   const [librarySearchBooks, setLibrarySearchBooks] = useState<ApiBookCardModel[]>([])
   const [webSearchResultBooks, setWebSearchResultBooks] = useState<ApiBookCardModel[]>([])
   const searchResultBooks = isWebSearch ? webSearchResultBooks : librarySearchBooks
-  const [criteria, setCriteria] = useState<SearchCriteria>(() => normalizeCriteriaForRoute(parseCriteriaFromUrl(new URLSearchParams(window.location.search)), isWebSearch))
+  const [criteria, setCriteria] = useState<SearchCriteria>(() => parseCriteriaForRoute(new URLSearchParams(window.location.search), isWebSearch))
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(new URLSearchParams(window.location.search)).text)
   const [selected, setSelected] = useState<string[]>([])
   const [selectMode, setSelectMode] = useState(false)
@@ -153,7 +153,7 @@ export function useSearchController({
     ? parseHitomiAppend(new URLSearchParams(window.location.search))
     : 'Normal')
   const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [draftCriteria, setDraftCriteria] = useState<SearchCriteria>(() => normalizeCriteriaForRoute(parseCriteriaFromUrl(new URLSearchParams(window.location.search)), isWebSearch))
+  const [draftCriteria, setDraftCriteria] = useState<SearchCriteria>(() => parseCriteriaForRoute(new URLSearchParams(window.location.search), isWebSearch))
   const [draftHitomiAppend, setDraftHitomiAppend] = useState<HitomiAppend>(() => isWebSearch
     ? parseHitomiAppend(new URLSearchParams(window.location.search))
     : 'Normal')
@@ -417,7 +417,7 @@ export function useSearchController({
   useEffect(() => {
     const syncFromUrl = () => {
       const params = new URLSearchParams(window.location.search)
-      const nextCriteria = normalizeCriteriaForRoute(parseCriteriaFromUrl(params), isWebSearch)
+      const nextCriteria = parseCriteriaForRoute(params, isWebSearch)
       setCriteria(nextCriteria)
       setQuery(nextCriteria.text)
       setDraftCriteria(cloneCriteria(nextCriteria))
@@ -469,10 +469,15 @@ export function useSearchController({
     .slice(0, 8)
   const tagCandidates = tagInput.trim() ? remoteTagCandidates : localTagCandidates
   const showTagCandidates = tagInputFocused && tagCandidates.length > 0
+  const japaneseLanguageEnabled = criteria.tags.some((tag) => sameTag(tag, JAPANESE_LANGUAGE_TAG))
 
   const submitSearch = useCallback((event: FormEvent) => {
     event.preventDefault()
-    const nextCriteria: SearchCriteria = { ...emptyCriteria(), text: query.trim() }
+    const nextCriteria: SearchCriteria = {
+      ...emptyCriteria(),
+      text: query.trim(),
+      tags: isWebSearch && japaneseLanguageEnabled ? [JAPANESE_LANGUAGE_TAG] : [],
+    }
     const url = createSearchUrl(nextCriteria, isWebSearch ? hitomiAppend : undefined)
     if (isBookViewer) {
       window.location.assign(url.toString())
@@ -484,10 +489,15 @@ export function useSearchController({
     setDraftCriteria(cloneCriteria(nextCriteria))
     setSelected([])
     window.requestAnimationFrame(() => document.getElementById('results-region')?.focus())
-  }, [hitomiAppend, isBookViewer, isWebSearch, query])
+  }, [hitomiAppend, isBookViewer, isWebSearch, japaneseLanguageEnabled, query])
 
   const searchByTag = useCallback((tag: BookTag) => {
-    const nextCriteria: SearchCriteria = { ...emptyCriteria(), tags: [resolveTag(tag)] }
+    const resolvedTag = resolveTag(tag)
+    const nextTags = [resolvedTag]
+    if (isWebSearch && japaneseLanguageEnabled && !sameTag(resolvedTag, JAPANESE_LANGUAGE_TAG)) {
+      nextTags.push(JAPANESE_LANGUAGE_TAG)
+    }
+    const nextCriteria: SearchCriteria = { ...emptyCriteria(), tags: nextTags }
     const url = createSearchUrl(nextCriteria, isWebSearch ? hitomiAppend : undefined)
     if (isBookViewer) {
       window.location.assign(url.toString())
@@ -500,7 +510,29 @@ export function useSearchController({
     setDraftCriteria(cloneCriteria(nextCriteria))
     setSelected([])
     window.requestAnimationFrame(() => document.getElementById('results-region')?.focus())
-  }, [hitomiAppend, isBookViewer, isWebSearch])
+  }, [hitomiAppend, isBookViewer, isWebSearch, japaneseLanguageEnabled])
+
+  const toggleJapaneseLanguage = useCallback(() => {
+    if (!isWebSearch) return
+    const nextTags = japaneseLanguageEnabled
+      ? criteria.tags.filter((tag) => !sameTag(tag, JAPANESE_LANGUAGE_TAG))
+      : [...criteria.tags, JAPANESE_LANGUAGE_TAG]
+    const nextCriteria: SearchCriteria = {
+      ...criteria,
+      tags: nextTags,
+      tagMode: 'and',
+    }
+    const url = createSearchUrl(nextCriteria, hitomiAppend)
+    if (isBookViewer) {
+      window.location.assign(url.toString())
+      return
+    }
+    window.history.pushState({}, '', url)
+    setResultPage(1)
+    setCriteria(nextCriteria)
+    setDraftCriteria(cloneCriteria(nextCriteria))
+    setSelected([])
+  }, [criteria, hitomiAppend, isBookViewer, isWebSearch, japaneseLanguageEnabled])
 
   const openAdvancedSearch = useCallback(() => {
     setDraftCriteria(cloneCriteria(normalizeCriteriaForRoute(criteria, isWebSearch)))
@@ -538,11 +570,13 @@ export function useSearchController({
   }, [])
 
   const selectDraftTag = useCallback((tag: BookTag) => {
-    setDraftCriteria((current) => isWebSearch
-      ? { ...current, tags: [resolveTag(tag)], tagMode: 'and' }
-      : current.tags.some((selectedTag) => sameTag(selectedTag, tag))
-        ? current
-        : { ...current, tags: [...current.tags, resolveTag(tag)] })
+    setDraftCriteria((current) => ({
+      ...current,
+      tags: current.tags.some((selectedTag) => sameTag(selectedTag, tag))
+        ? current.tags
+        : [...current.tags, resolveTag(tag)],
+      tagMode: isWebSearch ? 'and' : current.tagMode,
+    }))
     setTagInput('')
     setHighlightedTagIndex(0)
     setTagInputFocused(true)
@@ -567,7 +601,7 @@ export function useSearchController({
       pagesMin: isWebSearch ? '' : draftCriteria.pagesMin.trim(),
       pagesMax: isWebSearch ? '' : draftCriteria.pagesMax.trim(),
       tagMode: isWebSearch ? 'and' : draftCriteria.tagMode,
-      tags: (isWebSearch ? draftCriteria.tags.slice(0, 1) : draftCriteria.tags).map((tag) => resolveTag(tag)),
+      tags: draftCriteria.tags.map((tag) => resolveTag(tag)),
     }
     const url = createSearchUrl(nextCriteria, isWebSearch ? nextHitomiAppend : undefined)
     if (isBookViewer) {
@@ -586,23 +620,6 @@ export function useSearchController({
   }, [draftCriteria, draftHitomiAppend, isBookViewer, isWebSearch])
 
   const fetchWebBook = useCallback(async (book: BookCardModel) => {
-    const apiGroupId = book.apiGroupId?.trim()
-    const apiBookId = book.apiBookId?.trim()
-    if (apiGroupId && apiBookId) {
-      try {
-        const response = await getWebBookCacheBook(apiGroupId, apiBookId)
-        if (response.data) {
-          const cached = mapWebCacheBookToCard(response.data)
-          try {
-            return (await overlaySavedBookStatuses([cached]))[0] ?? cached
-          } catch {
-            return cached
-          }
-        }
-      } catch (error) {
-        if (!book.url) throw error
-      }
-    }
     if (!book.url) throw new ApiError('Book URLがありません。', { category: 'validation' })
     const response = await getWebBookContent(book.url)
     const refreshed = response.book
@@ -656,14 +673,9 @@ export function useSearchController({
     if (book.status === 'Downloaded' || book.status === 'Downloading') return
 
     const bookKey = getBookIdentityKey(book)
-    const apiGroupId = book.apiGroupId?.trim()
-    const apiBookId = book.apiBookId?.trim()
     try {
-      if (apiGroupId && apiBookId) {
-        await downloadWebBookCacheBook(apiGroupId, apiBookId)
-      }
-      else if (book.url) await startBookDownload({ url: book.url, requestedBy: 'nyapture-web' })
-      else throw new ApiError('Book URLがありません。', { category: 'validation' })
+      if (!book.url) throw new ApiError('Book URLがありません。', { category: 'validation' })
+      await startBookDownload({ url: book.url, requestedBy: 'nyapture-web' })
       setWebSearchResultBooks((current) => current.map((candidate) => getBookIdentityKey(candidate) === bookKey
         ? { ...candidate, status: 'Downloading' }
         : candidate))
@@ -860,6 +872,8 @@ export function useSearchController({
     loadDeleteDialogThumbnail,
     submitSearch,
     searchByTag,
+    japaneseLanguageEnabled,
+    toggleJapaneseLanguage,
     openAdvancedSearch,
     requestAdvancedClose,
     afterAdvancedClose,

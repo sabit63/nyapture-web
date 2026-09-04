@@ -104,6 +104,8 @@ export function SearchPage({ controller }: SearchPageProps) {
     setSortDirection,
     toggleSelectMode,
     refresh,
+    japaneseLanguageEnabled,
+    toggleJapaneseLanguage,
     selectAllVisibleBooks,
     refreshSelectedWebBooks,
     deleteSelectedLibraryBooks,
@@ -155,6 +157,21 @@ export function SearchPage({ controller }: SearchPageProps) {
         <div className="results-toolbar">
           <div className="results-actions">
             {selectMode && <span className="selection-count" aria-live="polite">{selected.length}件を選択中</span>}
+            {isWebSearch && (
+              <Button
+                className={`language-toggle ${japaneseLanguageEnabled ? 'is-active' : ''}`}
+                variant="ghost"
+                tone="neutral"
+                size="compact"
+                type="button"
+                aria-label={`日本語指定は${japaneseLanguageEnabled ? 'オン' : 'オフ'}。${japaneseLanguageEnabled ? 'オフ' : 'オン'}に切り替える`}
+                aria-pressed={japaneseLanguageEnabled}
+                disabled={isSearchLoading}
+                onClick={toggleJapaneseLanguage}
+              >
+                日本語
+              </Button>
+            )}
             <label className="sort-control sort-control--type">
               <span>並び順</span>
               {isWebSearch ? (

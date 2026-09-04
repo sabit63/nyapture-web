@@ -36,6 +36,7 @@ const safePage = (value: unknown) => {
 }
 
 const tagFieldFor = (tagType: unknown, append: unknown) => {
+  if (tagType === 'Languages') return HITOMI_TAG_FIELDS.Languages
   if (append === 'Male' || append === 'Female') return append.toLocaleLowerCase()
   return typeof tagType === 'string' && tagType in HITOMI_TAG_FIELDS
     ? HITOMI_TAG_FIELDS[tagType as NyaTagType]
@@ -55,13 +56,11 @@ export const buildHitomiSearchUrl = (
   const normalizedPage = safePage(page)
   const text = typeof criteria?.text === 'string' ? criteria.text.trim() : ''
   const tags = Array.isArray(criteria?.tags) ? criteria.tags : []
-  const selectedTag = tags.find((tag) => normalizeTagName(tag?.name))
-  const terms = text ? [text] : []
-
-  if (selectedTag) {
-    const tagName = normalizeTagName(selectedTag.name)
-    terms.push(`${tagFieldFor(selectedTag.type, append)}:${tagName}`)
-  }
+  const tagTerms = tags.flatMap((tag) => {
+    const tagName = normalizeTagName(tag?.name)
+    return tagName ? [`${tagFieldFor(tag?.type, append)}:${tagName}`] : []
+  })
+  const terms = text ? [text, ...tagTerms] : tagTerms
 
   if (terms.length === 0) {
     return normalizedPage > 1
