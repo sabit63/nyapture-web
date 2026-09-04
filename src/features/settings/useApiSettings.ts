@@ -1,0 +1,255 @@
+import { useCallback, useEffect, useRef, useState, type Dispatch, type FormEvent, type RefObject, type SetStateAction } from 'react'
+
+import {
+  API_PROXY_PROTOCOLS,
+  DEFAULT_API_SETTINGS,
+  clearPersistedApiSettings,
+  configureApi,
+  getErrorMessage,
+  loadPersistedApiSettings,
+  loadPersistedDisplaySettings,
+  normalizeDisplaySettings,
+  savePersistedApiSettings,
+  savePersistedDisplaySettings,
+  testApiConnection as testApiConnectionRequest,
+  validateApiSettings,
+} from '../../api'
+import type { ApiProxyProtocol, ApiSettings, ApiSettingsErrors, DisplaySettings } from '../../api'
+import type { NativeDialogControls } from '../../components/ui'
+
+export type ApiConnectionState = 'idle' | 'pending' | 'success' | 'error'
+
+export const API_CONNECTION_STATE_LABELS: Record<ApiConnectionState, string> = {
+  idle: '未確認',
+  pending: '確認中',
+  success: '接続済み',
+  error: '接続エラー',
+}
+
+export type ApiSettingsController = {
+  apiSettings: ApiSettings
+  apiSettingsDraft: ApiSettings
+  displaySettings: DisplaySettings
+  displaySettingsDraft: DisplaySettings
+  apiSettingsOpen: boolean
+  apiSettingsExpanded: boolean
+  apiSettingsErrors: ApiSettingsErrors
+  apiSettingsSaveError: string
+  apiKeyVisible: boolean
+  editKeyVisible: boolean
+  draftConnectionState: ApiConnectionState
+  draftConnectionError: string
+  activeConnectionState: ApiConnectionState
+  apiRevision: number
+  apiSettingsDialogRef: RefObject<HTMLDialogElement | null>
+  apiSettingsTriggerRef: RefObject<HTMLButtonElement | null>
+  openApiSettings: () => void
+  requestApiSettingsClose: (reason: Parameters<NativeDialogControls['requestClose']>[0]) => boolean
+  afterApiSettingsClose: () => void
+  clearDraftConnectionCheck: () => void
+  testApiConnection: (settings?: ApiSettings) => Promise<void>
+  saveApiSettings: (event: FormEvent<HTMLFormElement>, requestClose: NativeDialogControls['requestClose']) => void
+  resetApiSettings: (requestClose: NativeDialogControls['requestClose']) => void
+  setApiSettingsExpanded: (expanded: boolean) => void
+  setApiKeyVisible: (visible: boolean | ((current: boolean) => boolean)) => void
+  setEditKeyVisible: (visible: boolean | ((current: boolean) => boolean)) => void
+  setApiSettingsDraft: Dispatch<SetStateAction<ApiSettings>>
+  setApiSettingsErrors: Dispatch<SetStateAction<ApiSettingsErrors>>
+  setApiSettingsSaveError: Dispatch<SetStateAction<string>>
+  setDisplaySettingsDraft: Dispatch<SetStateAction<DisplaySettings>>
+}
+
+export function useApiSettings(notify: (message: string, tone?: 'success' | 'warning' | 'error') => void): ApiSettingsController {
+  const [apiSettings, setApiSettings] = useState<ApiSettings>(() => configureApi(loadPersistedApiSettings()))
+  const [apiSettingsDraft, setApiSettingsDraft] = useState<ApiSettings>(() => ({ ...apiSettings }))
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadPersistedDisplaySettings())
+  const [displaySettingsDraft, setDisplaySettingsDraft] = useState<DisplaySettings>(() => ({ ...displaySettings }))
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false)
+  const [apiSettingsExpanded, setApiSettingsExpanded] = useState(true)
+  const [apiSettingsErrors, setApiSettingsErrors] = useState<ApiSettingsErrors>({})
+  const [apiSettingsSaveError, setApiSettingsSaveError] = useState('')
+  const [apiKeyVisible, setApiKeyVisible] = useState(false)
+  const [editKeyVisible, setEditKeyVisible] = useState(false)
+  const [draftConnectionState, setDraftConnectionState] = useState<ApiConnectionState>('idle')
+  const [draftConnectionError, setDraftConnectionError] = useState('')
+  const [activeConnectionState, setActiveConnectionState] = useState<ApiConnectionState>('idle')
+  const [apiRevision, setApiRevision] = useState(0)
+  const apiSettingsDialogRef = useRef<HTMLDialogElement>(null)
+  const apiSettingsTriggerRef = useRef<HTMLButtonElement>(null)
+  const draftConnectionAbortRef = useRef<AbortController | null>(null)
+  const activeConnectionAbortRef = useRef<AbortController | null>(null)
+  const announceActiveConnectionRef = useRef<'save' | 'reset' | null>(null)
+
+  const clearDraftConnectionCheck = useCallback(() => {
+    draftConnectionAbortRef.current?.abort()
+    draftConnectionAbortRef.current = null
+    setDraftConnectionError('')
+    setDraftConnectionState('idle')
+  }, [])
+
+  const testApiConnection = useCallback(async (settings: ApiSettings = apiSettingsDraft) => {
+    const { normalized, errors } = validateApiSettings(settings)
+    setApiSettingsErrors(errors)
+    if (!normalized) return
+
+    setApiSettingsDraft(normalized)
+    setApiSettingsSaveError('')
+    clearDraftConnectionCheck()
+    setDraftConnectionState('pending')
+    const controller = new AbortController()
+    draftConnectionAbortRef.current = controller
+    try {
+      await testApiConnectionRequest(normalized, controller.signal)
+      if (controller.signal.aborted) return
+      setDraftConnectionState('success')
+    } catch (error) {
+      if (controller.signal.aborted) return
+      setDraftConnectionError(getErrorMessage(error))
+      setDraftConnectionState('error')
+    } finally {
+      if (draftConnectionAbortRef.current === controller) draftConnectionAbortRef.current = null
+    }
+  }, [apiSettingsDraft, clearDraftConnectionCheck])
+
+  const openApiSettings = useCallback(() => {
+    const nextDraft = { ...apiSettings }
+    clearDraftConnectionCheck()
+    setApiKeyVisible(false)
+    setEditKeyVisible(false)
+    setApiSettingsExpanded(true)
+    setApiSettingsDraft(nextDraft)
+    setDisplaySettingsDraft({ ...displaySettings })
+    setApiSettingsErrors({})
+    setApiSettingsSaveError('')
+    setApiSettingsOpen(true)
+    void testApiConnection(nextDraft)
+  }, [apiSettings, clearDraftConnectionCheck, displaySettings, testApiConnection])
+
+  const prepareApiSettingsClose = useCallback(() => {
+    clearDraftConnectionCheck()
+    setApiKeyVisible(false)
+    setEditKeyVisible(false)
+  }, [clearDraftConnectionCheck])
+
+  const requestApiSettingsClose = useCallback((_reason: Parameters<NativeDialogControls['requestClose']>[0]) => {
+    prepareApiSettingsClose()
+    setApiSettingsOpen(false)
+    return true
+  }, [prepareApiSettingsClose])
+
+  const afterApiSettingsClose = useCallback(() => {
+    prepareApiSettingsClose()
+    setApiSettingsOpen(false)
+  }, [prepareApiSettingsClose])
+
+  const saveApiSettings = useCallback((event: FormEvent<HTMLFormElement>, requestClose: NativeDialogControls['requestClose']) => {
+    event.preventDefault()
+    const { normalized, errors } = validateApiSettings(apiSettingsDraft)
+    setApiSettingsErrors(errors)
+    if (!normalized) return
+    const normalizedDisplaySettings = normalizeDisplaySettings(displaySettingsDraft)
+
+    try {
+      savePersistedApiSettings(normalized)
+      savePersistedDisplaySettings(normalizedDisplaySettings)
+    } catch {
+      setApiSettingsSaveError('設定を端末へ保存できませんでした。ブラウザのストレージ設定を確認してください。')
+      return
+    }
+
+    clearDraftConnectionCheck()
+    configureApi(normalized)
+    setDisplaySettings(normalizedDisplaySettings)
+    setApiSettings(normalized)
+    setApiSettingsDraft(normalized)
+    setDisplaySettingsDraft(normalizedDisplaySettings)
+    announceActiveConnectionRef.current = 'save'
+    setApiRevision((current) => current + 1)
+    requestClose('submit')
+  }, [apiSettingsDraft, clearDraftConnectionCheck, displaySettingsDraft])
+
+  const resetApiSettings = useCallback((requestClose: NativeDialogControls['requestClose']) => {
+    if (!window.confirm('端末に保存したAPI設定を削除し、既定値へ戻しますか？')) return
+
+    try {
+      clearPersistedApiSettings()
+    } catch {
+      setApiSettingsSaveError('端末に保存したAPI設定を削除できませんでした。ブラウザのストレージ設定を確認してください。')
+      return
+    }
+
+    const defaults = configureApi({ ...DEFAULT_API_SETTINGS })
+    clearDraftConnectionCheck()
+    setApiSettings(defaults)
+    setApiSettingsDraft(defaults)
+    setApiSettingsErrors({})
+    setApiSettingsSaveError('')
+    announceActiveConnectionRef.current = 'reset'
+    setApiRevision((current) => current + 1)
+    requestClose('submit')
+  }, [clearDraftConnectionCheck])
+
+  useEffect(() => {
+    activeConnectionAbortRef.current?.abort()
+    const controller = new AbortController()
+    activeConnectionAbortRef.current = controller
+    const announcedAction = announceActiveConnectionRef.current
+    setActiveConnectionState('pending')
+
+    void testApiConnectionRequest(undefined, controller.signal)
+      .then(() => {
+        if (controller.signal.aborted) return
+        setActiveConnectionState('success')
+        if (announcedAction === 'save') notify('API設定を保存し、接続を確認しました')
+        if (announcedAction === 'reset') notify('API設定を既定値へ戻し、接続を確認しました')
+        if (announceActiveConnectionRef.current === announcedAction) announceActiveConnectionRef.current = null
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setActiveConnectionState('error')
+        if (announcedAction === 'save') notify('API設定を保存しましたが、接続を確認できませんでした', 'warning')
+        if (announcedAction === 'reset') notify('API設定を既定値へ戻しましたが、接続を確認できませんでした', 'warning')
+        if (announceActiveConnectionRef.current === announcedAction) announceActiveConnectionRef.current = null
+      })
+      .finally(() => {
+        if (activeConnectionAbortRef.current === controller) activeConnectionAbortRef.current = null
+      })
+
+    return () => controller.abort()
+  }, [apiRevision, notify])
+
+  return {
+    apiSettings,
+    apiSettingsDraft,
+    displaySettings,
+    displaySettingsDraft,
+    apiSettingsOpen,
+    apiSettingsExpanded,
+    apiSettingsErrors,
+    apiSettingsSaveError,
+    apiKeyVisible,
+    editKeyVisible,
+    draftConnectionState,
+    draftConnectionError,
+    activeConnectionState,
+    apiRevision,
+    apiSettingsDialogRef,
+    apiSettingsTriggerRef,
+    openApiSettings,
+    requestApiSettingsClose,
+    afterApiSettingsClose,
+    clearDraftConnectionCheck,
+    testApiConnection,
+    saveApiSettings,
+    resetApiSettings,
+    setApiSettingsExpanded,
+    setApiKeyVisible,
+    setEditKeyVisible,
+    setApiSettingsDraft,
+    setApiSettingsErrors,
+    setApiSettingsSaveError,
+    setDisplaySettingsDraft,
+  }
+}
+
+export { API_PROXY_PROTOCOLS, type ApiProxyProtocol }

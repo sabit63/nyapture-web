@@ -35,6 +35,15 @@ import type {
   MongoDbDiagnosticsResponse,
 } from '../models/dashboard'
 import { useVisiblePolling } from '../hooks/use-visible-polling'
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  IconButton,
+  type CloseReason,
+} from './ui'
 
 type DetailEnvelope<T> = DashboardApiResponse<T>
 type DetailLoader<T> = (signal: AbortSignal) => Promise<DetailEnvelope<T>>
@@ -150,7 +159,7 @@ function MetricCard({ label, value, icon: Icon, tone = 'muted' }: { label: strin
 }
 
 function DetailFrame<T>({ title, query, children }: { title: string; query: DetailQuery<T>; children: ReactNode }) {
-  return <div className="dashboard-detail__content" aria-busy={query.loading}><p className="dashboard__live-region dashboard-detail__live-region sr-only" role="status" aria-live="polite">{query.announcement}</p><div className="dashboard-detail__meta-line">{query.generatedAt && <time className="dashboard-detail__generated" dateTime={query.generatedAt}>{formatDateTime(query.generatedAt)}</time>}</div>{query.error && <div className="dashboard-detail__inline-error" role="alert"><CircleAlert size={15} aria-hidden="true" /><span>{query.error}</span><button className="icon-button" type="button" aria-label={`${title}を再試行`} onClick={query.refresh} disabled={query.loading}><RotateCcw size={15} aria-hidden="true" /></button></div>}{query.data === null ? query.loading ? <DetailSkeleton /> : <div className="dashboard-detail__empty" role="status"><TriangleAlert size={18} aria-hidden="true" /><span>データなし</span></div> : children}</div>
+  return <div className="dashboard-detail__content" aria-busy={query.loading}><p className="dashboard__live-region dashboard-detail__live-region sr-only" role="status" aria-live="polite">{query.announcement}</p><div className="dashboard-detail__meta-line">{query.generatedAt && <time className="dashboard-detail__generated" dateTime={query.generatedAt}>{formatDateTime(query.generatedAt)}</time>}</div>{query.error && <div className="dashboard-detail__inline-error" role="alert"><CircleAlert size={15} aria-hidden="true" /><span>{query.error}</span><IconButton variant="ghost" tone="danger" size="compact" type="button" aria-label={`${title}を再試行`} onClick={query.refresh} disabled={query.loading}><RotateCcw size={15} aria-hidden="true" /></IconButton></div>}{query.data === null ? query.loading ? <DetailSkeleton /> : <div className="dashboard-detail__empty" role="status"><TriangleAlert size={18} aria-hidden="true" /><span>データなし</span></div> : children}</div>
 }
 
 function useDashboardData<T>(apiRevision: number, route: string, load: DetailLoader<T>, title: string, getGeneratedAt?: (data: T | null) => string | null): DetailQuery<T> {
@@ -247,31 +256,33 @@ export function DataFolderDetails({ apiRevision }: { apiRevision: number }) {
 }
 
 function ConfirmDialog({ open, title, value, pending, confirmLabel, triggerRef, onConfirm, onDismiss }: { open: boolean; title: string; value?: ReactNode; pending: boolean; confirmLabel: string; triggerRef: RefObject<HTMLElement | null>; onConfirm: () => void; onDismiss: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const dismiss = useCallback(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (typeof dialog.close === 'function') {
-      dialog.close()
-      return
-    }
-    dialog.removeAttribute('open')
+  const onRequestClose = useCallback((reason: CloseReason) => {
+    if (pending || reason === 'submit') return false
     onDismiss()
-    restoreDialogFocus(triggerRef)
-  }, [onDismiss, triggerRef])
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (open && !dialog.open) {
-      if (typeof dialog.showModal === 'function') dialog.showModal()
-      else dialog.setAttribute('open', '')
-    }
-    if (!open && dialog.open) {
-      if (typeof dialog.close === 'function') dialog.close()
-      else dialog.removeAttribute('open')
-    }
-  }, [open])
-  return <dialog ref={dialogRef} className="dashboard-detail__dialog" aria-labelledby="dashboard-confirm-title" onCancel={(event) => { if (pending) event.preventDefault() }} onClose={() => { onDismiss(); restoreDialogFocus(triggerRef) }}><div className="dashboard-detail__dialog-body"><h2 id="dashboard-confirm-title">{title}</h2>{value && <div>{value}</div>}<div className="dashboard-detail__dialog-actions"><button className="dashboard-detail__button" type="button" disabled={pending} onClick={dismiss}><X size={15} aria-hidden="true" />キャンセル</button><button className="dashboard-detail__button dashboard-detail__button--danger" type="button" aria-busy={pending} disabled={pending} onClick={onConfirm}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{pending ? '処理中' : confirmLabel}</button></div></div></dialog>
+    return true
+  }, [onDismiss, pending])
+
+  return (
+    <Dialog
+      open={open}
+      className="dashboard-detail__dialog"
+      aria-labelledby="dashboard-confirm-title"
+      onRequestClose={onRequestClose}
+      resolveRestoreFocus={() => triggerRef.current}
+      dismissible={!pending}
+    >
+      {({ requestClose }) => (
+        <>
+          <DialogHeader><h2 id="dashboard-confirm-title">{title}</h2></DialogHeader>
+          <DialogBody>{value && <div>{value}</div>}</DialogBody>
+          <DialogFooter className="dashboard-detail__dialog-actions">
+            <Button variant="outline" tone="neutral" size="compact" type="button" disabled={pending} onClick={() => requestClose('close-button')}><X size={15} aria-hidden="true" />キャンセル</Button>
+            <Button variant="solid" tone="danger" size="compact" type="button" aria-busy={pending} disabled={pending} onClick={onConfirm}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{pending ? '処理中' : confirmLabel}</Button>
+          </DialogFooter>
+        </>
+      )}
+    </Dialog>
+  )
 }
 
 type LogLevelFilter = 'All' | 'Information' | 'Warning' | 'Error' | 'Critical'
@@ -284,12 +295,6 @@ const mergeLogs = (current: DashboardLogsResponse | null, incoming: DashboardLog
   entries.forEach((entry, index) => { const key = entry.sequence == null ? `${entry.timestamp ?? ''}-${entry.category ?? ''}-${entry.message ?? ''}-${index}` : String(entry.sequence); bySequence.set(key, entry) })
   const nextEntries = Array.from(bySequence.values()).sort((left, right) => (left.sequence ?? 0) - (right.sequence ?? 0)).slice(-500)
   return { ...(current ?? {}), ...(incoming ?? {}), entries: nextEntries, latestSequence: Math.max(current?.latestSequence ?? 0, incoming?.latestSequence ?? 0, ...nextEntries.map((entry) => entry.sequence ?? 0)) }
-}
-
-const restoreDialogFocus = (triggerRef: RefObject<HTMLElement | null>) => {
-  const focus = () => triggerRef.current?.focus()
-  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(focus)
-  else focus()
 }
 
 export function LogsDetails({ apiRevision }: { apiRevision: number }) {
@@ -338,5 +343,5 @@ export function LogsDetails({ apiRevision }: { apiRevision: number }) {
 
   const data = query.data
   if (!data) return <DetailFrame title="Logs" query={query}>{null}</DetailFrame>
-  return <DetailFrame title="Logs" query={query}><DetailSection title="ログ" count={formatNumber(entries.length)}><div className="dashboard-detail__toolbar"><label className="dashboard-detail__filter-label" htmlFor="dashboard-log-level">Level<select id="dashboard-log-level" value={level} onChange={(event) => setLevel(event.target.value as LogLevelFilter)}><option value="All">All</option><option value="Information">Information</option><option value="Warning">Warning</option><option value="Error">Error</option><option value="Critical">Critical</option></select></label><label className="dashboard-detail__filter-label" htmlFor="dashboard-log-category">Category<select id="dashboard-log-category" value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option value={item} key={item}>{item}</option>)}</select></label><label className="dashboard-detail__search-field" htmlFor="dashboard-log-keyword"><Search size={14} aria-hidden="true" /><span className="sr-only">Keyword</span><input id="dashboard-log-keyword" type="search" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="Keyword" /></label><label className="dashboard-detail__check-label"><input type="checkbox" checked={autoScroll} onChange={(event) => setAutoScroll(event.target.checked)} />自動スクロール</label><button ref={triggerRef} className="dashboard-detail__button dashboard-detail__button--danger" type="button" onClick={() => setClearOpen(true)}><Trash2 size={15} aria-hidden="true" />クリア</button></div><div ref={listRef} className="dashboard-detail__table-wrap dashboard-detail__log-scroll" role="region" aria-label="ログ一覧" tabIndex={0}><table className="dashboard-detail__table"><caption className="sr-only">ログ一覧</caption><thead><tr><th scope="col">時刻</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Message</th></tr></thead><tbody>{entries.map((entry, index) => { const status = getStatus(entry.level); return <tr key={`${entry.sequence ?? 'entry'}-${index}`}><td><time dateTime={entry.timestamp ?? undefined}>{formatDateTime(entry.timestamp)}</time></td><td><StatusBadge tone={status.tone} icon={status.icon}>{visibleLogLevel(entry.level)}</StatusBadge></td><td>{entry.category || '—'}</td><td><span className="dashboard-detail__log-message">{entry.message || '—'}</span>{entry.exception && <details className="dashboard-detail__exception"><summary>例外</summary><pre>{entry.exception}</pre></details>}</td></tr> })}</tbody></table>{!entries.length && <div className="dashboard-detail__empty">—</div>}</div>{feedback && <span className="dashboard-detail__feedback" role="status">{feedback}</span>}</DetailSection><ConfirmDialog open={clearOpen} title="ログ クリア" value={<StatusBadge tone="danger" icon={Trash2}>全ログ</StatusBadge>} pending={clearPending} confirmLabel="クリア" triggerRef={triggerRef} onConfirm={() => void clearLogs()} onDismiss={() => setClearOpen(false)} /></DetailFrame>
+  return <DetailFrame title="Logs" query={query}><DetailSection title="ログ" count={formatNumber(entries.length)}><div className="dashboard-detail__toolbar"><label className="dashboard-detail__filter-label" htmlFor="dashboard-log-level">Level<select id="dashboard-log-level" value={level} onChange={(event) => setLevel(event.target.value as LogLevelFilter)}><option value="All">All</option><option value="Information">Information</option><option value="Warning">Warning</option><option value="Error">Error</option><option value="Critical">Critical</option></select></label><label className="dashboard-detail__filter-label" htmlFor="dashboard-log-category">Category<select id="dashboard-log-category" value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option value={item} key={item}>{item}</option>)}</select></label><label className="dashboard-detail__search-field" htmlFor="dashboard-log-keyword"><Search size={14} aria-hidden="true" /><span className="sr-only">Keyword</span><input id="dashboard-log-keyword" type="search" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="Keyword" /></label><label className="dashboard-detail__check-label"><input type="checkbox" checked={autoScroll} onChange={(event) => setAutoScroll(event.target.checked)} />自動スクロール</label><Button ref={triggerRef} variant="solid" tone="danger" size="default" type="button" onClick={() => setClearOpen(true)}><Trash2 size={15} aria-hidden="true" />クリア</Button></div><div ref={listRef} className="dashboard-detail__table-wrap dashboard-detail__log-scroll" role="region" aria-label="ログ一覧" tabIndex={0}><table className="dashboard-detail__table"><caption className="sr-only">ログ一覧</caption><thead><tr><th scope="col">時刻</th><th scope="col">Level</th><th scope="col">Category</th><th scope="col">Message</th></tr></thead><tbody>{entries.map((entry, index) => { const status = getStatus(entry.level); return <tr key={`${entry.sequence ?? 'entry'}-${index}`}><td><time dateTime={entry.timestamp ?? undefined}>{formatDateTime(entry.timestamp)}</time></td><td><StatusBadge tone={status.tone} icon={status.icon}>{visibleLogLevel(entry.level)}</StatusBadge></td><td>{entry.category || '—'}</td><td><span className="dashboard-detail__log-message">{entry.message || '—'}</span>{entry.exception && <details className="dashboard-detail__exception"><summary>例外</summary><pre>{entry.exception}</pre></details>}</td></tr> })}</tbody></table>{!entries.length && <div className="dashboard-detail__empty">—</div>}</div>{feedback && <span className="dashboard-detail__feedback" role="status">{feedback}</span>}</DetailSection><ConfirmDialog open={clearOpen} title="ログ クリア" value={<StatusBadge tone="danger" icon={Trash2}>全ログ</StatusBadge>} pending={clearPending} confirmLabel="クリア" triggerRef={triggerRef} onConfirm={() => void clearLogs()} onDismiss={() => setClearOpen(false)} /></DetailFrame>
 }

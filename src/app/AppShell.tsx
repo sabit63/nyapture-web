@@ -2,6 +2,7 @@ import { Menu, X } from 'lucide-react'
 import { type ReactNode, type RefObject } from 'react'
 
 import nyaIcon from '../assets/icon.png'
+import { Button, buttonClassName } from '../components/ui/Button'
 import { IconButton } from '../components/ui/IconButton'
 import { isNavigationItemActive, navigationGroups } from './navigation'
 
@@ -37,6 +38,8 @@ export function AppShell({
           <IconButton
             ref={menuButtonRef}
             className="menu-button"
+            variant="ghost"
+            tone="neutral"
             aria-label="ナビゲーションを開く"
             aria-expanded={drawerOpen}
             aria-controls="primary-navigation"
@@ -57,13 +60,20 @@ export function AppShell({
         </div>
       </header>
 
-      <button className="drawer-scrim" type="button" aria-label="ナビゲーションを閉じる" onClick={onCloseDrawer} />
+      <Button
+        className="drawer-scrim"
+        variant="ghost"
+        tone="neutral"
+        size="compact"
+        aria-label="ナビゲーションを閉じる"
+        onClick={onCloseDrawer}
+      />
 
       <aside id="primary-navigation" className={`drawer ${drawerOpen ? 'drawer--open' : ''}`} aria-label="メインナビゲーション">
         <div className="drawer__mobile-head">
           <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
           <span>Nyapture</span>
-          <IconButton aria-label="ナビゲーションを閉じる" onClick={onCloseDrawer}>
+          <IconButton variant="ghost" tone="neutral" aria-label="ナビゲーションを閉じる" onClick={onCloseDrawer}>
             <X size={19} aria-hidden="true" />
           </IconButton>
         </div>
@@ -78,16 +88,31 @@ export function AppShell({
                   return (
                     <li key={item.label}>
                       {item.href ? (
-                        <a href={item.href} className={`nav-item ${itemIsActive ? 'nav-item--active' : ''}`} aria-current={itemIsActive ? 'page' : undefined} onClick={onNavigate}>
+                        <a
+                          href={item.href}
+                          className={buttonClassName(
+                            { variant: 'ghost', tone: 'neutral', size: 'default' },
+                            `nav-item ${itemIsActive ? 'nav-item--active' : ''}`,
+                          )}
+                          aria-current={itemIsActive ? 'page' : undefined}
+                          onClick={onNavigate}
+                        >
                           <Icon size={18} />
                           <span>{item.label}</span>
                         </a>
                       ) : (
-                        <button className="nav-item" type="button" aria-label={`${item.label}（準備中）`} disabled>
+                        <Button
+                          className="nav-item"
+                          variant="ghost"
+                          tone="neutral"
+                          size="default"
+                          aria-label={`${item.label}（準備中）`}
+                          disabled
+                        >
                           <Icon size={18} />
                           <span>{item.label}</span>
                           <span className="nav-item__soon">Soon</span>
-                        </button>
+                        </Button>
                       )}
                     </li>
                   )

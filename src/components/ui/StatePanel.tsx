@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 import './state-panel.css'
 
-export type StatePanelTone = 'neutral' | 'danger'
+export type StatePanelTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 
 export type StatePanelProps = {
   title: string

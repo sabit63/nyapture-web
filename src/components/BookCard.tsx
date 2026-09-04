@@ -7,13 +7,15 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import type { ApiBookCardModel } from '../api'
 import { requestBlob } from '../api'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
 import { Thumbnail } from './Thumbnail'
+import { Button } from './ui/Button'
+import { Dialog, DialogBody, DialogHeader } from './ui/Dialog'
 import { IconButton } from './ui/IconButton'
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
 import type { BookCardModel, BookTag } from '../models'
@@ -47,9 +49,9 @@ export function BookCard({
   onDownload,
 }: BookCardProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
-  const tagsPanelRef = useRef<HTMLDivElement>(null)
-  const tagsPointerStartedOutsideRef = useRef(false)
   const tagsTriggerRef = useRef<HTMLButtonElement>(null)
+  const tagsCloseButtonRef = useRef<HTMLButtonElement>(null)
+  const [tagsOpen, setTagsOpen] = useState(false)
   const thumbnailRequest = (book as ApiBookCardModel).thumbnailRequest
   const thumbnailReloadKey = (book as ApiBookCardModel).thumbnailReloadKey
   const sourceLabel = book.sourceLabel?.trim() || undefined
@@ -70,8 +72,7 @@ export function BookCard({
       ? `${book.title}はダウンロード中`
       : `${book.title}をダウンロード`
 
-  const openTagsDialog = () => dialogRef.current?.showModal()
-  const closeTagsDialog = () => dialogRef.current?.close()
+  const openTagsDialog = () => setTagsOpen(true)
 
   return (
     <article className={`book-card ${selected ? 'book-card--selected' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`} data-book-status={book.status}>
@@ -90,22 +91,52 @@ export function BookCard({
         <BookStatusBadge status={book.status} />
         {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
         {selectMode ? (
-          <button className="card-select" type="button" aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`} aria-pressed={selected} onClick={onToggle}>
+          <IconButton
+            className="card-select card-select--control"
+            variant="ghost"
+            tone="neutral"
+            size="compact"
+            aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`}
+            aria-pressed={selected}
+            onClick={onToggle}
+          >
             {selected && <Check size={15} />}
-          </button>
+          </IconButton>
         ) : isWebSearch ? (
           <div className="card-actions" aria-label={`${book.title}の操作`}>
-            <button className="card-action" type="button" aria-label={`${book.title}を再読み込み`} onClick={() => onRefresh?.()}>
+            <IconButton
+              className="card-action card-action--control"
+              variant="ghost"
+              tone="neutral"
+              size="compact"
+              aria-label={`${book.title}を再読み込み`}
+              onClick={() => onRefresh?.()}
+            >
               <RefreshCw size={16} aria-hidden="true" />
-            </button>
-            <button className="card-action" type="button" aria-label={downloadLabel} disabled={downloadDisabled} onClick={() => onDownload?.()}>
+            </IconButton>
+            <IconButton
+              className="card-action card-action--control"
+              variant="ghost"
+              tone="neutral"
+              size="compact"
+              aria-label={downloadLabel}
+              disabled={downloadDisabled}
+              onClick={() => onDownload?.()}
+            >
               <Download size={16} aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
         ) : (
-          <button className="card-action card-action--delete" type="button" aria-label={`${book.title}を削除`} onClick={(event) => onDelete?.(event.currentTarget)}>
+          <IconButton
+            className="card-action card-action--control card-action--delete"
+            variant="ghost"
+            tone="danger"
+            size="compact"
+            aria-label={`${book.title}を削除`}
+            onClick={(event) => onDelete?.(event.currentTarget)}
+          >
             <Trash2 size={17} aria-hidden="true" />
-          </button>
+          </IconButton>
         )}
       </Thumbnail>
       <div className="book-card__body">
@@ -117,15 +148,17 @@ export function BookCard({
             <TagChip key={`${tag.type}:${tag.name}`} tag={tag} size="compact" onClick={() => onTagSearch(tag)} />
           ))}
           {hiddenTagCount > 0 && (
-            <button
+            <Button
               ref={tagsTriggerRef}
-              className="tag-overflow"
-              type="button"
+              className="tag-overflow tag-overflow--control"
+              variant="ghost"
+              tone="accent"
+              size="compact"
               aria-label={`${book.title}の残り${hiddenTagCount}件のタグを表示`}
               onClick={openTagsDialog}
             >
               +{hiddenTagCount}
-            </button>
+            </Button>
           )}
         </div>
         <div className="book-card__meta">
@@ -133,71 +166,60 @@ export function BookCard({
           <time dateTime={book.uploadedTime}><CalendarDays size={13} aria-hidden="true" />{formatDisplayDate(book.uploadedTime)}</time>
         </div>
       </div>
-      <dialog
+      <Dialog
         ref={dialogRef}
-        className="ui-dialog tags-dialog"
+        className="tags-dialog"
+        open={tagsOpen}
         aria-labelledby={`tags-dialog-title-${book.bookId}`}
-        onClose={() => tagsTriggerRef.current?.focus()}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault()
-            closeTagsDialog()
-          }
-        }}
-        onPointerDown={(event) => {
-          const panel = tagsPanelRef.current
-          if (!panel) return
-          const rect = panel.getBoundingClientRect()
-          tagsPointerStartedOutsideRef.current = event.clientX < rect.left
-            || event.clientX > rect.right
-            || event.clientY < rect.top
-            || event.clientY > rect.bottom
-        }}
-        onClick={(event) => {
-          if (event.target === event.currentTarget && tagsPointerStartedOutsideRef.current) closeTagsDialog()
-          tagsPointerStartedOutsideRef.current = false
+        initialFocusRef={tagsCloseButtonRef}
+        resolveRestoreFocus={() => tagsTriggerRef.current}
+        onRequestClose={() => {
+          setTagsOpen(false)
+          return true
         }}
       >
-        <div ref={tagsPanelRef} className="tags-dialog__panel">
-          <header className="tags-dialog__header">
-            <div>
-              <span>タグ一覧</span>
-              <h2 id={`tags-dialog-title-${book.bookId}`}>{book.title}</h2>
-            </div>
-            <IconButton aria-label="タグ一覧を閉じる" onClick={closeTagsDialog}>
-              <X size={19} aria-hidden="true" />
-            </IconButton>
-          </header>
-          <div className="tags-dialog__body">
-            {TAG_TYPE_ORDER.map((type) => {
-              const tags = book.tags.filter((tag) => tag.type === type)
-              if (!tags.length) return null
-              return (
-                <section className="tags-dialog__group" key={type} aria-labelledby={`tags-${book.bookId}-${type}`}>
-                  <div className="tags-dialog__group-heading">
-                    <h3 id={`tags-${book.bookId}-${type}`}>{TAG_TYPE_LABELS[type]}</h3>
-                    <span>{tags.length}</span>
-                  </div>
-                  <div className="tags-dialog__chips">
-                    {tags.map((tag) => (
-                      <TagChip
-                        key={`${tag.type}:${tag.name}`}
-                        tag={tag}
-                        size="default"
-                        title={tag.displayName && tag.displayName !== tag.name ? tag.name : undefined}
-                        onClick={() => {
-                          closeTagsDialog()
-                          onTagSearch(tag)
-                        }}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
+        {({ requestClose }) => (
+          <div className="tags-dialog__panel">
+            <DialogHeader className="tags-dialog__header">
+              <div>
+                <span>タグ一覧</span>
+                <h2 id={`tags-dialog-title-${book.bookId}`}>{book.title}</h2>
+              </div>
+              <IconButton ref={tagsCloseButtonRef} aria-label="タグ一覧を閉じる" onClick={() => requestClose('close-button')}>
+                <X size={19} aria-hidden="true" />
+              </IconButton>
+            </DialogHeader>
+            <DialogBody className="tags-dialog__body">
+              {TAG_TYPE_ORDER.map((type) => {
+                const tags = book.tags.filter((tag) => tag.type === type)
+                if (!tags.length) return null
+                return (
+                  <section className="tags-dialog__group" key={type} aria-labelledby={`tags-${book.bookId}-${type}`}>
+                    <div className="tags-dialog__group-heading">
+                      <h3 id={`tags-${book.bookId}-${type}`}>{TAG_TYPE_LABELS[type]}</h3>
+                      <span>{tags.length}</span>
+                    </div>
+                    <div className="tags-dialog__chips">
+                      {tags.map((tag) => (
+                        <TagChip
+                          key={`${tag.type}:${tag.name}`}
+                          tag={tag}
+                          size="default"
+                          title={tag.displayName && tag.displayName !== tag.name ? tag.name : undefined}
+                          onClick={() => {
+                            requestClose('submit')
+                            onTagSearch(tag)
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )
+              })}
+            </DialogBody>
           </div>
-        </div>
-      </dialog>
+        )}
+      </Dialog>
     </article>
   )
 }

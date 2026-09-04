@@ -48,6 +48,15 @@ import type {
   MaintenanceStorageSyncMode,
 } from '../models/dashboard'
 import { useVisiblePolling } from '../hooks/use-visible-polling'
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  IconButton,
+  type CloseReason,
+} from './ui'
 
 type DetailStatus = 'idle' | 'loading' | 'refreshing' | 'success' | 'error'
 type MutationStatus = 'idle' | 'pending' | 'success' | 'error'
@@ -101,7 +110,7 @@ function DetailSkeleton() { return <div className="dashboard-detail__loading" ar
 function DetailState({ status, error, onRetry }: { status: DetailStatus; error: string | null; onRetry: () => void }) {
   if (status === 'loading') return <DetailSkeleton />
   if (!error) return null
-  return <div className="dashboard-detail__error" role="alert"><CircleAlert size={15} aria-hidden="true" /><span>{error}</span><button className="dashboard-detail__button" type="button" aria-label="再試行" onClick={onRetry} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></button></div>
+  return <div className="dashboard-detail__error" role="alert"><CircleAlert size={15} aria-hidden="true" /><span>{error}</span><IconButton variant="ghost" tone="danger" size="compact" type="button" aria-label="再試行" onClick={onRetry} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton></div>
 }
 function DetailSection({ title, count, children }: { title: string; count?: ReactNode; children: ReactNode }) { return <section className="dashboard-detail__section"><div className="dashboard-detail__section-heading"><h2>{title}</h2>{count !== undefined && <span className="dashboard-detail__count">{count}</span>}</div>{children}</section> }
 function ActionFeedback({ status, message }: { status: MutationStatus; message: string | null }) { if (!message && status !== 'pending') return null; return <span className="dashboard-detail__feedback" role="status" aria-live="polite">{status === 'pending' && <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" />}{status === 'success' && <Check size={14} aria-hidden="true" />}{status === 'error' && <CircleAlert size={14} aria-hidden="true" />}<span>{status === 'pending' ? '処理中' : message}</span></span> }
@@ -170,72 +179,94 @@ export function ServiceDetails({ service, apiRevision }: { service: DashboardSer
   const test = async () => { if (testStatus === 'pending') return; const controller = create(); setTestStatus('pending'); setTestMessage(null); try { const response = await testService(service, controller.signal); if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? '疎通テストに失敗しました。', { category: 'server' }); setTestResult(response.data ?? null); setTestStatus('success'); setTestMessage(response.message ?? '疎通テスト完了') } catch (requestError: unknown) { if (!isAbort(requestError, controller.signal)) { setTestStatus('error'); setTestMessage(mutationError(requestError)) } } finally { release(controller); if (!controller.signal.aborted) setTestStatus((current) => current === 'pending' ? 'idle' : current) } }
 
   if (status === 'loading') return <DetailSkeleton />
-  return <div className="dashboard-detail__content" aria-busy={status === 'refreshing'}><div className="dashboard-detail__toolbar"><StatusBadge tone={config?.isApiKeyConfigured ? 'success' : 'muted'} icon={Server}>{config?.isApiKeyConfigured ? 'API key 設定済み' : 'API key 未設定'}</StatusBadge>{dirty && <StatusBadge tone="warning">未保存</StatusBadge>}<button className="dashboard-detail__button" type="button" aria-label={`${title}を更新`} onClick={() => setReload((current) => current + 1)} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></button></div><DetailState status={status} error={error} onRetry={() => setReload((current) => current + 1)} /><form className="dashboard-detail__form" onSubmit={(event) => void save(event)}><div className="dashboard-detail__form-grid"><label>Base URL<input type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label><label>API key<input type="text" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => { setApiKey(event.target.value); setKeyTouched(true) }} /></label></div><div className="dashboard-detail__form-actions"><button className="dashboard-detail__button dashboard-detail__button--primary" type="submit" disabled={!dirty || saveStatus === 'pending'} aria-busy={saveStatus === 'pending'}>{saveStatus === 'pending' ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}保存</button><button className="dashboard-detail__button" type="button" onClick={() => void test()} disabled={testStatus === 'pending'} aria-busy={testStatus === 'pending'}>{testStatus === 'pending' ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Activity size={15} aria-hidden="true" />}テスト</button><ActionFeedback status={saveStatus} message={saveMessage} /><ActionFeedback status={testStatus} message={testMessage} /></div></form><DetailSection title="現在"><dl className="dashboard-detail__grid"><div className="dashboard-detail__metric"><dt>Base URL</dt><dd>{textValue(config?.baseUrl)}</dd></div><div className="dashboard-detail__metric"><dt>API key</dt><dd>{config?.isApiKeyConfigured ? '設定済み' : '未設定'}</dd></div><div className="dashboard-detail__metric"><dt>変更</dt><dd>{formatDateTime(config?.lastModified)}</dd></div></dl></DetailSection><DetailSection title="接続"><div className="dashboard-detail__status-row">{testResult ? <>{testResult.success ? <StatusBadge tone="success" icon={CheckCircle2}>正常</StatusBadge> : <StatusBadge tone="danger" icon={CircleAlert}>失敗</StatusBadge>}<span>{testResult.statusCode ?? '—'}</span><span>{testResult.latencyMs == null ? '—' : `${formatNumber(testResult.latencyMs)} ms`}</span><span>{textValue(testResult.message)}</span></> : <span className="dashboard-detail__empty">—</span>}</div></DetailSection></div>
+  return (
+    <div className="dashboard-detail__content" aria-busy={status === 'refreshing'}>
+      <div className="dashboard-detail__toolbar">
+        <StatusBadge tone={config?.isApiKeyConfigured ? 'success' : 'muted'} icon={Server}>{config?.isApiKeyConfigured ? 'API key 設定済み' : 'API key 未設定'}</StatusBadge>
+        {dirty && <StatusBadge tone="warning">未保存</StatusBadge>}
+        <IconButton variant="ghost" tone="neutral" size="compact" type="button" aria-label={`${title}を更新`} onClick={() => setReload((current) => current + 1)} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton>
+      </div>
+      <DetailState status={status} error={error} onRetry={() => setReload((current) => current + 1)} />
+      <form className="dashboard-detail__form" onSubmit={(event) => void save(event)}>
+        <div className="dashboard-detail__form-grid">
+          <label>Base URL<input type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} /></label>
+          <label>API key<input type="text" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => { setApiKey(event.target.value); setKeyTouched(true) }} /></label>
+        </div>
+        <div className="dashboard-detail__form-actions">
+          <Button variant="solid" tone="accent" size="default" type="submit" disabled={!dirty || saveStatus === 'pending'} aria-busy={saveStatus === 'pending'}>{saveStatus === 'pending' ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}保存</Button>
+          <Button variant="outline" tone="neutral" size="default" type="button" onClick={() => void test()} disabled={testStatus === 'pending'} aria-busy={testStatus === 'pending'}>{testStatus === 'pending' ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Activity size={15} aria-hidden="true" />}テスト</Button>
+          <ActionFeedback status={saveStatus} message={saveMessage} />
+          <ActionFeedback status={testStatus} message={testMessage} />
+        </div>
+      </form>
+      <DetailSection title="現在"><dl className="dashboard-detail__grid"><div className="dashboard-detail__metric"><dt>Base URL</dt><dd>{textValue(config?.baseUrl)}</dd></div><div className="dashboard-detail__metric"><dt>API key</dt><dd>{config?.isApiKeyConfigured ? '設定済み' : '未設定'}</dd></div><div className="dashboard-detail__metric"><dt>変更</dt><dd>{formatDateTime(config?.lastModified)}</dd></div></dl></DetailSection>
+      <DetailSection title="接続"><div className="dashboard-detail__status-row">{testResult ? <>{testResult.success ? <StatusBadge tone="success" icon={CheckCircle2}>正常</StatusBadge> : <StatusBadge tone="danger" icon={CircleAlert}>失敗</StatusBadge>}<span>{testResult.statusCode ?? '—'}</span><span>{testResult.latencyMs == null ? '—' : `${formatNumber(testResult.latencyMs)} ms`}</span><span>{textValue(testResult.message)}</span></> : <span className="dashboard-detail__empty">—</span>}</div></DetailSection>
+    </div>
+  )
 }
 
 const numericDraft = (value?: number | null) => value == null ? '' : String(value)
 const parseNumeric = (value: string, minimum = 0) => { if (!value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) && parsed >= minimum ? parsed : undefined }
 const issueInResult = (result: MaintenanceCheckResultDetailDto | null | undefined) => ['warning', 'warn', 'error', 'failed', 'failure'].includes(normalize(result?.status)) || Object.keys(result?.issuePages ?? {}).length > 0
-const restoreDialogFocus = (triggerRef?: RefObject<HTMLElement | null>) => {
-  const focus = () => triggerRef?.current?.focus()
-  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(focus)
-  else focus()
-}
 
 function ActionDialog({ open, title, value, pending, confirmLabel, triggerRef, onConfirm, onDismiss }: { open: boolean; title: string; value?: ReactNode; pending: boolean; confirmLabel: string; triggerRef?: RefObject<HTMLElement | null>; onConfirm: () => void; onDismiss: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const dismiss = useCallback(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (typeof dialog.close === 'function') {
-      dialog.close()
-      return
-    }
-    dialog.removeAttribute('open')
+  const onRequestClose = useCallback((reason: CloseReason) => {
+    if (pending || reason === 'submit') return false
     onDismiss()
-    restoreDialogFocus(triggerRef)
-  }, [onDismiss, triggerRef])
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (open && !dialog.open) {
-      if (typeof dialog.showModal === 'function') dialog.showModal()
-      else dialog.setAttribute('open', '')
-    }
-    if (!open && dialog.open) {
-      if (typeof dialog.close === 'function') dialog.close()
-      else dialog.removeAttribute('open')
-    }
-  }, [open])
-  return <dialog ref={dialogRef} className="dashboard-detail__dialog" aria-labelledby="dashboard-action-dialog-title" onCancel={(event) => { if (pending) event.preventDefault(); else onDismiss() }} onClose={() => { onDismiss(); restoreDialogFocus(triggerRef) }}><div className="dashboard-detail__dialog-body"><h2 id="dashboard-action-dialog-title">{title}</h2>{value && <div>{value}</div>}<div className="dashboard-detail__dialog-actions"><button className="dashboard-detail__button" type="button" disabled={pending} onClick={dismiss}><X size={15} aria-hidden="true" />キャンセル</button><button className="dashboard-detail__button dashboard-detail__button--primary" type="button" aria-busy={pending} disabled={pending} onClick={onConfirm}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{pending ? '処理中' : confirmLabel}</button></div></div></dialog>
+    return true
+  }, [onDismiss, pending])
+
+  return (
+    <Dialog
+      open={open}
+      className="dashboard-detail__dialog"
+      aria-labelledby="dashboard-action-dialog-title"
+      onRequestClose={onRequestClose}
+      resolveRestoreFocus={() => triggerRef?.current ?? null}
+      dismissible={!pending}
+    >
+      {({ requestClose }) => (
+        <>
+          <DialogHeader><h2 id="dashboard-action-dialog-title">{title}</h2></DialogHeader>
+          <DialogBody>{value && <div>{value}</div>}</DialogBody>
+          <DialogFooter className="dashboard-detail__dialog-actions">
+            <Button variant="outline" tone="neutral" size="compact" type="button" disabled={pending} onClick={() => requestClose('close-button')}><X size={15} aria-hidden="true" />キャンセル</Button>
+            <Button variant="solid" tone="accent" size="compact" type="button" aria-busy={pending} disabled={pending} onClick={onConfirm}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{pending ? '処理中' : confirmLabel}</Button>
+          </DialogFooter>
+        </>
+      )}
+    </Dialog>
+  )
 }
 
 function BookCacheDialog({ open, pending, bookId, triggerRef, onBookIdChange, onSubmit, onDismiss }: { open: boolean; pending: boolean; bookId: string; triggerRef: RefObject<HTMLElement | null>; onBookIdChange: (value: string) => void; onSubmit: (event: FormEvent) => void; onDismiss: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const dismiss = useCallback(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (typeof dialog.close === 'function') {
-      dialog.close()
-      return
-    }
-    dialog.removeAttribute('open')
+  const onRequestClose = useCallback((reason: CloseReason) => {
+    if (pending || reason === 'submit') return false
     onDismiss()
-    restoreDialogFocus(triggerRef)
-  }, [onDismiss, triggerRef])
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    if (open && !dialog.open) {
-      if (typeof dialog.showModal === 'function') dialog.showModal()
-      else dialog.setAttribute('open', '')
-    }
-    if (!open && dialog.open) {
-      if (typeof dialog.close === 'function') dialog.close()
-      else dialog.removeAttribute('open')
-    }
-  }, [open])
-  return <dialog ref={dialogRef} className="dashboard-detail__dialog" aria-labelledby="cache-remove-dialog-title" onCancel={(event) => { if (pending) event.preventDefault(); else onDismiss() }} onClose={() => { onDismiss(); restoreDialogFocus(triggerRef) }}><form className="dashboard-detail__dialog-body" onSubmit={onSubmit}><h2 id="cache-remove-dialog-title">Cache 個別削除</h2><p>BookIdだけを指定します。</p><label>BookId<input value={bookId} onChange={(event) => onBookIdChange(event.target.value)} required /></label><div className="dashboard-detail__dialog-actions"><button className="dashboard-detail__button" type="button" onClick={dismiss} disabled={pending}>キャンセル</button><button className="dashboard-detail__button dashboard-detail__button--danger" type="submit" disabled={pending} aria-busy={pending}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}削除</button></div></form></dialog>
+    return true
+  }, [onDismiss, pending])
+
+  return (
+    <Dialog
+      open={open}
+      className="dashboard-detail__dialog"
+      aria-labelledby="cache-remove-dialog-title"
+      onRequestClose={onRequestClose}
+      resolveRestoreFocus={() => triggerRef.current ?? null}
+      dismissible={!pending}
+    >
+      {({ requestClose }) => (
+        <form className="dashboard-detail__dialog-form" onSubmit={onSubmit}>
+          <DialogHeader><h2 id="cache-remove-dialog-title">Cache 個別削除</h2></DialogHeader>
+          <DialogBody><p>BookIdだけを指定します。</p><label>BookId<input value={bookId} onChange={(event) => onBookIdChange(event.target.value)} required /></label></DialogBody>
+          <DialogFooter className="dashboard-detail__dialog-actions">
+            <Button variant="outline" tone="neutral" size="compact" type="button" onClick={() => requestClose('close-button')} disabled={pending}>キャンセル</Button>
+            <Button variant="solid" tone="danger" size="compact" type="submit" disabled={pending} aria-busy={pending}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}削除</Button>
+          </DialogFooter>
+        </form>
+      )}
+    </Dialog>
+  )
 }
 
 function RunDetail({ data, filter }: { data: MaintenanceRunDetailResponse; filter: 'all' | 'issues' }) {
@@ -325,7 +356,32 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
   const running = Boolean(snapshot?.isRunning)
   const paused = Boolean(snapshot?.isPaused)
   const busy = action !== null
-  return <div className="dashboard-detail__content" aria-busy={status === 'refreshing'}><div className="dashboard-detail__toolbar"><StatusBadge tone={running ? 'info' : 'muted'} icon={running ? Activity : CheckCircle2}>{running ? '実行中' : '停止'}</StatusBadge><StatusBadge tone={paused ? 'warning' : 'muted'} icon={Pause}>{paused ? 'Paused' : 'Not paused'}</StatusBadge><StatusBadge tone={snapshot?.isThrottled ? 'warning' : 'muted'} icon={Gauge}>{snapshot?.isThrottled ? 'Throttled' : 'Not throttled'}</StatusBadge><span>Run {textValue(snapshot?.currentRunId)}</span><span>{formatNumber(snapshot?.currentProcessedBooks)} books</span><span>CPU {snapshot?.currentCpuUsage == null ? '—' : `${formatNumber(snapshot.currentCpuUsage)}%`}</span><button className="dashboard-detail__button" type="button" aria-label="Maintenanceを更新" onClick={() => setReload((current) => current + 1)} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></button></div><DetailState status={status} error={error ?? issueError} onRetry={() => setReload((current) => current + 1)} /><DetailSection title="実行状態"><dl className="dashboard-detail__definition-grid"><div><dt>CurrentRunId</dt><dd>{textValue(snapshot?.currentRunId)}</dd></div><div><dt>処理済み Books</dt><dd>{formatNumber(snapshot?.currentProcessedBooks)}</dd></div><div><dt>CPU 使用率</dt><dd>{snapshot?.currentCpuUsage == null ? '—' : `${formatNumber(snapshot.currentCpuUsage)}%`}</dd></div><div><dt>最終実行</dt><dd>{formatDateTime(snapshot?.lastExecutionTime)}</dd></div><div><dt>次回実行</dt><dd>{formatDateTime(snapshot?.nextExecutionTime)}</dd></div><div><dt>最終結果</dt><dd>{textValue(snapshot?.lastExecutionResult)}</dd></div></dl></DetailSection><DetailSection title="操作"><div className="dashboard-detail__actions"><button ref={runTriggerRef} className="dashboard-detail__button dashboard-detail__button--primary" type="button" onClick={() => setRunMode('Quick')} disabled={busy || running}><Play size={14} aria-hidden="true" />Quick</button><button className="dashboard-detail__button" type="button" onClick={() => setRunMode('Deep')} disabled={busy || running}><Play size={14} aria-hidden="true" />Deep</button><button className="dashboard-detail__button dashboard-detail__button--danger" type="button" onClick={() => void mutate('cancel')} disabled={busy || !running}><X size={14} aria-hidden="true" />Cancel</button>{paused ? <button className="dashboard-detail__button" type="button" onClick={() => void mutate('resume')} disabled={busy || !running}><Play size={14} aria-hidden="true" />Resume</button> : <button className="dashboard-detail__button" type="button" onClick={() => void mutate('pause')} disabled={busy || !running}><Pause size={14} aria-hidden="true" />Pause</button>}<ActionFeedback status={actionStatus} message={actionMessage} /></div></DetailSection><DetailSection title="スケジュール"><form className="dashboard-detail__form" onSubmit={(event) => void saveSchedule(event)}><div className="dashboard-detail__form-grid"><label>Interval 分<input type="number" min="1" step="1" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} /></label><label>CPU %<input type="number" min="0" max="100" step="1" value={cpuThreshold} onChange={(event) => setCpuThreshold(event.target.value)} /></label></div><div className="dashboard-detail__form-actions"><button className="dashboard-detail__button" type="submit" disabled={scheduleStatus === 'pending'} aria-busy={scheduleStatus === 'pending'}>{scheduleStatus === 'pending' ? <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}保存</button><ActionFeedback status={scheduleStatus} message={scheduleMessage} /></div></form></DetailSection><DetailSection title="履歴" count={formatNumber(snapshot?.recentHistory?.length ?? 0)}><div className="dashboard-detail__table-wrap" role="region" aria-label="Maintenance履歴" tabIndex={0}><table className="dashboard-detail__table"><thead><tr><th scope="col">RunId</th><th scope="col">Start</th><th scope="col">Result</th><th scope="col">Mode</th><th scope="col">Books</th><th scope="col">Issues</th></tr></thead><tbody>{(snapshot?.recentHistory ?? []).map((entry: MaintenanceHistoryEntryDto, index) => { const id = entry.runId?.trim(); return <tr key={id ?? index}><th scope="row"><button className="dashboard-detail__table-button" type="button" onClick={() => id && loadRun(id)} disabled={!id} aria-expanded={id ? expandedRun === id : undefined}><code>{textValue(id)}</code></button></th><td>{formatDateTime(entry.startedAt)}</td><td>{textValue(entry.result)}</td><td>{textValue(entry.storageSyncMode)}</td><td>{formatNumber(entry.processedBooks)}</td><td>{formatNumber(entry.issuesDetected)}</td></tr> })}</tbody></table>{!snapshot?.recentHistory?.length && <div className="dashboard-detail__empty">—</div>}</div>{expandedRun && <div className="dashboard-detail__panel">{runLoading === expandedRun && <DetailSkeleton />}{runErrors[expandedRun] && <div className="dashboard-detail__error" role="alert"><CircleAlert size={14} aria-hidden="true" />{runErrors[expandedRun]}</div>}{runDetails[expandedRun] && <><div className="dashboard-detail__filters"><button className="dashboard-detail__button" type="button" aria-pressed={taskFilter === 'all'} onClick={() => setTaskFilter('all')}>All</button><button className="dashboard-detail__button" type="button" aria-pressed={taskFilter === 'issues'} onClick={() => setTaskFilter('issues')}>Issues</button></div><RunDetail data={runDetails[expandedRun]} filter={taskFilter} /></>}</div>}</DetailSection><DetailSection title="検出問題" count={formatNumber(issues.length)}><ul className="dashboard-detail__issue-list">{issues.map((issue, index) => <li className="dashboard-detail__issue" key={`${issue.runId}-${issue.target}-${index}`}><StatusBadge tone="warning" icon={TriangleAlert}>{textValue(issue.issueType)}</StatusBadge><code>{textValue(issue.target)}</code><span>{textValue(issue.detail)}</span><span>{textValue(issue.runId)}</span><time dateTime={issue.detectedAt ?? undefined}>{formatDateTime(issue.detectedAt)}</time></li>)}</ul>{!issues.length && <span className="dashboard-detail__empty">—</span>}</DetailSection><ActionDialog open={runMode !== null} title="Maintenance を開始" value={<StatusBadge tone={runMode === 'Deep' ? 'warning' : 'info'}>{textValue(runMode)}</StatusBadge>} pending={busy} confirmLabel="開始" triggerRef={runTriggerRef} onConfirm={() => void run()} onDismiss={() => setRunMode(null)} /></div>
+  return (
+    <div className="dashboard-detail__content" aria-busy={status === 'refreshing'}>
+      <div className="dashboard-detail__toolbar">
+        <StatusBadge tone={running ? 'info' : 'muted'} icon={running ? Activity : CheckCircle2}>{running ? '実行中' : '停止'}</StatusBadge>
+        <StatusBadge tone={paused ? 'warning' : 'muted'} icon={Pause}>{paused ? 'Paused' : 'Not paused'}</StatusBadge>
+        <StatusBadge tone={snapshot?.isThrottled ? 'warning' : 'muted'} icon={Gauge}>{snapshot?.isThrottled ? 'Throttled' : 'Not throttled'}</StatusBadge>
+        <span>Run {textValue(snapshot?.currentRunId)}</span>
+        <span>{formatNumber(snapshot?.currentProcessedBooks)} books</span>
+        <span>CPU {snapshot?.currentCpuUsage == null ? '—' : `${formatNumber(snapshot.currentCpuUsage)}%`}</span>
+        <IconButton variant="ghost" tone="neutral" size="compact" type="button" aria-label="Maintenanceを更新" onClick={() => setReload((current) => current + 1)} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton>
+      </div>
+      <DetailState status={status} error={error ?? issueError} onRetry={() => setReload((current) => current + 1)} />
+      <DetailSection title="実行状態"><dl className="dashboard-detail__definition-grid"><div><dt>CurrentRunId</dt><dd>{textValue(snapshot?.currentRunId)}</dd></div><div><dt>処理済み Books</dt><dd>{formatNumber(snapshot?.currentProcessedBooks)}</dd></div><div><dt>CPU 使用率</dt><dd>{snapshot?.currentCpuUsage == null ? '—' : `${formatNumber(snapshot.currentCpuUsage)}%`}</dd></div><div><dt>最終実行</dt><dd>{formatDateTime(snapshot?.lastExecutionTime)}</dd></div><div><dt>次回実行</dt><dd>{formatDateTime(snapshot?.nextExecutionTime)}</dd></div><div><dt>最終結果</dt><dd>{textValue(snapshot?.lastExecutionResult)}</dd></div></dl></DetailSection>
+      <DetailSection title="操作"><div className="dashboard-detail__actions">
+        <Button ref={runTriggerRef} variant="solid" tone="accent" size="default" type="button" onClick={() => setRunMode('Quick')} disabled={busy || running}><Play size={14} aria-hidden="true" />Quick</Button>
+        <Button variant="outline" tone="neutral" size="default" type="button" onClick={() => setRunMode('Deep')} disabled={busy || running}><Play size={14} aria-hidden="true" />Deep</Button>
+        <Button variant="solid" tone="danger" size="default" type="button" onClick={() => void mutate('cancel')} disabled={busy || !running}><X size={14} aria-hidden="true" />Cancel</Button>
+        {paused ? <Button variant="outline" tone="neutral" size="default" type="button" onClick={() => void mutate('resume')} disabled={busy || !running}><Play size={14} aria-hidden="true" />Resume</Button> : <Button variant="outline" tone="neutral" size="default" type="button" onClick={() => void mutate('pause')} disabled={busy || !running}><Pause size={14} aria-hidden="true" />Pause</Button>}
+        <ActionFeedback status={actionStatus} message={actionMessage} />
+      </div></DetailSection>
+      <DetailSection title="スケジュール"><form className="dashboard-detail__form" onSubmit={(event) => void saveSchedule(event)}><div className="dashboard-detail__form-grid"><label>Interval 分<input type="number" min="1" step="1" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} /></label><label>CPU %<input type="number" min="0" max="100" step="1" value={cpuThreshold} onChange={(event) => setCpuThreshold(event.target.value)} /></label></div><div className="dashboard-detail__form-actions"><Button variant="outline" tone="neutral" size="default" type="submit" disabled={scheduleStatus === 'pending'} aria-busy={scheduleStatus === 'pending'}>{scheduleStatus === 'pending' ? <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" /> : <Save size={14} aria-hidden="true" />}保存</Button><ActionFeedback status={scheduleStatus} message={scheduleMessage} /></div></form></DetailSection>
+      <DetailSection title="履歴" count={formatNumber(snapshot?.recentHistory?.length ?? 0)}><div className="dashboard-detail__table-wrap" role="region" aria-label="Maintenance履歴" tabIndex={0}><table className="dashboard-detail__table"><thead><tr><th scope="col">RunId</th><th scope="col">Start</th><th scope="col">Result</th><th scope="col">Mode</th><th scope="col">Books</th><th scope="col">Issues</th></tr></thead><tbody>{(snapshot?.recentHistory ?? []).map((entry: MaintenanceHistoryEntryDto, index) => { const id = entry.runId?.trim(); return <tr key={id ?? index}><th scope="row"><Button variant="ghost" tone="accent" size="compact" className="dashboard-detail__table-button" type="button" onClick={() => id && loadRun(id)} disabled={!id} aria-expanded={id ? expandedRun === id : undefined}><code>{textValue(id)}</code></Button></th><td>{formatDateTime(entry.startedAt)}</td><td>{textValue(entry.result)}</td><td>{textValue(entry.storageSyncMode)}</td><td>{formatNumber(entry.processedBooks)}</td><td>{formatNumber(entry.issuesDetected)}</td></tr> })}</tbody></table>{!snapshot?.recentHistory?.length && <div className="dashboard-detail__empty">—</div>}</div>{expandedRun && <div className="dashboard-detail__panel">{runLoading === expandedRun && <DetailSkeleton />}{runErrors[expandedRun] && <div className="dashboard-detail__error" role="alert"><CircleAlert size={14} aria-hidden="true" />{runErrors[expandedRun]}</div>}{runDetails[expandedRun] && <><div className="dashboard-detail__filters"><Button variant="ghost" tone="neutral" size="compact" type="button" aria-pressed={taskFilter === 'all'} onClick={() => setTaskFilter('all')}>All</Button><Button variant="ghost" tone="neutral" size="compact" type="button" aria-pressed={taskFilter === 'issues'} onClick={() => setTaskFilter('issues')}>Issues</Button></div><RunDetail data={runDetails[expandedRun]} filter={taskFilter} /></>}</div>}</DetailSection>
+      <DetailSection title="検出問題" count={formatNumber(issues.length)}><ul className="dashboard-detail__issue-list">{issues.map((issue, index) => <li className="dashboard-detail__issue" key={`${issue.runId}-${issue.target}-${index}`}><StatusBadge tone="warning" icon={TriangleAlert}>{textValue(issue.issueType)}</StatusBadge><code>{textValue(issue.target)}</code><span>{textValue(issue.detail)}</span><span>{textValue(issue.runId)}</span><time dateTime={issue.detectedAt ?? undefined}>{formatDateTime(issue.detectedAt)}</time></li>)}</ul>{!issues.length && <span className="dashboard-detail__empty">—</span>}</DetailSection>
+      <ActionDialog open={runMode !== null} title="Maintenance を開始" value={<StatusBadge tone={runMode === 'Deep' ? 'warning' : 'info'}>{textValue(runMode)}</StatusBadge>} pending={busy} confirmLabel="開始" triggerRef={runTriggerRef} onConfirm={() => void run()} onDismiss={() => setRunMode(null)} />
+    </div>
+  )
 }
 
 export function CacheDetails({ apiRevision }: { apiRevision: number }) {
@@ -345,7 +401,15 @@ export function CacheDetails({ apiRevision }: { apiRevision: number }) {
   const remove = async (event: FormEvent) => { event.preventDefault(); if (mutation === 'pending') return; if (!bookId.trim()) { setMutation('error'); setMessage('BookIdを入力してください。'); return } const controller = create(); setMutation('pending'); setMessage(null); try { const response = await removeDashboardBookCache(bookId.trim(), controller.signal); if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? 'Cacheエントリの削除に失敗しました。', { category: 'server' }); setMutation('success'); setMessage(response.message ?? '削除済み'); setRemoveOpen(false); setBookId(''); query.refresh() } catch (error: unknown) { if (!isAbort(error, controller.signal)) { setMutation('error'); setMessage(mutationError(error)) } } finally { release(controller); if (!controller.signal.aborted) setMutation((current) => current === 'pending' ? 'idle' : current) } }
   if (query.status === 'loading') return <DetailSkeleton />
   const metrics = query.data ?? EMPTY_CACHE
-  return <div className="dashboard-detail__content" aria-busy={query.status === 'refreshing'}><div className="dashboard-detail__toolbar"><StatusBadge tone="info" icon={HardDrive}>Cache</StatusBadge><button className="dashboard-detail__button" type="button" aria-label="Cacheを更新" onClick={query.refresh} disabled={query.status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></button></div><DetailState status={query.status} error={query.error} onRetry={query.refresh} /><DetailSection title="Metrics"><div className="dashboard-detail__metrics"><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Size</span><strong>{formatBytes(metrics.sizeBytes)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Entries</span><strong>{formatNumber(metrics.entryCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hit rate</span><strong>{metrics.hitRate == null ? '—' : `${formatNumber(metrics.hitRate * 100)}%`}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hits</span><strong>{formatNumber(metrics.hitCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Misses</span><strong>{formatNumber(metrics.missCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Evictions</span><strong>{formatNumber(metrics.evictionCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Strategy</span><strong>{textValue(metrics.strategy)}</strong></div></div><div className="dashboard-detail__meta"><span>更新 {formatDateTime(metrics.generatedAt)}</span></div></DetailSection><DetailSection title="操作"><div className="dashboard-detail__actions"><button ref={clearTriggerRef} className="dashboard-detail__button dashboard-detail__button--danger" type="button" onClick={() => setClearOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Clear all</button><button ref={removeTriggerRef} className="dashboard-detail__button" type="button" onClick={() => setRemoveOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Book</button><ActionFeedback status={mutation} message={message} /></div></DetailSection><ActionDialog open={clearOpen} title="Cache を全件クリア" value={<><ShieldAlert size={16} aria-hidden="true" />全件削除</>} pending={mutation === 'pending'} confirmLabel="クリア" triggerRef={clearTriggerRef} onConfirm={() => void clear()} onDismiss={() => setClearOpen(false)} /><BookCacheDialog open={removeOpen} pending={mutation === 'pending'} bookId={bookId} triggerRef={removeTriggerRef} onBookIdChange={setBookId} onSubmit={(event) => void remove(event)} onDismiss={() => setRemoveOpen(false)} /></div>
+  return (
+    <div className="dashboard-detail__content" aria-busy={query.status === 'refreshing'}>
+      <div className="dashboard-detail__toolbar"><StatusBadge tone="info" icon={HardDrive}>Cache</StatusBadge><IconButton variant="ghost" tone="neutral" size="compact" type="button" aria-label="Cacheを更新" onClick={query.refresh} disabled={query.status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton></div>
+      <DetailState status={query.status} error={query.error} onRetry={query.refresh} />
+      <DetailSection title="Metrics"><div className="dashboard-detail__metrics"><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Size</span><strong>{formatBytes(metrics.sizeBytes)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Entries</span><strong>{formatNumber(metrics.entryCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hit rate</span><strong>{metrics.hitRate == null ? '—' : `${formatNumber(metrics.hitRate * 100)}%`}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hits</span><strong>{formatNumber(metrics.hitCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Misses</span><strong>{formatNumber(metrics.missCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Evictions</span><strong>{formatNumber(metrics.evictionCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Strategy</span><strong>{textValue(metrics.strategy)}</strong></div></div><div className="dashboard-detail__meta"><span>更新 {formatDateTime(metrics.generatedAt)}</span></div></DetailSection>
+      <DetailSection title="操作"><div className="dashboard-detail__actions"><Button ref={clearTriggerRef} variant="solid" tone="danger" size="default" type="button" onClick={() => setClearOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Clear all</Button><Button ref={removeTriggerRef} variant="outline" tone="neutral" size="default" type="button" onClick={() => setRemoveOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Book</Button><ActionFeedback status={mutation} message={message} /></div></DetailSection>
+      <ActionDialog open={clearOpen} title="Cache を全件クリア" value={<><ShieldAlert size={16} aria-hidden="true" />全件削除</>} pending={mutation === 'pending'} confirmLabel="クリア" triggerRef={clearTriggerRef} onConfirm={() => void clear()} onDismiss={() => setClearOpen(false)} /><BookCacheDialog open={removeOpen} pending={mutation === 'pending'} bookId={bookId} triggerRef={removeTriggerRef} onBookIdChange={setBookId} onSubmit={(event) => void remove(event)} onDismiss={() => setRemoveOpen(false)} />
+    </div>
+  )
 }
 
 export default ServiceDetails

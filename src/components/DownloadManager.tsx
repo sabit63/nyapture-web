@@ -41,6 +41,7 @@ import type {
 } from '../realtime/book-download-hub'
 import { Snackbar, useSnackbar } from './Snackbar'
 import { Thumbnail } from './Thumbnail'
+import { Button, IconButton, StatePanel } from './ui'
 import './download-manager.css'
 
 type DownloadStatus = 'running' | 'queued' | 'paused' | 'failed' | 'stopped' | 'cancelled' | 'completed' | 'unknown'
@@ -937,25 +938,34 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
         </div>
 
         <div className="download-manager__global-actions" aria-label="ダウンロード全体の操作">
-          <button
-            className="download-manager__button download-manager__button--success download-manager__button--icon-only"
+          <IconButton
+            variant="outline"
+            tone="success"
+            size="compact"
+            className="download-manager__global-action"
             type="button"
             aria-label="全て再開"
             disabled={isPending('global-resume') || pausedCount === 0}
             onClick={resumeAllDownloads}
           >
             <Play size={16} aria-hidden="true" />
-          </button>
-          <button
-            className="download-manager__button download-manager__button--warning download-manager__button--icon-only"
+          </IconButton>
+          <IconButton
+            variant="outline"
+            tone="warning"
+            size="compact"
+            className="download-manager__global-action"
             type="button"
             aria-label="全て一時停止"
             disabled={isPending('global-pause') || activeDownloads === 0}
             onClick={pauseAllDownloads}
           >
             <Pause size={16} aria-hidden="true" />
-          </button>
-          <button
+          </IconButton>
+          <IconButton
+            variant="ghost"
+            tone="neutral"
+            size="compact"
             className="download-manager__icon-button"
             type="button"
             aria-label="ダウンロード一覧を更新"
@@ -963,7 +973,7 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
             onClick={refreshDownloads}
           >
             <RefreshCw className={isRefreshing ? 'is-spinning' : undefined} size={18} aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
       </header>
 
@@ -979,14 +989,17 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
             onChange={(event) => setSearchQuery(event.target.value)}
           />
           {searchQuery && (
-            <button
+            <IconButton
+              variant="ghost"
+              tone="neutral"
+              size="compact"
               className="download-manager__search-clear"
               type="button"
               aria-label="検索をクリア"
               onClick={() => setSearchQuery('')}
             >
               <X size={14} aria-hidden="true" />
-            </button>
+            </IconButton>
           )}
         </div>
 
@@ -1013,7 +1026,7 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
         <div className="download-manager__error" role="alert">
           <TriangleAlert size={16} aria-hidden="true" />
           <span>{loadError}</span>
-          <button type="button" onClick={refreshDownloads} disabled={isRefreshing}>再試行</button>
+          <Button variant="outline" tone="danger" size="compact" className="download-manager__error-retry" type="button" onClick={refreshDownloads} disabled={isRefreshing}>再試行</Button>
         </div>
       )}
 
@@ -1025,21 +1038,25 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
           </div>
         </div>
       ) : loadError && downloads.length === 0 ? (
-        <div className="download-manager__empty download-manager__empty--error" role="alert">
-          <span className="download-manager__empty-icon" aria-hidden="true"><TriangleAlert size={28} /></span>
-          <h2>ダウンロード一覧を読み込めませんでした</h2>
-          <p>{loadError}</p>
-          <button
-            className={`download-manager__clear-button ${isRefreshing ? 'download-manager__clear-button--pending' : ''}`}
-            type="button"
+        <StatePanel
+          title="ダウンロード一覧を読み込めませんでした"
+          description={loadError}
+          icon={<TriangleAlert size={28} />}
+          tone="danger"
+          role="alert"
+          action={<Button
+            variant="outline"
+            tone="danger"
+            size="compact"
+            className={isRefreshing ? 'download-manager__clear-button--pending' : 'download-manager__clear-button'}
             aria-label={isRefreshing ? '再試行中…' : '再試行'}
             aria-busy={isRefreshing}
             onClick={refreshDownloads}
             disabled={isRefreshing}
           >
             {isRefreshing ? <RefreshCw className="is-spinning" size={16} aria-hidden="true" /> : '再試行'}
-          </button>
-        </div>
+          </Button>}
+        />
       ) : filteredDownloads.length > 0 ? (
         <div className="download-manager__list" aria-live="polite" aria-busy={isRefreshing}>
           {filteredDownloads.map((download) => (
@@ -1056,15 +1073,11 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
           ))}
         </div>
       ) : (
-        <div className="download-manager__empty" role="status">
-          <span className="download-manager__empty-icon" aria-hidden="true"><Search size={28} /></span>
-          <h2>{hasSearchQuery ? '条件に一致するダウンロードがありません' : 'ダウンロードはありません'}</h2>
-          {hasSearchQuery && (
-            <button className="download-manager__clear-button" type="button" onClick={clearSearch}>
-              検索をクリア
-            </button>
-          )}
-        </div>
+        <StatePanel
+          title={hasSearchQuery ? '条件に一致するダウンロードがありません' : 'ダウンロードはありません'}
+          icon={<Search size={28} />}
+          action={hasSearchQuery && <Button variant="outline" tone="accent" size="compact" className="download-manager__clear-button" type="button" onClick={clearSearch}>検索をクリア</Button>}
+        />
       )}
 
       <Snackbar notice={notice} onDismiss={dismiss} />

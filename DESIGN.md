@@ -87,7 +87,7 @@ components:
     typography: "{typography.label-md}"
     rounded: "{rounded.sm}"
     padding: 0.75rem
-    height: 2.25rem
+    height: 2.5rem
   button-primary-hover:
     backgroundColor: "{colors.primary-hover}"
     textColor: "{colors.on-primary}"
@@ -97,12 +97,12 @@ components:
     typography: "{typography.label-md}"
     rounded: "{rounded.sm}"
     padding: 0.75rem
-    height: 2.25rem
+    height: 2.5rem
   icon-button:
     backgroundColor: transparent
     textColor: "{colors.text-muted}"
     rounded: "{rounded.sm}"
-    size: 2.375rem
+    size: 2.5rem
   input:
     backgroundColor: "{colors.background-deep}"
     textColor: "{colors.text}"
@@ -209,11 +209,70 @@ Interactive controls use the small radius, content cards and dialogs use the med
 
 - Buttons share one height and typography scale. A screen should normally have one visually primary action.
 - Icon buttons require an accessible name and a visible focus ring. Destructive icons use the danger palette only when the action is available.
+- When an icon alone sufficiently conveys the action, prefer an icon-only button without visible explanatory text. Always provide the action name through `aria-label`.
+- Do not add decorative captions, eyebrow labels, or explanatory microcopy that repeats a heading, value, icon, control, or nearby context. Add visible labels only when they prevent ambiguity or are necessary to understand or operate the interface; required accessible names remain mandatory.
 - Dialogs share the same frame, backdrop, header, scrollable body, and footer behavior. Focus returns to the trigger after closing.
 - Inputs pair a visible label with helper or error text. Focus and invalid states must not be communicated by color alone.
 - Status badges use a shared semantic tone model. Domain-specific book statuses may extend it without redefining the base palette.
 - Loading, error, and empty states use a common state panel. Keep the title actionable and the description concise.
 - Book covers and reader pages remain visually dominant; operational decoration must not obscure artwork.
+
+### Permanent UI Organization Contract
+
+Separate standard UI from domain UI. Manage `Button`, `IconButton`, `StatePanel`, and
+regular `Dialog` as shared primitives that do not reference API/routing/feature state.
+Page-level actions in Search, AppShell, Dashboard, and Download Manager are standard UI.
+Viewer sheets, overlays, and handles, DownloadCard-specific operations, and tag/cover
+palettes are domain exceptions owned by each feature.
+
+Standard control density is default `40px` and compact `32px`; inline padding is
+`12px` and `8px`, respectively, and icon sizes are `18px` and `16px`, respectively.
+Limit variant/tone combinations to `solid` (accent/danger/success/warning), `outline`
+(neutral/accent/danger/success/warning), and `ghost` (neutral/accent/danger). The
+default `Button` is outline/neutral/default, and `IconButton` is ghost/neutral/default.
+Standard Dialog footers are right-aligned by default; only Dialogs that need split alignment
+or a similar arrangement may define a local layout in the caller. Do not use legacy
+class/token aliases; feature CSS must reference canonical tokens only.
+
+Apply the wide three-column layout in Dashboard detail only to the data displays using
+`grid`, `metrics`, `cards`, and `definition-grid`. Keep `field-grid` and `form-grid` at
+a maximum of two columns. Viewer and DownloadCard exceptions must not change their
+information density or interaction model merely to resemble standard primitive visuals.
+
+### Standard Dialog lifecycle
+
+Standard Dialog uses controlled `open` and `useNativeDialog`; the caller owns its width,
+form, ARIA label/ID, and pending state. The `reason` in `onRequestClose(reason)` is the
+union of `escape`, `backdrop`, `close-button`, `submit`, and `programmatic`; a caller that
+returns `true` updates `open=false` in the same event. Only the hook executes native
+`showModal()`/`close()`. Always call `preventDefault` on `cancel`; accept only a backdrop
+pointerdown→click sequence that began outside the panel, and discard the state on
+`pointercancel`. If the caller rejects an unexpected native close, clear the reason and
+reopen without running `onAfterClose` or restoring focus. Run `onAfterClose` exactly once
+only for an accepted close; for an explicit close, restore focus to `resolveRestoreFocus`
+(the element focused before opening when unspecified). `dismissible=false` rejects Escape,
+backdrop, and close-button dismissal. The caller specifies `resolveRestoreFocus` only when
+a submit or programmatic close needs a focus target. The caller or `useId` helper creates
+unique `aria-labelledby`/`aria-describedby` IDs. Viewer sheet is outside this contract.
+
+Use `StatePanel` only for loading/error/empty states at the page or primary content-region
+level. Do not use it for inline errors, partial failures, empty table states, or Viewer
+overlays; keep them as local states within each domain.
+
+Literal values are permitted only for 1px borders/outlines, shadows/transforms, aspect
+ratios, safe-area insets, accessibility offsets, image/icon-specific dimensions,
+cover/tag palettes, status-specific badges, progress widths, Viewer sheets/docks and
+reader chrome, DownloadCard-specific operations, and Dashboard operation-identifying
+icons. Use tokens for spacing, standard radii, breakpoints, and global state colors.
+`tag-chip.css` is included in this exception as the owner of the tag palette.
+
+### Phased Migration and Verification Limits
+
+Build each UI migration phase independently without changing the API, routing, state, DOM
+order, focus order, or pending conditions. Remove temporary migration ledgers when complete,
+leaving only permanent contracts and exceptions in this document. Build, TypeScript, and
+static searches can detect contract violations, but do not guarantee runtime focus, Dialog
+lifecycle, responsive rendering, contrast, or visual equivalence of the CSS cascade.
 
 ## Do's and Don'ts
 

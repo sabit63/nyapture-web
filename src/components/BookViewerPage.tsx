@@ -13,6 +13,8 @@ import type { BookCardModel, BookTag, NyaTagType } from '../models'
 import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
+import { Button, buttonClassName } from './ui/Button'
+import { IconButton } from './ui/IconButton'
 import './book-viewer.css'
 
 type BookViewerRouteState = 'missing' | 'loading' | 'notFound' | 'error' | 'ready'
@@ -153,8 +155,8 @@ function BookViewerPage({ routeState, routeIdentity, book, errorMessage, onRetry
             ? errorMessage ?? 'APIへの接続を確認して、もう一度お試しください。'
             : '指定されたBookはライブラリまたは検索結果にありません。'}
       </p>
-      {isError && onRetry && <button className="button button--primary" type="button" onClick={onRetry}>再試行</button>}
-      <a className="button button--secondary" href="/search">検索へ戻る</a>
+      {isError && onRetry && <Button variant="solid" tone="accent" onClick={onRetry}>再試行</Button>}
+      <a className={buttonClassName({ variant: 'outline', tone: 'neutral' })} href="/search">検索へ戻る</a>
     </section>
   )
 }
@@ -314,9 +316,15 @@ function BookViewerReady({
     <section className="book-viewer" aria-labelledby={titleId}>
       <h1 id={titleId} ref={headingRef} className="sr-only" tabIndex={-1}>{book.title}の画像一覧</h1>
 
-      <button className="book-viewer__back" type="button" aria-label="戻る" onClick={navigateBack}>
+      <IconButton
+        className="book-viewer__back book-viewer__back--control"
+        variant="ghost"
+        tone="neutral"
+        aria-label="戻る"
+        onClick={navigateBack}
+      >
         <ArrowLeft size={18} aria-hidden="true" />
-      </button>
+      </IconButton>
 
       <section ref={readerRef} className="book-viewer__reader" aria-labelledby={titleId}>
         {totalPages > 0 ? (
@@ -340,9 +348,15 @@ function BookViewerReady({
       </section>
 
       {showScrollTop && (
-        <button className="book-viewer__scroll-top" type="button" aria-label="先頭へ戻る" onClick={scrollToTop}>
+        <IconButton
+          className="book-viewer__scroll-top book-viewer__scroll-top--control"
+          variant="ghost"
+          tone="neutral"
+          aria-label="先頭へ戻る"
+          onClick={scrollToTop}
+        >
           <ArrowUp size={18} aria-hidden="true" />
-        </button>
+        </IconButton>
       )}
 
       <aside className="book-viewer__dock" aria-label="Book操作">

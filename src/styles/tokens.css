@@ -1,8 +1,4 @@
 :root {
-  --color-primary: #c1339e;
-  --color-primary-hover: #d248b0;
-  --color-primary-soft: #c1339e1e;
-  --color-on-primary: #fff;
   --color-background: #1f1f29;
   --color-background-deep: #191922;
   --color-surface: #242430;
@@ -16,10 +12,6 @@
   --color-text-muted: #a7a7b6;
   --color-text-dim: #9696a8;
   --color-focus: #7fb9ff;
-  --color-info: #4c9be8;
-  --color-success: #45b95d;
-  --color-warning: #e0a83b;
-  --color-danger: #ef4d5f;
 
   --font-family-sans: "Noto Sans JP", system-ui, sans-serif;
   --font-size-label-sm: .6875rem;
@@ -60,8 +52,60 @@
   --radius-lg: 15px;
   --radius-full: 9999px;
 
-  --control-height-sm: 36px;
-  --control-height-md: 40px;
+  /* Standard control density. */
+  --control-height-default: 40px;
+  --control-height-compact: 32px;
+  --control-padding-inline-default: 12px;
+  --control-padding-inline-compact: 8px;
+  --control-icon-size-default: 18px;
+  --control-icon-size-compact: 16px;
+  --control-font-size-default: var(--font-size-label-md);
+  --control-font-size-compact: var(--font-size-label-sm);
+
+  /* Semantic radius aliases. The primitive values above are the stable
+     geometry contract; feature styles should consume these names. */
+  --radius-control: var(--radius-sm);
+  --radius-surface: var(--radius-md);
+  --radius-overview: var(--radius-lg);
+
+  /* Canonical semantic tone tokens. Values intentionally match the current
+     palette so token adoption does not alter the existing visual language. */
+  --color-accent-fill: #c1339e;
+  --color-accent-on-fill: #fff;
+  --color-accent-text: #d248b0;
+  --color-accent-border: #c1339e;
+  --color-accent-soft: #c1339e1e;
+
+  --color-info-fill: #4c9be8;
+  --color-info-on-fill: #fff;
+  --color-info-text: #8dc8ff;
+  --color-info-border: #4c9be8;
+  --color-info-soft: #4c9be81e;
+
+  --color-success-fill: #45b95d;
+  --color-success-on-fill: #fff;
+  --color-success-text: #83df95;
+  --color-success-border: #45b95d;
+  --color-success-soft: #45b95d18;
+
+  --color-warning-fill: #e0a83b;
+  --color-warning-on-fill: #191922;
+  --color-warning-text: #efc56e;
+  --color-warning-border: #e0a83b;
+  --color-warning-soft: #e0a83b18;
+
+  --color-danger-fill: #ef4d5f;
+  --color-danger-on-fill: #fff;
+  --color-danger-text: #ff9aa5;
+  --color-danger-border: #ef4d5f;
+  --color-danger-soft: #ef4d5f18;
+
+  --color-neutral-fill: #2a2a37;
+  --color-neutral-on-fill: #eeeef4;
+  --color-neutral-text: #a7a7b6;
+  --color-neutral-border: #393947;
+  --color-neutral-soft: #ffffff0a;
+
   --shadow-raised: 0 12px 30px #08081040;
   --shadow-floating: 0 28px 80px #050509a8;
   --duration-fast: 150ms;
@@ -70,28 +114,6 @@
   --drawer-width: 268px;
   --topbar-height: 56px;
 
-  /* Compatibility aliases while page styles migrate to semantic names. */
-  --background: var(--color-background);
-  --background-deep: var(--color-background-deep);
-  --surface: var(--color-surface);
-  --surface-raised: var(--color-surface-raised);
-  --surface-hover: var(--color-surface-hover);
-  --appbar: var(--color-appbar);
-  --drawer: var(--color-drawer);
-  --border: var(--color-border);
-  --border-subtle: var(--color-border-subtle);
-  --text: var(--color-text);
-  --text-muted: var(--color-text-muted);
-  --text-dim: var(--color-text-dim);
-  --primary: var(--color-primary);
-  --primary-hover: var(--color-primary-hover);
-  --primary-soft: var(--color-primary-soft);
-  --tertiary: #d75a29;
-  --info: var(--color-info);
-  --success: var(--color-success);
-  --warning: var(--color-warning);
-  --danger: var(--color-danger);
-  --focus: var(--color-focus);
 }
 
 @media (min-width: 640px) {

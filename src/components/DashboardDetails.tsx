@@ -21,6 +21,7 @@ import {
   LogsDetails,
   MongoDbDetails,
 } from './DashboardReadDetails'
+import { buttonClassName, IconButton } from './ui'
 import './dashboard-details.css'
 
 export type DashboardDetailRoute =
@@ -58,10 +59,10 @@ export function DashboardDetails({ route, apiRevision }: DashboardDetailsProps) 
   return (
     <section className="dashboard-detail" aria-labelledby="dashboard-detail-title">
       <header className="dashboard-detail__header">
-        <a className="dashboard-detail__icon-button" href="/dashboard" aria-label="Dashboardへ戻る"><ArrowLeft size={18} aria-hidden="true" /></a>
+        <a className={buttonClassName({ variant: 'ghost', tone: 'neutral', size: 'compact' }, 'dashboard-detail__icon-button')} href="/dashboard" aria-label="Dashboardへ戻る"><ArrowLeft size={18} aria-hidden="true" /></a>
         <span className="dashboard-detail__route-icon" aria-hidden="true"><Icon size={22} /></span>
         <h1 id="dashboard-detail-title">{meta.title}</h1>
-        <button className="dashboard-detail__icon-button dashboard-detail__refresh" type="button" aria-label="更新" onClick={() => setRefreshRevision((revision) => revision + 1)}><RefreshCw size={17} aria-hidden="true" /></button>
+        <IconButton variant="ghost" tone="neutral" size="compact" className="dashboard-detail__icon-button dashboard-detail__refresh" type="button" aria-label="更新" onClick={() => setRefreshRevision((revision) => revision + 1)}><RefreshCw size={17} aria-hidden="true" /></IconButton>
       </header>
       <div className="dashboard-detail__body">
         {route === 'mongodb' && <MongoDbDetails apiRevision={detailRevision} />}

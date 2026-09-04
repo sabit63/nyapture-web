@@ -2,7 +2,7 @@
   position: absolute;
   z-index: 1;
   inset: 0;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-surface) var(--radius-surface) 0 0;
   pointer-events: none;
 }
 

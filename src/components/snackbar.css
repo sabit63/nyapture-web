@@ -11,7 +11,7 @@
   margin: 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid;
-  border-radius: 8px;
+  border-radius: var(--radius-surface);
   box-shadow: 0 14px 36px #05050870;
   font-size: .72rem;
   line-height: 1.45;
@@ -23,9 +23,9 @@
 
 .snackbar__icon { flex: 0 0 auto; }
 .snackbar__message { min-width: 0; overflow-wrap: anywhere; }
-.snackbar--success { border-color: #45b95d5e; background: #1d2922ef; color: #a0e7ae; }
-.snackbar--warning { border-color: #c99b4e80; background: #30291def; color: #e8c77f; }
-.snackbar--error { border-color: #ef4d5f70; background: #301d23ef; color: #ffacb4; }
+.snackbar--success { border-color: var(--color-success-border); background: var(--color-success-soft); color: var(--color-success-text); }
+.snackbar--warning { border-color: var(--color-warning-border); background: var(--color-warning-soft); color: var(--color-warning-text); }
+.snackbar--error { border-color: var(--color-danger-border); background: var(--color-danger-soft); color: var(--color-danger-text); }
 
 @keyframes snackbar-in {
   from { opacity: 0; transform: translateY(8px); }
