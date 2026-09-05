@@ -6,8 +6,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
-import type { MouseEvent } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 
 import type { ApiBookCardModel } from '../api'
 import { requestBlob } from '../api'
@@ -30,11 +30,19 @@ export type BookCardProps = {
   selected: boolean
   onToggle: () => void
   onTagSearch: (tag: BookTag) => void
-  onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
+  onTagSearchDestinationRequest?: (tag: BookTag, trigger: HTMLButtonElement) => void
   isDownloadCandidate?: boolean
   onDelete?: (trigger: HTMLButtonElement) => void
   onRefresh?: () => void
   onDownload?: () => void
+  onOpen?: () => void
+  openDisabled?: boolean
+  actionsDisabled?: boolean
+  downloadDisabled?: boolean
+  downloadLabel?: string
+  allowWebDelete?: boolean
+  extraActions?: ReactNode
+  footer?: ReactNode
 }
 
 export function BookCard({
@@ -48,10 +56,19 @@ export function BookCard({
   onDelete,
   onRefresh,
   onDownload,
+  onOpen,
+  openDisabled = false,
+  actionsDisabled = false,
+  downloadDisabled = false,
+  downloadLabel,
+  allowWebDelete = false,
+  extraActions,
+  footer,
 }: BookCardProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const tagsTriggerRef = useRef<HTMLButtonElement>(null)
   const tagsCloseButtonRef = useRef<HTMLButtonElement>(null)
+  const tagsId = useId()
   const [tagsOpen, setTagsOpen] = useState(false)
   const thumbnailRequest = (book as ApiBookCardModel).thumbnailRequest
   const thumbnailReloadKey = (book as ApiBookCardModel).thumbnailReloadKey
@@ -71,7 +88,9 @@ export function BookCard({
   const isWebBook = book.status === 'WebBook' || book.status === 'WebBookInPage'
   const canRefresh = !isDownloading && !isDownloaded && typeof onRefresh === 'function'
   const canDownload = !isDownloading && !isDownloaded && typeof onDownload === 'function'
-  const canDelete = !isWebBook && typeof onDelete === 'function'
+  const canDelete = (allowWebDelete || !isWebBook) && typeof onDelete === 'function'
+  const hasActions = canRefresh || canDownload || canDelete || (extraActions !== undefined && extraActions !== null)
+  const tagsDialogTitleId = `tags-dialog-title-${tagsId}`
 
   const handleThumbnailClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.target instanceof Element && event.target.closest('button,[role="button"]')) {
@@ -102,21 +121,34 @@ export function BookCard({
   const openTagsDialog = () => setTagsOpen(true)
 
   return (
-    <article className={`book-card ${selected ? 'book-card--selected' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`} data-book-status={book.status}>
+    <article
+      className={`book-card ${selected ? 'book-card--selected' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`}
+      data-book-status={book.status}
+      aria-busy={actionsDisabled || undefined}
+    >
       <Thumbnail
         src={book.thumbnailUrl}
         load={thumbnailRequest ? loadThumbnail : undefined}
         reloadKey={thumbnailReloadKey}
         loadingPolicy={{ mode: 'page', viewports: 3 }}
         alt={`${book.title}の表紙`}
-        linkHref={viewerUrl}
-        linkAriaLabel={`${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
-        linkTabIndex={selectMode ? -1 : undefined}
-        linkOnClick={handleThumbnailClick}
+        linkHref={onOpen ? undefined : viewerUrl}
+        linkAriaLabel={onOpen ? undefined : `${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
+        linkTabIndex={onOpen ? undefined : (selectMode ? -1 : undefined)}
+        linkOnClick={onOpen ? undefined : handleThumbnailClick}
         fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
         fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
         variant={book.cover}
       >
+        {onOpen && (
+          <button
+            type="button"
+            className="book-cover__open-button"
+            aria-label={`${book.title}を表示`}
+            disabled={openDisabled}
+            onClick={onOpen}
+          />
+        )}
         {book.totalPage > 0 && <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>}
         <BookStatusBadge status={book.status} />
         {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
@@ -128,11 +160,12 @@ export function BookCard({
             size="compact"
             aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`}
             aria-pressed={selected}
+            disabled={actionsDisabled}
             onClick={onToggle}
           >
             {selected && <Check size={15} />}
           </IconButton>
-        ) : (canRefresh || canDownload || canDelete) ? (
+        ) : hasActions ? (
           <div className="card-actions" aria-label={`${book.title}の操作`}>
             {canRefresh && (
               <IconButton
@@ -141,6 +174,7 @@ export function BookCard({
                 tone="neutral"
                 size="compact"
                 aria-label={`${book.title}を再読み込み`}
+                disabled={actionsDisabled}
                 onClick={() => onRefresh?.()}
               >
                 <RefreshCw size={16} aria-hidden="true" />
@@ -152,7 +186,8 @@ export function BookCard({
                 variant="outline"
                 tone="neutral"
                 size="compact"
-                aria-label={`${book.title}をダウンロード`}
+                aria-label={downloadLabel ?? `${book.title}をダウンロード`}
+                disabled={actionsDisabled || downloadDisabled}
                 onClick={() => onDownload?.()}
               >
                 <Download size={16} aria-hidden="true" />
@@ -165,11 +200,13 @@ export function BookCard({
                 tone="danger"
                 size="compact"
                 aria-label={`${book.title}を削除`}
+                disabled={actionsDisabled}
                 onClick={(event) => onDelete?.(event.currentTarget)}
               >
                 <Trash2 size={17} aria-hidden="true" />
               </IconButton>
             )}
+            {extraActions}
           </div>
         ) : null}
       </Thumbnail>
@@ -179,7 +216,15 @@ export function BookCard({
             <CalendarDays size={11} aria-hidden="true" />
             {formatDisplayDate(book.uploadedTime)}
           </time>
-          <h3><InternalLink href={viewerUrl}>{book.title}</InternalLink></h3>
+          <h3>
+            {onOpen ? (
+              <button type="button" className="book-card__title-button" disabled={openDisabled} onClick={onOpen}>
+                {book.title}
+              </button>
+            ) : (
+              <InternalLink href={viewerUrl}>{book.title}</InternalLink>
+            )}
+          </h3>
         </div>
         <div className="book-tags" aria-label="主要タグ">
           {inlineTags.map((tag) => (
@@ -205,12 +250,13 @@ export function BookCard({
             </Button>
           )}
         </div>
+        {footer !== undefined && footer !== null && <div className="book-card__extra">{footer}</div>}
       </div>
       <Dialog
         ref={dialogRef}
         className="tags-dialog"
         open={tagsOpen}
-        aria-labelledby={`tags-dialog-title-${book.bookId}`}
+        aria-labelledby={tagsDialogTitleId}
         initialFocusRef={tagsCloseButtonRef}
         resolveRestoreFocus={() => tagsTriggerRef.current}
         onRequestClose={() => {
@@ -223,7 +269,7 @@ export function BookCard({
             <DialogHeader className="tags-dialog__header">
               <div>
                 <span>タグ一覧</span>
-                <h2 id={`tags-dialog-title-${book.bookId}`}>{book.title}</h2>
+                <h2 id={tagsDialogTitleId}>{book.title}</h2>
               </div>
               <IconButton ref={tagsCloseButtonRef} aria-label="タグ一覧を閉じる" onClick={() => requestClose('close-button')}>
                 <X size={19} aria-hidden="true" />
@@ -234,9 +280,9 @@ export function BookCard({
                 const tags = book.tags.filter((tag) => tag.type === type)
                 if (!tags.length) return null
                 return (
-                  <section className="tags-dialog__group" key={type} aria-labelledby={`tags-${book.bookId}-${type}`}>
+                  <section className="tags-dialog__group" key={type} aria-labelledby={`tags-${tagsId}-${type}`}>
                     <div className="tags-dialog__group-heading">
-                      <h3 id={`tags-${book.bookId}-${type}`}>{TAG_TYPE_LABELS[type]}</h3>
+                      <h3 id={`tags-${tagsId}-${type}`}>{TAG_TYPE_LABELS[type]}</h3>
                       <span>{tags.length}</span>
                     </div>
                     <div className="tags-dialog__chips">

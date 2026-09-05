@@ -209,3 +209,19 @@ describe('getBookPageBlob query contract', () => {
     assert.equal(new URL(requestUrl).searchParams.get('fallback_to_original'), 'true')
   })
 })
+
+it('retains only sanitized string validation messages from HTTP errors', async () => {
+  const client = new ApiClient({ apiUrl: 'http://localhost:5270', apiKey: 'cache-secret-value', editKey: 'cache-edit-secret' })
+  setFetch(async () => new Response(JSON.stringify({
+    success: false,
+    data: { errors: ['invalid cache-secret-value', 'invalid cache-edit-secret', { secret: 'must not retain' }] },
+  }), { status: 400 }))
+  await assert.rejects(client.requestJson('/api/dashboard/web-cache/config'), (error: unknown) => {
+    assert.ok(error instanceof ApiError)
+    assert.equal(error.status, 400)
+    assert.equal(error.validationErrors?.length, 2)
+    assert.ok(error.validationErrors?.every((message) => !message.includes('cache-secret-value') && !message.includes('cache-edit-secret')))
+    assert.ok(!JSON.stringify(error).includes('must not retain'))
+    return true
+  })
+})

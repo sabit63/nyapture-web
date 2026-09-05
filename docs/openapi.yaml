@@ -4193,6 +4193,11 @@ components:
             type: array
             items:
               type: string
+        tags:
+          type: array
+          description: ローカル保存済みBookでの使用件数と承認済み日本語表示名を付与したタグ
+          items:
+            $ref: "#/components/schemas/TagEntity"
         uploadedTime:
           type: string
           format: date-time

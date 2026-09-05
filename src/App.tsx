@@ -9,6 +9,7 @@ import { AppShell } from './app/AppShell'
 import { navigateBackOrFallback, RouterRuntime, useRouterLocation } from './app/client-router'
 import { Dashboard } from './components/Dashboard'
 import { DownloadManager } from './components/DownloadManager'
+import { WebCachePage } from './features/web-cache/WebCachePage'
 import { useSnackbar } from './components/Snackbar'
 import { IconButton } from './components/ui'
 import { SearchHeader, SearchPage, useSearchController } from './features/search'
@@ -24,6 +25,7 @@ function App() {
   const routerLocation = useRouterLocation()
   const currentPath = routerLocation.pathname
   const isWebSearch = currentPath === '/hitomila/search'
+  const isWebCache = currentPath === '/web-cache'
   const isMissingTagSearch = currentPath === '/search/missing-tags'
   const isLibrarySearch = currentPath === '/search' || isMissingTagSearch
   const isBookViewer = currentPath === '/book/viewer'
@@ -92,7 +94,7 @@ function App() {
       onNavigate={shellController.onNavigate}
       onBack={isBookViewer ? navigateBack : undefined}
       menuButtonRef={shellController.menuButtonRef}
-      headerCenter={isDashboard ? (
+      headerCenter={isDashboard || isWebCache ? (
         <span aria-hidden="true" />
       ) : (
         <SearchHeader controller={searchController} />
@@ -144,6 +146,8 @@ function App() {
     >
       {isDownloadManager ? (
         <DownloadManager apiRevision={apiSettingsController.apiRevision} />
+      ) : isWebCache ? (
+        <WebCachePage apiRevision={apiSettingsController.apiRevision} displaySettings={apiSettingsController.displaySettings} notify={notify} />
       ) : isDashboard ? (
         <Dashboard path={currentPath} apiRevision={apiSettingsController.apiRevision} />
       ) : isBookViewer && viewerRoute ? (

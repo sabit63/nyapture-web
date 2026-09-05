@@ -10,6 +10,7 @@ import type {
   OnlineBookPageResponse,
   OnlineBookResponse,
   TagAutocompleteResponse,
+  TagEntity,
   TagAdditionalNameDto,
   TagAdditionalNameUpsertRequest,
   TagAdditionalNameUpsertResponse,
@@ -26,6 +27,7 @@ export type WebBookCacheBookDto = {
   captions?: Record<string, string>
   totalPage?: number
   tagSet?: Record<string, string[]>
+  tags?: TagEntity[]
   uploadedTime?: string
   pageUrls?: string[]
   thumbnailUrl?: string | null

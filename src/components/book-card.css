@@ -42,11 +42,17 @@
 .book-card .card-select.card-select--control[aria-pressed='true'],
 .book-card .card-select.card-select--control[aria-pressed='true']:hover:not(:disabled) { border-color: var(--color-accent-border); background: var(--color-accent-fill); color: var(--color-accent-on-fill); }
 
+.book-cover__open-button { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.book-cover__open-button:disabled { cursor: default; }
+
 .book-card__body { padding: var(--space-3); }
 .book-card__title-row { min-width: 0; display: flex; flex-direction: column; }
 .book-card h3 { margin: 0; overflow: hidden; font-size: .86rem; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .book-card h3 a { text-decoration: none; }
-.book-card h3 a:hover { color: #f2a6d9; text-decoration: underline; text-underline-offset: 3px; }
+.book-card h3 button { max-width: 100%; overflow: hidden; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.book-card h3 a:hover,
+.book-card h3 button:hover:not(:disabled) { color: #f2a6d9; text-decoration: underline; text-underline-offset: 3px; }
+.book-card h3 button:disabled { cursor: default; }
 .book-card__uploaded-time { align-self: flex-end; display: inline-flex; align-items: center; gap: var(--layout-tight-gap); margin-bottom: var(--space-1); color: #aaaab8; font-size: .65rem; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .book-card__uploaded-time svg { flex: 0 0 auto; color: #818192; }
 .book-tags { min-height: 27px; display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--layout-tight-gap); margin-top: var(--space-3); overflow: visible; }

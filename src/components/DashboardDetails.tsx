@@ -24,6 +24,7 @@ import {
 import { InternalLink } from '../app/client-router'
 import { buttonClassName, IconButton } from './ui'
 import './dashboard-details.css'
+import { WebCacheManagement } from '../features/web-cache/WebCacheManagement'
 
 export type DashboardDetailRoute =
   | 'mongodb'
@@ -32,6 +33,7 @@ export type DashboardDetailRoute =
   | 'image-worker'
   | 'maintenance'
   | 'cache'
+  | 'web-cache'
   | 'logs'
 
 type RouteMeta = { title: string; icon: LucideIcon }
@@ -43,6 +45,7 @@ const ROUTE_META: Record<DashboardDetailRoute, RouteMeta> = {
   'image-worker': { title: 'ImageWorker', icon: Image },
   maintenance: { title: 'Maintenance', icon: Wrench },
   cache: { title: 'Cache', icon: Zap },
+  'web-cache': { title: 'Web Cache', icon: Server },
   logs: { title: 'Logs', icon: ListChecks },
 }
 
@@ -65,7 +68,7 @@ export function DashboardDetails({ route, apiRevision }: DashboardDetailsProps) 
         <InternalLink className={buttonClassName({ variant: 'ghost', tone: 'neutral', size: 'compact' }, 'dashboard-detail__icon-button')} href="/dashboard" aria-label="Dashboardへ戻る"><ArrowLeft size={18} aria-hidden="true" /></InternalLink>
         <span className="dashboard-detail__route-icon" aria-hidden="true"><Icon size={22} /></span>
         <h1 id="dashboard-detail-title">{meta.title}</h1>
-        <IconButton variant="ghost" tone="neutral" size="compact" className="dashboard-detail__icon-button dashboard-detail__refresh" type="button" aria-label="更新" onClick={() => setRefreshRevision((revision) => revision + 1)}><RefreshCw size={17} aria-hidden="true" /></IconButton>
+        {route !== 'web-cache' && <IconButton variant="ghost" tone="neutral" size="compact" className="dashboard-detail__icon-button dashboard-detail__refresh" type="button" aria-label="更新" onClick={() => setRefreshRevision((revision) => revision + 1)}><RefreshCw size={17} aria-hidden="true" /></IconButton>}
       </header>
       <div className="dashboard-detail__body">
         {route === 'mongodb' && <MongoDbDetails apiRevision={detailRevision} />}
@@ -74,6 +77,7 @@ export function DashboardDetails({ route, apiRevision }: DashboardDetailsProps) 
         {route === 'image-worker' && <ServiceDetails service="image-worker" apiRevision={detailRevision} />}
         {route === 'maintenance' && <MaintenanceDetails apiRevision={detailRevision} />}
         {route === 'cache' && <CacheDetails apiRevision={detailRevision} />}
+        {route === 'web-cache' && <WebCacheManagement apiRevision={apiRevision} />}
         {route === 'logs' && <LogsDetails apiRevision={detailRevision} />}
       </div>
     </section>

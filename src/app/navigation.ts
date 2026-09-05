@@ -24,6 +24,7 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'オンライン',
     items: [
       { label: 'Hitomi', icon: Globe2, href: '/hitomila/search' },
+      { label: 'キャッシュ候補', icon: ListFilter, href: '/web-cache' },
       { label: 'ダウンロード', icon: Download, href: '/download/book' },
     ],
   },
@@ -31,12 +32,13 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'システム',
     items: [
       { label: 'Dashboard', icon: Gauge, href: '/dashboard' },
+      { label: 'Web Cache', icon: Globe2, href: '/dashboard/web-cache' },
     ],
   },
 ]
 
 export const isNavigationItemActive = (item: NavigationItem, currentPath: string) => (
   item.href === '/dashboard'
-    ? currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')
+    ? currentPath === '/dashboard' || currentPath.startsWith('/dashboard/') && currentPath !== '/dashboard/web-cache'
     : item.href === currentPath
 )

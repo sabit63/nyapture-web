@@ -138,7 +138,15 @@ export const mapEBookToCard = (
   }
 }
 
-export const mapWebCacheBookToCard = (book: WebBookCacheBookDto): ApiBookCardModel => {
+export const mapWebCacheBookToCard = (
+  book: WebBookCacheBookDto,
+): ApiBookCardModel => {
+  const tagSet = normalizeTagSet(book.tagSet)
+  for (const tag of book.tags ?? []) {
+    if (!tag.type || !isTagType(tag.type) || !tag.name) continue
+    const names = tagSet[tag.type] ?? []
+    if (!names.includes(tag.name)) tagSet[tag.type] = [...names, tag.name]
+  }
   const mapped = mapEBookToCard({
     groupId: book.groupId ?? undefined,
     bookId: book.bookId ?? undefined,
@@ -146,12 +154,13 @@ export const mapWebCacheBookToCard = (book: WebBookCacheBookDto): ApiBookCardMod
     title: book.title ?? undefined,
     captions: book.captions,
     totalPage: book.totalPage,
-    tagSet: normalizeTagSet(book.tagSet),
+    tagSet,
     uploadedTime: book.uploadedTime,
     pageUrls: book.pageUrls,
     status: 'WebBook',
   }, {
     context: 'hitomi',
+    entities: book.tags,
     sourceUrl: book.sourcePageUrl ?? book.url,
   })
 

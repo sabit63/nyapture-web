@@ -20,6 +20,7 @@ import { Button, IconButton, StatePanel } from '../../components/ui'
 import { HITOMI_APPENDS, TAG_TYPE_LABELS } from '../../models'
 import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
+import { isDownloadCandidate } from './download-candidate'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
 import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
@@ -382,13 +383,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                   onToggle={() => toggleSelection(getBookIdentityKey(book))}
                   onTagSearch={searchByTag}
                   onTagSearchDestinationRequest={openTagSearchDestination}
-                  isDownloadCandidate={isWebSearch
-                    && (book.status === 'WebBook' || book.status === 'WebBookInPage')
-                    && book.tags.some((tag) => (
-                      (tag.type === 'Artists' || tag.type === 'Groups')
-                      && typeof tag.count === 'number'
-                      && tag.count >= 1
-                    ))}
+                  isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
                   onDelete={(trigger) => deleteLibraryBook(book, trigger)}
                   onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
                   onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}

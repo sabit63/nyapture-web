@@ -440,7 +440,7 @@ function ThumbnailInstance({
     <div ref={rootRef} className={rootClassName}>
       {imageLink}
       {imageState === 'error' && (
-        <div className="book-cover__fallback" role="img" aria-label={fallbackAriaLabel ?? `${alt}を表示できません`}>
+        <div className="book-cover__fallback" role="group" aria-label={fallbackAriaLabel ?? `${alt}を表示できません`}>
           <ImageOff size={34} strokeWidth={1.4} aria-hidden="true" />
           <span>{fallbackText ?? 'サムネイルはありません'}</span>
           {(src || load) && retryOnError && (

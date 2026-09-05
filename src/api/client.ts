@@ -71,6 +71,7 @@ export type ApiErrorOptions = {
   status?: number
   category?: ApiErrorCategory
   cause?: unknown
+  validationErrors?: string[]
 }
 
 const ERROR_MESSAGES: Record<ApiErrorCategory, string> = {
@@ -253,6 +254,7 @@ const categoryForError = (error: unknown): ApiErrorCategory => {
 export class ApiError extends Error {
   readonly status?: number
   readonly category: ApiErrorCategory
+  readonly validationErrors?: string[]
 
   constructor(message: string, options: ApiErrorOptions = {}) {
     const category = options.category ?? (typeof options.status === 'number' ? categoryForStatus(options.status) : 'unknown')
@@ -262,6 +264,7 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = options.status
     this.category = category
+    this.validationErrors = options.validationErrors?.map(redactSecrets)
   }
 
   toUserMessage() {
@@ -468,6 +471,10 @@ export class ApiClient {
         throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
           status: response.status,
           category: categoryForStatus(response.status),
+          validationErrors: isRecord(payload) && isRecord(payload.data) && Array.isArray(payload.data.errors)
+            ? payload.data.errors.filter((value): value is string => typeof value === 'string')
+              .map((value) => redactWithSettings(value, this.settings))
+            : undefined,
         })
       }
       return payload as T
