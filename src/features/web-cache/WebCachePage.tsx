@@ -1,6 +1,6 @@
 import { ExternalLink, RefreshCw, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
-import { getErrorMessage, mapWebCacheBookToCard, type DisplaySettings } from '../../api'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { getDownloadStatuses, getErrorMessage, mapWebCacheBookToCard, type ApiBookCardModel, type DisplaySettings } from '../../api'
 import { ApiError } from '../../api/client'
 import { deleteCacheBook, enqueueCacheBook, getCacheBook, getCacheConfig, searchCache } from '../../api/web-cache'
 import { isDownloadCandidate } from '../search/download-candidate'
@@ -8,7 +8,14 @@ import { InternalLink, navigate, useRouterLocation } from '../../app/client-rout
 import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
 import { BookCard } from '../../components/BookCard'
 import { TagChip } from '../../components/TagChip'
-import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, type BookTag } from '../../models'
+import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, type BookDownloadStatus, type BookTag } from '../../models'
+import { bookDownloadHubClient, type BookDownloadHubStatusEventKind } from '../../realtime/book-download-hub'
+import {
+  applySearchBookDownloadStatuses,
+  chooseLatestSearchBookDownloadStatus,
+  getDownloadStatusIdentityKey,
+  normalizeSearchBookDownloadStatus,
+} from '../../realtime/search-book-status'
 import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton, StatePanel, iconButtonClassName } from '../../components/ui'
 import type { SnackbarTone } from '../../components/Snackbar'
 import type { WebBookCacheBookDto } from '../../models/web-cache'
@@ -37,8 +44,16 @@ function safeUrl(value?: string | null) {
 const autoState = (book: WebBookCacheBookDto) => book.autoDownloadEnqueuedAt
   ? '自動投入済み' : !book.autoDownloadEvaluatedAt ? '自動判定待ち' : book.autoDownloadMatched ? '自動条件に一致' : '自動条件の対象外'
 
-function CacheCard({ book, disabled, enqueued, onDetail, onEnqueue, onDelete, onTagSearch, onTagSearchDestinationRequest }: {
+const mapCacheResultBook = (book: WebBookCacheBookDto): ApiBookCardModel => ({
+  ...mapWebCacheBookToCard(book),
+  status: 'WebBookInPage',
+  thumbnailUrl: undefined,
+  thumbnailReloadKey: `${identity(book)}:${book.lastSyncedAt ?? ''}`,
+})
+
+function CacheCard({ book, card, disabled, enqueued, onDetail, onEnqueue, onDelete, onTagSearch, onTagSearchDestinationRequest }: {
   book: WebBookCacheBookDto
+  card: ApiBookCardModel
   disabled: boolean
   enqueued: boolean
   onDetail: () => void
@@ -49,12 +64,6 @@ function CacheCard({ book, disabled, enqueued, onDetail, onEnqueue, onDelete, on
 }) {
   const valid = hasIdentity(book)
   const source = sourceUrl(book)
-  const card = useMemo(() => ({
-    ...mapWebCacheBookToCard(book),
-    status: 'WebBookInPage' as const,
-    thumbnailUrl: undefined,
-    thumbnailReloadKey: `${identity(book)}:${book.lastSyncedAt ?? ''}`,
-  }), [book])
   return (
     <BookCard
       book={card}
@@ -95,6 +104,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
   const [booksText, setBooksText] = useState(applied.bookIds.join(', '))
   const [groups, setGroups] = useState<string[]>([])
   const [books, setBooks] = useState<WebBookCacheBookDto[]>([])
+  const [bookCards, setBookCards] = useState<ApiBookCardModel[]>([])
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -112,7 +122,78 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
   const [pending, setPending] = useState<Set<string>>(new Set())
   const [enqueued, setEnqueued] = useState<Set<string>>(new Set())
   const operations = useRef(new Map<string, AbortController>())
+  const pendingStatusesRef = useRef(new Map<string, BookDownloadStatus>())
+  const latestStatusesRef = useRef(new Map<string, BookDownloadStatus>())
+  const statusVersionsRef = useRef(new Map<string, number>())
+  const realtimeFrameRef = useRef<number | null>(null)
+  const statusSnapshotControllerRef = useRef<AbortController | null>(null)
   useDocumentTitle(formatPageTitle(`キャッシュ候補 · ${applied.page}ページ`))
+
+  const applyStatuses = useCallback((statuses: BookDownloadStatus[]) => {
+    if (statuses.length === 0) return
+    setBookCards((current) => applySearchBookDownloadStatuses(
+      current,
+      statuses,
+      statusVersionsRef.current,
+    ))
+  }, [])
+
+  const flushPendingStatuses = useCallback(() => {
+    realtimeFrameRef.current = null
+    const statuses = [...pendingStatusesRef.current.values()]
+    pendingStatusesRef.current.clear()
+    applyStatuses(statuses)
+  }, [applyStatuses])
+
+  const queueStatus = useCallback((
+    kind: BookDownloadHubStatusEventKind,
+    status: BookDownloadStatus,
+  ) => {
+    const normalized = normalizeSearchBookDownloadStatus(status, kind === 'completed')
+    const key = getDownloadStatusIdentityKey(normalized)
+    if (!key) return
+
+    const current = latestStatusesRef.current.get(key)
+    const latest = chooseLatestSearchBookDownloadStatus(current, normalized)
+    if (latest === current) return
+    latestStatusesRef.current.set(key, latest)
+
+    const executionState = latest.executionState
+    const applyImmediately = kind === 'completed'
+      || kind === 'failed'
+      || kind === 'cancelled'
+      || executionState === 'Completed'
+      || executionState === 'Failed'
+      || executionState === 'Cancelled'
+      || executionState === 'Paused'
+      || executionState === 'Stopped'
+    if (applyImmediately) {
+      pendingStatusesRef.current.delete(key)
+      applyStatuses([latest])
+      return
+    }
+
+    pendingStatusesRef.current.set(key, latest)
+    if (realtimeFrameRef.current === null) {
+      realtimeFrameRef.current = window.requestAnimationFrame(flushPendingStatuses)
+    }
+  }, [applyStatuses, flushPendingStatuses])
+
+  const loadStatusSnapshot = useCallback(async () => {
+    statusSnapshotControllerRef.current?.abort()
+    const controller = new AbortController()
+    statusSnapshotControllerRef.current = controller
+    try {
+      const statuses = await getDownloadStatuses(controller.signal)
+      if (controller.signal.aborted || !statuses || typeof statuses !== 'object' || Array.isArray(statuses)) return
+      Object.values(statuses).forEach((status) => queueStatus('statusUpdate', status))
+    } catch {
+      // Realtime events can still keep visible candidates current when a
+      // best-effort reconnect snapshot is unavailable.
+    } finally {
+      if (statusSnapshotControllerRef.current === controller) statusSnapshotControllerRef.current = null
+    }
+  }, [queueStatus])
 
   useEffect(() => {
     setDraft(applied)
@@ -141,7 +222,14 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
         navigate(`/web-cache${serializeCacheSearch({ ...applied, page: pages })}`, { replace: true })
         return
       }
-      setBooks(response.books ?? [])
+      const nextBooks = response.books ?? []
+      statusVersionsRef.current.clear()
+      setBooks(nextBooks)
+      setBookCards(applySearchBookDownloadStatuses(
+        nextBooks.map(mapCacheResultBook),
+        [...latestStatusesRef.current.values()],
+        statusVersionsRef.current,
+      ))
       setTotalCount(response.totalCount ?? 0)
       setTotalPages(pages)
 
@@ -150,6 +238,39 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [applied, revision])
+
+  useEffect(() => {
+    const pendingStatuses = pendingStatusesRef.current
+    const latestStatuses = latestStatusesRef.current
+    const statusVersions = statusVersionsRef.current
+    const realtimeFrame = realtimeFrameRef
+    const statusSnapshotController = statusSnapshotControllerRef
+    const applyCollection = (statuses: BookDownloadStatus[]) => {
+      statuses.forEach((status) => queueStatus('statusUpdate', status))
+    }
+    const unsubscribe = bookDownloadHubClient.subscribe({
+      onStatus: queueStatus,
+      onRunningDownloads: applyCollection,
+      onQueuedDownloads: applyCollection,
+      onAllDownloadStatuses: (statuses) => applyCollection(Object.values(statuses)),
+      onBookDownloadStatus: (status) => queueStatus('statusUpdate', status),
+      onResyncRequested: () => { void loadStatusSnapshot() },
+    })
+
+    void loadStatusSnapshot()
+    return () => {
+      unsubscribe()
+      statusSnapshotController.current?.abort()
+      statusSnapshotController.current = null
+      pendingStatuses.clear()
+      latestStatuses.clear()
+      statusVersions.clear()
+      if (realtimeFrame.current !== null) {
+        window.cancelAnimationFrame(realtimeFrame.current)
+        realtimeFrame.current = null
+      }
+    }
+  }, [loadStatusSnapshot, queueStatus])
 
   useEffect(() => {
     if (!selected) return
@@ -247,7 +368,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
       {error && <StatePanel title="検索できませんでした" description={error} action={<Button onClick={() => setRevision((value) => value + 1)}>再試行</Button>} />}
       {loading ? <StatePanel title="候補を検索しています…" /> : !error && books.length === 0 ? <StatePanel title="該当する候補がありません" description="検索条件を変更するか、管理画面で同期状態を確認してください。" /> : !error && (
         <div className="book-grid" style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}>
-          {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
+          {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} card={bookCards[index] ?? mapCacheResultBook(book)} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
         </div>
       )}
       {!loading && !error && totalPages > 1 && <nav className="pagination" aria-label="キャッシュ候補のページ">{getPaginationItems(applied.page, totalPages, 5).map((page, index) => page === 'ellipsis' ? <span key={`gap-${index}`}>…</span> : page === applied.page ? <span key={page} className="pagination__current" aria-current="page">{page}</span> : <Button key={page} onClick={() => navigate(`/web-cache${serializeCacheSearch({ ...applied, page })}`)} aria-label={`${page}ページへ`}>{page}</Button>)}</nav>}

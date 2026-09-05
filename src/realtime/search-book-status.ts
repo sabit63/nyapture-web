@@ -43,6 +43,23 @@ const timestampValue = (value: string | null | undefined) => {
   return Number.isNaN(parsed) ? undefined : parsed
 }
 
+export const chooseLatestSearchBookDownloadStatus = (
+  current: BookDownloadStatus | undefined,
+  next: BookDownloadStatus,
+) => {
+  if (!current) return next
+
+  const currentTimestamp = timestampValue(current.lastUpdated)
+  const nextTimestamp = timestampValue(next.lastUpdated)
+  if (currentTimestamp === undefined || nextTimestamp === undefined) return next
+  if (nextTimestamp < currentTimestamp) return current
+  if (nextTimestamp > currentTimestamp) return next
+
+  return next.executionState === 'Completed' && current.executionState !== 'Completed'
+    ? next
+    : current
+}
+
 export const getApiBookIdentityKey = (
   book: Pick<ApiBookCardModel, 'apiGroupId' | 'apiBookId'>,
 ) => {

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapEBookToCard } from '../src/api/books'
+import { mapEBookToCard, mapWebCacheBookToCard } from '../src/api/books'
 import type { BookDownloadStatus } from '../src/models'
 import {
   applySearchBookDownloadStatus,
+  chooseLatestSearchBookDownloadStatus,
   getApiBookIdentityKey,
   normalizeSearchBookDownloadStatus,
 } from '../src/realtime/search-book-status'
@@ -111,4 +112,31 @@ test('a later completion updates an existing downloaded card reload key', () => 
   assert.equal(result.changed, true)
   assert.equal(result.books[0].status, 'Downloaded')
   assert.equal(result.books[0].thumbnailReloadKey, `downloaded:${nextUpdatedAt}`)
+})
+
+test('latest realtime status keeps newer progress and lets completion win an equal timestamp', () => {
+  const progress = makeStatus()
+  const older = makeStatus({ lastUpdated: '2026-09-04T23:59:59.000Z' })
+  const completion = makeStatus({ executionState: 'Completed' })
+
+  assert.equal(chooseLatestSearchBookDownloadStatus(progress, older), progress)
+  assert.equal(chooseLatestSearchBookDownloadStatus(progress, completion), completion)
+  assert.equal(chooseLatestSearchBookDownloadStatus(completion, progress), completion)
+})
+
+test('web-cache candidates accept realtime status by their server identity', () => {
+  const card = {
+    ...mapWebCacheBookToCard({
+      groupId: 'group-1',
+      bookId: 'book-1',
+      title: 'Cached candidate',
+      totalPage: 12,
+    }),
+    status: 'WebBookInPage' as const,
+  }
+  const result = applySearchBookDownloadStatus([card], makeStatus(), new Map())
+
+  assert.equal(result.accepted, true)
+  assert.equal(result.changed, true)
+  assert.equal(result.books[0].status, 'Downloading')
 })

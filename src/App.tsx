@@ -50,7 +50,7 @@ function App() {
     shellController.onNavigate()
     if (apiSettingsController.apiSettingsOpen) apiSettingsController.requestApiSettingsClose('programmatic')
   }, [apiSettingsController, routerLocation.revision, shellController])
-  const realtimeEnabled = isLibrarySearch || isWebSearch || isDownloadManager
+  const realtimeEnabled = isLibrarySearch || isWebSearch || isWebCache || isDownloadManager
   const hubConnectionState = useBookDownloadHubConnection(realtimeEnabled, apiSettingsController.apiRevision)
   const searchController = useSearchController({
     isWebSearch,
