@@ -46,6 +46,7 @@ import {
   type HitomiSortPeriod,
   type SearchDestination,
   type SearchSyncFreshness,
+  type SearchValidationErrors,
 } from './search-utils'
 import { findSearchBookIndex } from './search-book-download'
 import {
@@ -71,6 +72,7 @@ type Notify = (message: string, tone?: 'success' | 'warning' | 'error') => void
 type SearchControllerOptions = {
   isWebSearch: boolean
   isLibrarySearch: boolean
+  isMissingTagSearch: boolean
   isBookViewer: boolean
   apiRevision: number
   displaySettings: DisplaySettings
@@ -122,6 +124,7 @@ const criteriaRouteKey = (
   text: criteria.text,
   tags: criteria.tags.map((tag) => ({ type: tag.type, name: tag.name })),
   tagMode: criteria.tagMode,
+  missingTagTypes: criteria.missingTagTypes,
   dateFrom: criteria.dateFrom,
   dateTo: criteria.dateTo,
   pagesMin: criteria.pagesMin,
@@ -190,6 +193,7 @@ const overlaySavedBookStatuses = async (
 export function useSearchController({
   isWebSearch,
   isLibrarySearch,
+  isMissingTagSearch,
   isBookViewer,
   apiRevision,
   displaySettings,
@@ -198,7 +202,7 @@ export function useSearchController({
 }: SearchControllerOptions) {
   const routerLocation = useRouterLocation()
   const routeSearchParams = useMemo(() => new URLSearchParams(routerLocation.search), [routerLocation.search])
-  const routeCriteria = useMemo(() => parseCriteriaForRoute(routeSearchParams, isWebSearch), [isWebSearch, routeSearchParams])
+  const routeCriteria = useMemo(() => parseCriteriaForRoute(routeSearchParams, isWebSearch, isMissingTagSearch), [isWebSearch, isMissingTagSearch, routeSearchParams])
   const routeHitomiAppend = isWebSearch ? parseHitomiAppend(routeSearchParams) : 'Normal'
   const routeResultPage = parsePageParam(routeSearchParams.get('page'))
   const [librarySearchBooks, setLibrarySearchBooks] = useState<ApiBookCardModel[]>([])
@@ -206,6 +210,8 @@ export function useSearchController({
   const [searchResponseTags, setSearchResponseTags] = useState<TagEntity[]>([])
   const searchResultBooks = isWebSearch ? webSearchResultBooks : librarySearchBooks
   const [criteria, setCriteria] = useState<SearchCriteria>(() => cloneCriteria(routeCriteria))
+  const [draftMissingTagTypes, setDraftMissingTagTypes] = useState<NyaTagType[]>(() => [...(routeCriteria.missingTagTypes ?? [])])
+  const [missingTagsError, setMissingTagsError] = useState(() => validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(routeSearchParams).text)
   const [selected, setSelected] = useState<string[]>([])
   const [selectMode, setSelectMode] = useState(false)
@@ -216,7 +222,7 @@ export function useSearchController({
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [draftCriteria, setDraftCriteria] = useState<SearchCriteria>(() => cloneCriteria(routeCriteria))
   const [draftHitomiAppend, setDraftHitomiAppend] = useState<HitomiAppend>(() => routeHitomiAppend)
-  const [advancedErrors, setAdvancedErrors] = useState<{ date?: string; pages?: string }>({})
+  const [advancedErrors, setAdvancedErrors] = useState<SearchValidationErrors>({})
   const [tagType, setTagType] = useState<NyaTagType>('Artists')
   const [tagInput, setTagInput] = useState('')
   const [tagInputFocused, setTagInputFocused] = useState(false)
@@ -255,7 +261,7 @@ export function useSearchController({
   const deleteDialogRef = useRef<HTMLDialogElement>(null)
   const deleteDialogTriggerRef = useRef<HTMLElement | null>(null)
   const deleteDialogPendingRef = useRef(false)
-  const currentSearchDestination: SearchDestination = isWebSearch ? 'hitomi' : 'library'
+  const currentSearchDestination: SearchDestination = isWebSearch ? 'hitomi' : isMissingTagSearch ? 'missing-tags' : 'library'
   const routeStateSynchronized = !isLibrarySearch && !isWebSearch
     ? true
     : criteriaRouteKey(criteria, hitomiAppend, resultPage, isWebSearch)
@@ -526,12 +532,12 @@ export function useSearchController({
   }, [createSearchRequest, runSearchRequest])
 
   const requestBackgroundSearch = useCallback(() => {
-    if (!isLibrarySearch && !isWebSearch) return
+    if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized || (isMissingTagSearch && !criteria.missingTagTypes?.length)) return
     // Connection/resync events never restart a foreground search or own its loader.
     const result = requestBackgroundSearchRequest(searchRequestLifecycleRef.current)
     searchRequestLifecycleRef.current = result.state
     if (result.token) startSearchRequest(result.token)
-  }, [isLibrarySearch, isWebSearch, startSearchRequest])
+  }, [isLibrarySearch, isWebSearch, isMissingTagSearch, criteria.missingTagTypes, routeStateSynchronized, startSearchRequest])
 
   useEffect(() => {
     requestBackgroundSearchRef.current = requestBackgroundSearch
@@ -542,6 +548,20 @@ export function useSearchController({
 
   useEffect(() => {
     if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized) return
+    if (isMissingTagSearch && !criteria.missingTagTypes?.length) {
+      activeSearchRequestRef.current?.controller.abort()
+      activeSearchRequestRef.current = null
+      searchRequestLifecycleRef.current = resetSearchRequestLifecycle(searchRequestLifecycleRef.current)
+      searchRealtimeBufferRef.current = null
+      setLibrarySearchBooks([])
+      setSearchResponseTags([])
+      setTotalResultPages(1)
+      setSearchState('idle')
+      setSearchSyncFreshness('idle')
+      setSearchError('')
+      setSearchLoaderVisible(false)
+      return
+    }
     const begun = beginForegroundSearchRequest(searchRequestLifecycleRef.current)
     searchRequestLifecycleRef.current = begun.state
     let loadingTimer: number | null = null
@@ -568,7 +588,7 @@ export function useSearchController({
         setSearchLoaderVisible(false)
       }
     }
-  }, [apiRevision, criteria, hitomiAppend, isActiveSearchRequest, isLibrarySearch, isWebSearch, resultPage, routeStateSynchronized, routerLocation.pathname, routerLocation.search, runSearchRequest, searchRevision, sortDirection, sortType, startSearchRequest])
+  }, [apiRevision, criteria, hitomiAppend, isActiveSearchRequest, isLibrarySearch, isMissingTagSearch, isWebSearch, resultPage, routeStateSynchronized, routerLocation.pathname, routerLocation.search, runSearchRequest, searchRevision, sortDirection, sortType, startSearchRequest])
 
   useEffect(() => {
     if (!isLibrarySearch && !isWebSearch) return
@@ -632,13 +652,15 @@ export function useSearchController({
     if (!isLibrarySearch && !isWebSearch) return
     setCriteria(cloneCriteria(routeCriteria))
     setQuery(routeCriteria.text)
+    setDraftMissingTagTypes([...(routeCriteria.missingTagTypes ?? [])])
+    setMissingTagsError(validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
     setDraftCriteria(cloneCriteria(routeCriteria))
     setHitomiAppend(routeHitomiAppend)
     setDraftHitomiAppend(routeHitomiAppend)
     setResultPageState(routeResultPage)
     setAdvancedErrors({})
     setSelected([])
-  }, [isLibrarySearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage, routerLocation.pathname, routerLocation.search])
+  }, [isLibrarySearch, isWebSearch, isMissingTagSearch, routeCriteria, routeHitomiAppend, routeResultPage, routerLocation.pathname, routerLocation.search])
 
   useEffect(() => {
     if (routerLocation.revision === 0) return
@@ -652,7 +674,8 @@ export function useSearchController({
     return tags === book.tags ? book : { ...book, tags }
   }), [searchResultBooks, tagDisplayNameOverrides])
 
-  const filteredBooks = isWebSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
+  // The missing-tag API evaluates ordinary conditions together with the missing types.
+  const filteredBooks = isWebSearch || isMissingTagSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
     const normalizedQuery = criteria.text.trim().toLocaleLowerCase()
     if (normalizedQuery) {
       const searchableText = [
@@ -693,17 +716,25 @@ export function useSearchController({
 
   const submitSearch = useCallback((event: FormEvent) => {
     event.preventDefault()
-    const nextCriteria: SearchCriteria = {
+    const nextCriteria: SearchCriteria = isMissingTagSearch ? {
+      ...cloneCriteria(criteria),
+      text: query.trim(),
+      missingTagTypes: [...draftMissingTagTypes],
+    } : {
       ...emptyCriteria(),
       text: query.trim(),
       tags: isWebSearch && japaneseLanguageEnabled ? [JAPANESE_LANGUAGE_TAG] : [],
     }
+    const errors = validateCriteria(nextCriteria, isMissingTagSearch)
+    setMissingTagsError(errors.missingTags ?? '')
+    if (errors.missingTags) return
+    if (isMissingTagSearch) setQuery(nextCriteria.text)
     const url = createSearchUrlForDestination(nextCriteria, {
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? hitomiAppend : undefined,
     })
     navigateSearchUrl(url)
-  }, [currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query])
+  }, [criteria, draftMissingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query])
 
   const searchByTag = useCallback((tag: BookTag) => {
     const resolvedTag = resolveTag(tag)
@@ -711,13 +742,13 @@ export function useSearchController({
     if (isWebSearch && japaneseLanguageEnabled && !sameTag(resolvedTag, JAPANESE_LANGUAGE_TAG)) {
       nextTags.push(JAPANESE_LANGUAGE_TAG)
     }
-    const nextCriteria: SearchCriteria = { ...emptyCriteria(), tags: nextTags }
+    const nextCriteria: SearchCriteria = { ...emptyCriteria(), tags: nextTags, ...(isMissingTagSearch ? { missingTagTypes: [...(criteria.missingTagTypes ?? [])] } : {}) }
     const url = createSearchUrlForDestination(nextCriteria, {
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? hitomiAppend : undefined,
     })
     navigateSearchUrl(url)
-  }, [currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl])
+  }, [criteria.missingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl])
 
   const openTagSearchDestination = useCallback((tag: BookTag, trigger: HTMLButtonElement) => {
     const resolvedTag = resolveTag(tag)
@@ -767,7 +798,9 @@ export function useSearchController({
   }, [criteria, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl])
 
   const openAdvancedSearch = useCallback(() => {
-    setDraftCriteria(cloneCriteria(normalizeCriteriaForRoute(criteria, isWebSearch)))
+    setDraftCriteria(cloneCriteria(normalizeCriteriaForRoute(isMissingTagSearch
+      ? { ...criteria, text: query, missingTagTypes: [...draftMissingTagTypes] }
+      : criteria, isWebSearch, isMissingTagSearch)))
     setDraftHitomiAppend(isWebSearch ? hitomiAppend : 'Normal')
     setAdvancedErrors({})
     setTagType('Artists')
@@ -775,7 +808,7 @@ export function useSearchController({
     setTagInputFocused(false)
     setHighlightedTagIndex(0)
     setAdvancedOpen(true)
-  }, [criteria, hitomiAppend, isWebSearch])
+  }, [criteria, draftMissingTagTypes, query, isMissingTagSearch, hitomiAppend, isWebSearch])
 
   const requestAdvancedClose = useCallback((_reason: 'escape' | 'backdrop' | 'close-button' | 'submit' | 'programmatic') => {
     setAdvancedOpen(false)
@@ -793,13 +826,13 @@ export function useSearchController({
   }, [])
 
   const clearAdvancedDraft = useCallback(() => {
-    setDraftCriteria(emptyCriteria())
+    setDraftCriteria((current) => ({ ...emptyCriteria(), ...(isMissingTagSearch ? { missingTagTypes: [...(current.missingTagTypes ?? [])] } : {}) }))
     setDraftHitomiAppend('Normal')
     setAdvancedErrors({})
     setTagType('Artists')
     setTagInput('')
     setHighlightedTagIndex(0)
-  }, [])
+  }, [isMissingTagSearch])
 
   const selectDraftTag = useCallback((tag: BookTag) => {
     setDraftCriteria((current) => ({
@@ -820,9 +853,9 @@ export function useSearchController({
 
   const applyAdvancedSearch = useCallback((event: FormEvent<HTMLFormElement>, requestClose: (reason: 'escape' | 'backdrop' | 'close-button' | 'submit' | 'programmatic') => boolean) => {
     event.preventDefault()
-    const errors = isWebSearch ? {} : validateCriteria(draftCriteria)
+    const errors = isWebSearch ? {} : validateCriteria(draftCriteria, isMissingTagSearch)
     setAdvancedErrors(errors)
-    if (!isWebSearch && (errors.date || errors.pages)) return
+    if (!isWebSearch && (errors.date || errors.pages || errors.missingTags)) return
 
     const nextHitomiAppend: HitomiAppend = isWebSearch ? draftHitomiAppend : 'Normal'
     const nextCriteria: SearchCriteria = {
@@ -839,9 +872,14 @@ export function useSearchController({
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? nextHitomiAppend : undefined,
     })
+    if (isMissingTagSearch) {
+      setQuery(nextCriteria.text)
+      setDraftMissingTagTypes([...(nextCriteria.missingTagTypes ?? [])])
+      setMissingTagsError('')
+    }
     navigateSearchUrl(url)
     requestClose('submit')
-  }, [currentSearchDestination, draftCriteria, draftHitomiAppend, isWebSearch, navigateSearchUrl])
+  }, [currentSearchDestination, draftCriteria, draftHitomiAppend, isWebSearch, isMissingTagSearch, navigateSearchUrl])
 
   const fetchWebBook = useCallback(async (book: BookCardModel) => {
     if (!book.url) throw new ApiError('Book URLがありません。', { category: 'validation' })
@@ -1109,6 +1147,11 @@ export function useSearchController({
   return {
     isWebSearch,
     isLibrarySearch,
+    isMissingTagSearch,
+    draftMissingTagTypes,
+    setDraftMissingTagTypes,
+    missingTagsError,
+    setMissingTagsError,
     isBookViewer,
     criteria,
     query,

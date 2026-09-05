@@ -69,6 +69,7 @@ const formatConditionSummary = (
 
 export type SearchPageTitleInput = {
   isWebSearch: boolean
+  isMissingTagSearch?: boolean
   isLibrarySearch: boolean
   criteria: SearchCriteria
   hitomiAppend: HitomiAppend
@@ -80,6 +81,7 @@ export type SearchPageTitleInput = {
 export const formatSearchPageTitle = ({
   isWebSearch,
   isLibrarySearch,
+  isMissingTagSearch = false,
   criteria,
   hitomiAppend,
   resultPage,
@@ -87,7 +89,11 @@ export const formatSearchPageTitle = ({
 }: SearchPageTitleInput) => {
   if (!isWebSearch && !isLibrarySearch) return APP_TITLE
 
-  const summary = formatConditionSummary(criteria, hitomiAppend, responseTags)
+  const missingSummary = isMissingTagSearch && criteria.missingTagTypes?.length
+    ? `すべて未設定: ${criteria.missingTagTypes.map((type) => TAG_TYPE_LABELS[type]).join('・')}`
+    : ''
+  const summary = [missingSummary, formatConditionSummary(criteria, hitomiAppend, responseTags)].filter(Boolean).join(' / ')
+  if (isMissingTagSearch) return formatPageTitle(summary ? `${summary}${resultPage > 1 ? ` / ${formatPageNumber(resultPage)}P` : ''}` : undefined, '未タグ検索')
   if (!summary) return isWebSearch ? formatPageTitle('Hitomi') : APP_TITLE
 
   const pageNumber = formatPageNumber(resultPage)

@@ -153,3 +153,30 @@
   .sort-control select { width: auto; min-width: 145px; }
   .hitomi-append-control select { width: auto; min-width: 112px; }
 }
+
+
+.missing-search-title {
+  width: min(100%, var(--container-wide));
+  margin: 0 auto var(--space-4);
+  font-size: var(--font-size-heading-md);
+}
+
+.missing-search-panel {
+  width: min(100%, var(--container-wide));
+  margin: 0 auto var(--layout-section-gap);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+}
+
+.missing-tag-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.missing-tag-options { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.missing-tag-options label { display: flex; align-items: center; gap: var(--space-2); min-height: var(--control-height-default); font-size: var(--font-size-body-md); cursor: pointer; }
+.missing-tag-options input { width: var(--space-4); height: var(--space-4); accent-color: var(--color-accent-fill); }
+.missing-tag-options input:focus-visible { outline: 2px solid var(--color-focus); outline-offset: var(--space-1); }
+.missing-tag-fields p { margin: var(--space-3) 0 0; color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.missing-tag-fields .advanced-field-error { color: var(--color-danger-text); }
+.missing-search-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
+.missing-search-actions span { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
+.missing-search-actions button { flex-shrink: 0; }

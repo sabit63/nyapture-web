@@ -17,10 +17,11 @@ import { retryPendingScrollRestoration } from '../../app/client-router'
 import { BookCard } from '../../components/BookCard'
 import { TagChip } from '../../components/TagChip'
 import { Button, IconButton, StatePanel } from '../../components/ui'
-import { HITOMI_APPENDS } from '../../models'
+import { HITOMI_APPENDS, TAG_TYPE_LABELS } from '../../models'
 import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
+import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
 
@@ -41,7 +42,7 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
 
   return (
     <form className="quick-search" role="search" onSubmit={submitSearch}>
-      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : '検索'}</label>
+      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</label>
       <input
         id="header-search"
         type="search"
@@ -134,6 +135,7 @@ export function SearchPage({ controller }: SearchPageProps) {
   useDocumentTitle(formatSearchPageTitle({
     isWebSearch,
     isLibrarySearch: controller.isLibrarySearch,
+    isMissingTagSearch: controller.isMissingTagSearch,
     criteria,
     hitomiAppend,
     resultPage,
@@ -142,10 +144,31 @@ export function SearchPage({ controller }: SearchPageProps) {
 
   return (
     <>
-      <h1 id="page-title" className="sr-only">{isWebSearch ? 'Web検索' : '検索'}</h1>
+      <h1 id="page-title" className={controller.isMissingTagSearch ? 'missing-search-title' : 'sr-only'}>{isWebSearch ? 'Web検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</h1>
+
+      {controller.isMissingTagSearch && (
+        <form className="missing-search-panel" onSubmit={controller.submitSearch}>
+          <MissingTagFields
+            id="missing-tags"
+            value={controller.draftMissingTagTypes}
+            error={controller.missingTagsError}
+            onChange={(types) => {
+              controller.setDraftMissingTagTypes(types)
+              controller.setMissingTagsError(types.length ? '' : '1種類以上選択してください。')
+            }}
+          />
+          <div className="missing-search-actions">
+            <span role="status">{controller.draftMissingTagTypes.length !== (criteria.missingTagTypes?.length ?? 0) || controller.draftMissingTagTypes.some((type) => !criteria.missingTagTypes?.includes(type)) || controller.query !== criteria.text ? '条件の変更はまだ検索結果に反映されていません' : ''}</span>
+            <Button type="submit" variant="solid" tone="accent">検索</Button>
+          </div>
+        </form>
+      )}
 
       <section className="filter-panel" aria-label="検索条件" hidden={!hasCriteria}>
         <div className="filter-values">
+          {controller.isMissingTagSearch && Boolean(criteria.missingTagTypes?.length) && (
+            <span className="filter-value">すべて未設定: {criteria.missingTagTypes?.map((type) => TAG_TYPE_LABELS[type]).join('・')}</span>
+          )}
           {criteria.text && (
             <span className="filter-value">検索: {criteria.text}</span>
           )}
@@ -319,6 +342,10 @@ export function SearchPage({ controller }: SearchPageProps) {
 
         {isSearchLoading && (
           <p className="sr-only" role="status" aria-live="polite">{searchLoadingAnnouncement}</p>
+        )}
+
+        {controller.isMissingTagSearch && searchState === 'success' && visibleBooks.length === 0 && (
+          <StatePanel title="条件に一致する本がありません" description="タグの種類や検索条件を変更してください。" role="status" />
         )}
 
         {searchState === 'error' && (

@@ -363,6 +363,7 @@ export type SearchCriteria = {
   text: string
   tags: BookTag[]
   tagMode: TagMode
+  missingTagTypes?: NyaTagType[]
   dateFrom: string
   dateTo: string
   pagesMin: string

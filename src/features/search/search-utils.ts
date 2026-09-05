@@ -26,11 +26,19 @@ export const emptyCriteria = (): SearchCriteria => ({
 export const cloneCriteria = (criteria: SearchCriteria): SearchCriteria => ({
   ...criteria,
   tags: criteria.tags.map((tag) => ({ ...tag })),
+  ...(criteria.missingTagTypes ? { missingTagTypes: [...criteria.missingTagTypes] } : {}),
 })
 
-export const normalizeCriteriaForRoute = (criteria: SearchCriteria, isWebSearch: boolean): SearchCriteria => isWebSearch
-  ? { ...criteria, tagMode: 'and' }
-  : criteria
+export const normalizeCriteriaForRoute = (
+  criteria: SearchCriteria,
+  isWebSearch: boolean,
+  isMissingTagSearch = false,
+): SearchCriteria => {
+  const normalized = isWebSearch ? { ...criteria, tagMode: 'and' as const } : criteria
+  if (isMissingTagSearch && !isWebSearch) return normalized
+  const { missingTagTypes: _missingTagTypes, ...withoutMissingTagTypes } = normalized
+  return withoutMissingTagTypes
+}
 
 const JAPANESE_LANGUAGE_TAG: BookTag = { type: 'Languages', name: 'japanese' }
 
@@ -60,25 +68,49 @@ export const parseCriteriaFromUrl = (params: URLSearchParams): SearchCriteria =>
   return criteria
 }
 
-export const parseCriteriaForRoute = (params: URLSearchParams, isWebSearch: boolean): SearchCriteria => {
-  const criteria = normalizeCriteriaForRoute(parseCriteriaFromUrl(params), isWebSearch)
+const DEFAULT_MISSING_TAG_TYPES: NyaTagType[] = ['Artists', 'Groups']
+
+const parseMissingTagTypes = (params: URLSearchParams): NyaTagType[] => {
+  const values = params.getAll('missingTagType')
+  if (values.length === 0) return [...DEFAULT_MISSING_TAG_TYPES]
+  return values
+    .filter((value): value is NyaTagType => TAG_TYPE_ORDER.includes(value as NyaTagType))
+    .filter((value, index, all) => all.indexOf(value) === index)
+}
+
+export const parseCriteriaForRoute = (
+  params: URLSearchParams,
+  isWebSearch: boolean,
+  isMissingTagSearch = false,
+): SearchCriteria => {
+  const criteria = normalizeCriteriaForRoute(parseCriteriaFromUrl(params), isWebSearch, isMissingTagSearch)
+  if (isMissingTagSearch && !isWebSearch) {
+    return { ...criteria, missingTagTypes: parseMissingTagTypes(params) }
+  }
   if (!isWebSearch || params.get('japanese')?.trim().toLocaleLowerCase() === 'off') return criteria
   if (criteria.tags.some(isJapaneseLanguageTag)) return criteria
   return { ...criteria, tags: [...criteria.tags, { ...JAPANESE_LANGUAGE_TAG }] }
 }
 
 export const criteriaHasValues = (criteria: SearchCriteria) => Boolean(
-  criteria.text.trim() || criteria.tags.length || criteria.dateFrom || criteria.dateTo || criteria.pagesMin || criteria.pagesMax,
+  criteria.text.trim()
+  || criteria.tags.length
+  || criteria.missingTagTypes?.length
+  || criteria.dateFrom
+  || criteria.dateTo
+  || criteria.pagesMin
+  || criteria.pagesMax,
 )
 
-export type SearchDestination = 'library' | 'hitomi'
+export type SearchDestination = 'library' | 'hitomi' | 'missing-tags'
 
 export const createSearchUrlForDestination = (
   criteria: SearchCriteria,
   options: { destination: SearchDestination; hitomiAppend?: HitomiAppend; origin?: string },
 ): URL => {
   const isHitomiSearch = options.destination === 'hitomi'
-  const pathname = isHitomiSearch ? '/hitomila/search' : '/search'
+  const isMissingTagSearch = options.destination === 'missing-tags'
+  const pathname = isHitomiSearch ? '/hitomila/search' : isMissingTagSearch ? '/search/missing-tags' : '/search'
   const url = new URL(pathname, options.origin ?? window.location.origin)
   const text = criteria.text.trim()
   const tags = isHitomiSearch
@@ -92,6 +124,13 @@ export const createSearchUrlForDestination = (
   if (criteria.dateTo) url.searchParams.set('dateTo', criteria.dateTo)
   if (criteria.pagesMin) url.searchParams.set('pagesMin', criteria.pagesMin)
   if (criteria.pagesMax) url.searchParams.set('pagesMax', criteria.pagesMax)
+  if (isMissingTagSearch && criteria.missingTagTypes !== undefined) {
+    if (criteria.missingTagTypes.length === 0) {
+      url.searchParams.set('missingTagType', '')
+    } else {
+      criteria.missingTagTypes.forEach((type) => url.searchParams.append('missingTagType', type))
+    }
+  }
   if (isHitomiSearch) url.searchParams.set('append', options.hitomiAppend ?? 'Normal')
   url.searchParams.set('page', '1')
   return url
@@ -163,10 +202,13 @@ export const getPaginationItems = (currentPage: number, totalPages: number, page
   return items
 }
 
-export type SearchValidationErrors = { date?: string; pages?: string }
+export type SearchValidationErrors = { date?: string; pages?: string; missingTags?: string }
 
-export const validateCriteria = (criteria: SearchCriteria): SearchValidationErrors => {
+export const validateCriteria = (criteria: SearchCriteria, isMissingTagSearch = false): SearchValidationErrors => {
   const errors: SearchValidationErrors = {}
+  if (isMissingTagSearch && !criteria.missingTagTypes?.length) {
+    errors.missingTags = '1種類以上選択してください。'
+  }
   if (criteria.dateFrom && criteria.dateTo && criteria.dateFrom > criteria.dateTo) {
     errors.date = '開始日は終了日以前にしてください。'
   }

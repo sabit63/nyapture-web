@@ -3,6 +3,7 @@ import { Eraser, Search, X } from 'lucide-react'
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, HITOMI_APPENDS, getTagLabel } from '../../models'
 import { TagChip } from '../../components/TagChip'
 import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton } from '../../components/ui'
+import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatTagCount } from './search-utils'
 
@@ -68,6 +69,17 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
           </DialogHeader>
 
           <DialogBody className="advanced-dialog__body">
+            {controller.isMissingTagSearch && (
+              <MissingTagFields
+                id="advanced-missing-tags"
+                value={draftCriteria.missingTagTypes ?? []}
+                error={advancedErrors.missingTags}
+                onChange={(types) => {
+                  setDraftCriteria((current) => ({ ...current, missingTagTypes: types }))
+                  setAdvancedErrors((current) => ({ ...current, missingTags: types.length ? undefined : '1種類以上選択してください。' }))
+                }}
+              />
+            )}
             {!isWebSearch && (
               <section className="advanced-dialog__field">
                 <label htmlFor="advanced-search-text">テキスト入力</label>

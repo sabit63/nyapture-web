@@ -24,7 +24,8 @@ function App() {
   const routerLocation = useRouterLocation()
   const currentPath = routerLocation.pathname
   const isWebSearch = currentPath === '/hitomila/search'
-  const isLibrarySearch = currentPath === '/search'
+  const isMissingTagSearch = currentPath === '/search/missing-tags'
+  const isLibrarySearch = currentPath === '/search' || isMissingTagSearch
   const isBookViewer = currentPath === '/book/viewer'
   const isDownloadManager = currentPath === '/download/book'
   const isDashboard = currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')
@@ -52,6 +53,7 @@ function App() {
   const searchController = useSearchController({
     isWebSearch,
     isLibrarySearch,
+    isMissingTagSearch,
     isBookViewer,
     apiRevision: apiSettingsController.apiRevision,
     displaySettings: apiSettingsController.displaySettings,
