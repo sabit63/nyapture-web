@@ -22,6 +22,7 @@ import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
 import { isDownloadCandidate } from './download-candidate'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
+import { applyTagEntityMetadata } from './tag-display-name'
 import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
@@ -133,6 +134,7 @@ export function SearchPage({ controller }: SearchPageProps) {
 
   const isSearchLoading = searchState === 'loading'
   const showSearchLoader = isSearchLoading && searchLoaderVisible
+  const displayedCriteriaTags = applyTagEntityMetadata(criteria.tags, searchResponseTags)
   useDocumentTitle(formatSearchPageTitle({
     isWebSearch,
     isLibrarySearch: controller.isLibrarySearch,
@@ -176,8 +178,15 @@ export function SearchPage({ controller }: SearchPageProps) {
           {criteria.tags.length > 0 && (
             <span className="filter-value filter-value--tags">
               <span className="filter-value__operator">{criteria.tagMode === 'and' ? 'すべてのタグ' : 'いずれかのタグ'}:</span>
-              {criteria.tags.map((tag) => (
-                <TagChip key={`${tag.type}:${tag.name}`} tag={tag} size="default" />
+              {displayedCriteriaTags.map((tag) => (
+                <TagChip
+                  key={`${tag.type}:${tag.name}`}
+                  tag={tag}
+                  size="default"
+                  title={tag.displayName && tag.displayName !== tag.name ? tag.name : undefined}
+                  onClick={() => searchByTag(tag)}
+                  onSearchDestinationRequest={openTagSearchDestination}
+                />
               ))}
             </span>
           )}

@@ -1,4 +1,4 @@
-import type { BookTag } from '../../models'
+import type { BookTag, TagEntity } from '../../models'
 import { sameTag } from './search-utils'
 
 export type TagDisplayNameOverrides = ReadonlyMap<string, string | undefined>
@@ -49,6 +49,33 @@ export const applyTagDisplayNameOverrides = (
     const updated = withTagDisplayName(tag, overrides.get(key))
     changed = changed || updated !== tag
     return updated
+  })
+  return changed ? next : tags
+}
+
+export const applyTagEntityMetadata = (
+  tags: BookTag[],
+  entities: TagEntity[],
+): BookTag[] => {
+  if (entities.length === 0) return tags
+  let changed = false
+  const next = tags.map((tag) => {
+    const entity = entities.find((candidate) => (
+      candidate.type !== undefined
+      && candidate.name !== undefined
+      && sameTag(candidate as BookTag, tag)
+    ))
+    const displayName = entity?.displayName?.trim()
+    const count = entity?.count
+    const displayNameChanged = Boolean(displayName) && displayName !== tag.displayName
+    const countChanged = typeof count === 'number' && count !== tag.count
+    if (!displayNameChanged && !countChanged) return tag
+    changed = true
+    return {
+      ...tag,
+      ...(displayName ? { displayName } : {}),
+      ...(typeof count === 'number' ? { count } : {}),
+    }
   })
   return changed ? next : tags
 }

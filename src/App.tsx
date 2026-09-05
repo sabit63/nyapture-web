@@ -147,7 +147,12 @@ function App() {
       {isDownloadManager ? (
         <DownloadManager apiRevision={apiSettingsController.apiRevision} />
       ) : isWebCache ? (
-        <WebCachePage apiRevision={apiSettingsController.apiRevision} displaySettings={apiSettingsController.displaySettings} notify={notify} />
+        <WebCachePage
+          apiRevision={apiSettingsController.apiRevision}
+          displaySettings={apiSettingsController.displaySettings}
+          notify={notify}
+          onTagSearchDestinationRequest={searchController.openTagSearchDestination}
+        />
       ) : isDashboard ? (
         <Dashboard path={currentPath} apiRevision={apiSettingsController.apiRevision} />
       ) : isBookViewer && viewerRoute ? (

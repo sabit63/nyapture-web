@@ -7,7 +7,8 @@ import { isDownloadCandidate } from '../search/download-candidate'
 import { InternalLink, navigate, useRouterLocation } from '../../app/client-router'
 import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
 import { BookCard } from '../../components/BookCard'
-import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER, type BookTag } from '../../models'
+import { TagChip } from '../../components/TagChip'
+import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, type BookTag } from '../../models'
 import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton, StatePanel, iconButtonClassName } from '../../components/ui'
 import type { SnackbarTone } from '../../components/Snackbar'
 import type { WebBookCacheBookDto } from '../../models/web-cache'
@@ -19,6 +20,7 @@ type Props = {
   apiRevision: number
   displaySettings: DisplaySettings
   notify: (message: string, tone?: SnackbarTone) => void
+  onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
 }
 
 const identity = (book: WebBookCacheBookDto) => JSON.stringify([book.groupId, book.bookId])
@@ -35,7 +37,7 @@ function safeUrl(value?: string | null) {
 const autoState = (book: WebBookCacheBookDto) => book.autoDownloadEnqueuedAt
   ? '自動投入済み' : !book.autoDownloadEvaluatedAt ? '自動判定待ち' : book.autoDownloadMatched ? '自動条件に一致' : '自動条件の対象外'
 
-function CacheCard({ book, disabled, enqueued, onDetail, onEnqueue, onDelete, onTagSearch }: {
+function CacheCard({ book, disabled, enqueued, onDetail, onEnqueue, onDelete, onTagSearch, onTagSearchDestinationRequest }: {
   book: WebBookCacheBookDto
   disabled: boolean
   enqueued: boolean
@@ -43,6 +45,7 @@ function CacheCard({ book, disabled, enqueued, onDetail, onEnqueue, onDelete, on
   onEnqueue: () => void
   onDelete: () => void
   onTagSearch: (tag: BookTag) => void
+  onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
 }) {
   const valid = hasIdentity(book)
   const source = sourceUrl(book)
@@ -68,6 +71,7 @@ function CacheCard({ book, disabled, enqueued, onDetail, onEnqueue, onDelete, on
       onDelete={onDelete}
       allowWebDelete
       onTagSearch={onTagSearch}
+      onTagSearchDestinationRequest={onTagSearchDestinationRequest}
       extraActions={source && <a className={iconButtonClassName({ variant: 'outline', tone: 'neutral', size: 'compact' }, 'card-action card-action--control')} href={source} target="_blank" rel="noopener noreferrer" aria-label="配信元を別タブで開く"><ExternalLink size={16} aria-hidden="true" /></a>}
       footer={<div className="cache-card-metadata">
         <p>{book.groupId || '不明'} / {book.bookId || '不明'}</p>
@@ -83,7 +87,7 @@ export function WebCachePage(props: Props) {
   return <CachePageSession key={props.apiRevision} {...props} />
 }
 
-function CachePageSession({ displaySettings, notify }: Props) {
+function CachePageSession({ displaySettings, notify, onTagSearchDestinationRequest }: Props) {
   const location = useRouterLocation()
   const applied = useMemo(() => parseCacheSearch(location.search), [location.search])
   const [draft, setDraft] = useState(applied)
@@ -214,6 +218,11 @@ function CachePageSession({ displaySettings, notify }: Props) {
     }
   }
 
+  function searchByTag(tag: BookTag) {
+    setSelected(null)
+    navigate(`/web-cache${serializeCacheSearch({ ...applied, q: tag.name, page: 1 })}`)
+  }
+
   const activeBook = detail ?? selected
   return (
     <section className="web-cache" aria-labelledby="web-cache-title">
@@ -238,7 +247,7 @@ function CachePageSession({ displaySettings, notify }: Props) {
       {error && <StatePanel title="検索できませんでした" description={error} action={<Button onClick={() => setRevision((value) => value + 1)}>再試行</Button>} />}
       {loading ? <StatePanel title="候補を検索しています…" /> : !error && books.length === 0 ? <StatePanel title="該当する候補がありません" description="検索条件を変更するか、管理画面で同期状態を確認してください。" /> : !error && (
         <div className="book-grid" style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}>
-          {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} onTagSearch={(tag) => navigate(`/web-cache${serializeCacheSearch({ ...applied, q: tag.name, page: 1 })}`)} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
+          {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
         </div>
       )}
       {!loading && !error && totalPages > 1 && <nav className="pagination" aria-label="キャッシュ候補のページ">{getPaginationItems(applied.page, totalPages, 5).map((page, index) => page === 'ellipsis' ? <span key={`gap-${index}`}>…</span> : page === applied.page ? <span key={page} className="pagination__current" aria-current="page">{page}</span> : <Button key={page} onClick={() => navigate(`/web-cache${serializeCacheSearch({ ...applied, page })}`)} aria-label={`${page}ページへ`}>{page}</Button>)}</nav>}
@@ -249,7 +258,7 @@ function CachePageSession({ displaySettings, notify }: Props) {
           {detailError && <div role="alert"><p className="cache-error">{detailError}</p><Button onClick={() => setDetailRevision((value) => value + 1)}>再試行</Button></div>}
           {detail && <><h3>{detail.title || 'タイトルなし'}</h3><dl className="cache-detail__fields">
             {Object.entries({ GroupId: detail.groupId, BookId: detail.bookId, ページ数: detail.totalPage, 投稿日: dateText(detail.uploadedTime), 初回キャッシュ: dateText(detail.firstCachedAt), 最終同期: dateText(detail.lastSyncedAt), 最終確認: dateText(detail.lastSeenAt), 同期エラー: detail.syncError, 自動判定: autoState(detail), 判定日時: dateText(detail.autoDownloadEvaluatedAt), 判定理由: detail.autoDownloadReason, 自動投入日時: dateText(detail.autoDownloadEnqueuedAt) }).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value ?? '—'}</dd></div>)}
-          </dl><h3>すべてのタグ</h3>{TAG_TYPE_ORDER.map((type) => { const tags = detailTags.filter((tag) => tag.type === type); return tags.length > 0 && <div key={type}><h4>{TAG_TYPE_LABELS[type]}</h4><div className="cache-tags">{tags.map((tag) => <span key={tag.name}>{getTagLabel(tag)}{typeof tag.count === 'number' && Number.isFinite(tag.count) ? `（${tag.count.toLocaleString('ja-JP')}件）` : ''}</span>)}</div></div> })}
+          </dl><h3>すべてのタグ</h3>{TAG_TYPE_ORDER.map((type) => { const tags = detailTags.filter((tag) => tag.type === type); return tags.length > 0 && <div key={type}><h4>{TAG_TYPE_LABELS[type]}</h4><div className="cache-tags">{tags.map((tag) => <TagChip key={`${tag.type}:${tag.name}`} tag={tag} size="default" title={tag.displayName && tag.displayName !== tag.name ? tag.name : undefined} onClick={() => searchByTag(tag)} onSearchDestinationRequest={onTagSearchDestinationRequest} />)}</div></div> })}
           <h3>URL</h3><dl className="cache-detail__fields">{Object.entries({ 配信元: detail.sourcePageUrl, URL: detail.url, サムネイル: detail.thumbnailUrl }).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{safeUrl(value) ? <a href={safeUrl(value)} target="_blank" rel="noopener noreferrer">{value}</a> : value || '—'}</dd></div>)}</dl>
           {(detail.pageUrls?.length ?? 0) > 0 && <details><summary>ページURL（{detail.pageUrls!.length}件）</summary><ul>{detail.pageUrls!.map((url, index) => <li key={`${index}:${url}`}>{safeUrl(url) ? <a href={safeUrl(url)} target="_blank" rel="noopener noreferrer">{url}</a> : url}</li>)}</ul></details>}
           </>}

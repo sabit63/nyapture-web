@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import type { BookTag, TagEntity } from '../src/models'
 import {
+  applyTagEntityMetadata,
   applyTagDisplayNameOverrides,
   getTagDisplayNameKey,
   updateTagDisplayNames,
@@ -52,4 +53,24 @@ test('applies immutable overrides and supports explicit removal', () => {
   assert.notEqual(result, source)
   assert.notEqual(result[0], source[0])
   assert.equal(result[1], source[1])
+})
+
+test('applies response entity display names and counts to search criteria tags', () => {
+  const tags: BookTag[] = [
+    target,
+    { type: 'Groups', name: 'Circle Name', displayName: '既存の表示名' },
+  ]
+  const entities: TagEntity[] = [
+    { type: 'Artists', name: 'artist name', displayName: ' 作家名 ', count: 3 },
+    { type: 'Groups', name: 'Circle Name', count: 0 },
+  ]
+
+  const result = applyTagEntityMetadata(tags, entities)
+
+  assert.deepEqual(result, [
+    { ...target, displayName: '作家名', count: 3 },
+    { ...tags[1], count: 0 },
+  ])
+  assert.notEqual(result, tags)
+  assert.notEqual(result[1], tags[1])
 })

@@ -16,7 +16,7 @@
 .cache-card-metadata { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-label-sm); overflow-wrap: anywhere; }
 .cache-card-metadata p { margin: var(--space-1) 0 0; }
 .cache-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.cache-tags span { background: var(--color-surface-raised); border-radius: var(--radius-sm); padding: 2px 6px; color: var(--color-text-muted); font-size: var(--font-size-label-sm); overflow-wrap: anywhere; }
+.cache-tags .tag-chip { max-width: 100%; }
 .cache-error { color: var(--color-danger-text, #ef6b73); overflow-wrap: anywhere; }
 .cache-detail { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
 .cache-detail[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
