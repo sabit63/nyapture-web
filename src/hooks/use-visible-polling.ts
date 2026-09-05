@@ -67,7 +67,9 @@ export function useVisiblePolling({ intervalMs, enabled = true, poll }: VisibleP
     controllerRef.current = controller
 
     void Promise.resolve()
-      .then(() => pollRef.current(controller.signal))
+      .then(() => {
+        if (!controller.signal.aborted) return pollRef.current(controller.signal)
+      })
       .catch(() => undefined)
       .finally(() => {
         if (controllerRef.current !== controller || runIdRef.current !== runId) return
@@ -118,4 +120,3 @@ export function useVisiblePolling({ intervalMs, enabled = true, poll }: VisibleP
     }
   }, [cancel, schedule])
 }
-

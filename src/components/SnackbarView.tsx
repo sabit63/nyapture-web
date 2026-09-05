@@ -1,16 +1,7 @@
-import { CheckCircle2, CircleAlert, TriangleAlert } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-
+import { CheckCircle2, CircleAlert, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { useEffect } from 'react'
+import type { SnackbarNotice, SnackbarTone } from './Snackbar'
 import './snackbar.css'
-
-export type SnackbarTone = 'success' | 'warning' | 'error'
-
-export type SnackbarNotice = {
-  id: number
-  message: string
-  tone: SnackbarTone
-}
 
 type SnackbarProps = {
   notice: SnackbarNotice | null
@@ -21,23 +12,6 @@ const TONE_ICONS: Record<SnackbarTone, LucideIcon> = {
   success: CheckCircle2,
   warning: TriangleAlert,
   error: CircleAlert,
-}
-
-export const useSnackbar = () => {
-  const [notice, setNotice] = useState<SnackbarNotice | null>(null)
-  const nextIdRef = useRef(0)
-
-  const notify = useCallback((message: string, tone: SnackbarTone = 'success') => {
-    const id = nextIdRef.current + 1
-    nextIdRef.current = id
-    setNotice({ id, message, tone })
-  }, [])
-
-  const dismiss = useCallback((id?: number) => {
-    setNotice((current) => id === undefined || current?.id === id ? null : current)
-  }, [])
-
-  return { notice, notify, dismiss }
 }
 
 export function Snackbar({ notice, onDismiss }: SnackbarProps) {

@@ -370,6 +370,33 @@ export type SearchCriteria = {
   pagesMax: string
 }
 
+const LOCAL_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/** Return whether a value is an actual local calendar date (not just ISO-shaped text). */
+export const isValidLocalDate = (value: string) => {
+  if (!LOCAL_DATE_PATTERN.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+}
+
+/** Convert a validated local calendar date to the API's UTC timestamp. */
+export const localDateToIso = (value: string, endOfDay = false) => {
+  if (!isValidLocalDate(value)) return undefined
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 999 : 0,
+  ).toISOString()
+}
+
 type LegacyBookFixtureFields = Partial<Record<'source', string>>
 
 export type BookCardModel = EBook & LegacyBookFixtureFields & {

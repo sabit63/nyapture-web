@@ -3,19 +3,15 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type FormEvent
 import {
   API_PROXY_PROTOCOLS,
   DEFAULT_API_SETTINGS,
-  clearPersistedApiSettings,
   configureApi,
   getErrorMessage,
-  loadPersistedApiSettings,
-  loadPersistedDisplaySettings,
   normalizeDisplaySettings,
-  savePersistedApiSettings,
-  savePersistedDisplaySettings,
   testApiConnection as testApiConnectionRequest,
   validateApiSettings,
 } from '../../api'
 import type { ApiProxyProtocol, ApiSettings, ApiSettingsErrors, DisplaySettings } from '../../api'
 import type { NativeDialogControls } from '../../components/ui'
+import { loadAppSettings, saveAppSettings } from '../../api/app-settings-storage'
 
 export type ApiConnectionState = 'idle' | 'pending' | 'success' | 'error'
 
@@ -60,9 +56,10 @@ export type ApiSettingsController = {
 }
 
 export function useApiSettings(notify: (message: string, tone?: 'success' | 'warning' | 'error') => void): ApiSettingsController {
-  const [apiSettings, setApiSettings] = useState<ApiSettings>(() => configureApi(loadPersistedApiSettings()))
+  const [initialSettings] = useState(loadAppSettings)
+  const [apiSettings, setApiSettings] = useState<ApiSettings>(() => configureApi(initialSettings.api))
   const [apiSettingsDraft, setApiSettingsDraft] = useState<ApiSettings>(() => ({ ...apiSettings }))
-  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => loadPersistedDisplaySettings())
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(initialSettings.display)
   const [displaySettingsDraft, setDisplaySettingsDraft] = useState<DisplaySettings>(() => ({ ...displaySettings }))
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false)
   const [apiSettingsExpanded, setApiSettingsExpanded] = useState(true)
@@ -150,8 +147,7 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     const normalizedDisplaySettings = normalizeDisplaySettings(displaySettingsDraft)
 
     try {
-      savePersistedApiSettings(normalized)
-      savePersistedDisplaySettings(normalizedDisplaySettings)
+      saveAppSettings({ api: normalized, display: normalizedDisplaySettings })
     } catch {
       setApiSettingsSaveError('設定を端末へ保存できませんでした。ブラウザのストレージ設定を確認してください。')
       return
@@ -172,7 +168,7 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     if (!window.confirm('端末に保存したAPI設定を削除し、既定値へ戻しますか？')) return
 
     try {
-      clearPersistedApiSettings()
+      saveAppSettings({ api: DEFAULT_API_SETTINGS, display: displaySettings })
     } catch {
       setApiSettingsSaveError('端末に保存したAPI設定を削除できませんでした。ブラウザのストレージ設定を確認してください。')
       return
@@ -187,7 +183,7 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     announceActiveConnectionRef.current = 'reset'
     setApiRevision((current) => current + 1)
     requestClose('submit')
-  }, [clearDraftConnectionCheck])
+  }, [clearDraftConnectionCheck, displaySettings])
 
   useEffect(() => {
     activeConnectionAbortRef.current?.abort()

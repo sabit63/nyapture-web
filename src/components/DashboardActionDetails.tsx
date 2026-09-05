@@ -1,6 +1,5 @@
 import {
   Activity,
-  Check,
   CheckCircle2,
   CircleAlert,
   Gauge,
@@ -16,7 +15,7 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react'
-import type { FormEvent, ReactNode, RefObject } from 'react'
+import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, getErrorMessage } from '../api'
 import {
@@ -39,7 +38,6 @@ import type { DashboardService, ServiceConfigResponse } from '../api/dashboard'
 import type {
   CacheMetricsResponse,
   ConnectionTestResult,
-  DashboardApiResponse,
   DashboardMaintenanceResponse,
   MaintenanceCheckResultDetailDto,
   MaintenanceHistoryEntryDto,
@@ -49,17 +47,31 @@ import type {
 } from '../models/dashboard'
 import { useVisiblePolling } from '../hooks/use-visible-polling'
 import {
+  ActionDialog,
+  ActionFeedback,
+  BookCacheDialog,
+  DetailSection,
+  DetailSkeleton,
+  DetailState,
+  StatusBadge,
+  useDashboardResource,
+  formatBytes,
+  formatDateTime,
+  formatNumber,
+  getDashboardStatus,
+  cacheClearStateLabel,
+  cacheClearStateTone,
+  isCacheClearConflict,
+  normalize,
+  textValue,
+  type DetailStatus,
+  type MutationStatus,
+} from '../features/dashboard'
+import {
   Button,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
   IconButton,
-  type CloseReason,
 } from './ui'
 
-type DetailStatus = 'idle' | 'loading' | 'refreshing' | 'success' | 'error'
-type MutationStatus = 'idle' | 'pending' | 'success' | 'error'
 type MaintenanceAction = 'run' | 'cancel' | 'pause' | 'resume' | null
 type MaintenanceMutation = Exclude<MaintenanceAction, 'run' | null>
 
@@ -67,80 +79,11 @@ const EMPTY_SERVICE = {} as ServiceConfigResponse
 const EMPTY_MAINTENANCE = {} as DashboardMaintenanceResponse
 const EMPTY_CACHE = {} as CacheMetricsResponse
 
-const formatNumber = (value?: number | null) => typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('ja-JP').format(value) : '—'
-const formatBytes = (value?: number | null) => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
-  if (Math.abs(value) < 1024) return `${formatNumber(value)} B`
-  const units = ['KB', 'MB', 'GB', 'TB', 'PB']
-  let size = Math.abs(value)
-  let unit = -1
-  while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit += 1 }
-  return `${value < 0 ? '-' : ''}${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(size)} ${units[unit]}`
-}
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(date)
-}
-const textValue = (value?: string | number | boolean | null) => value === undefined || value === null || value === '' ? '—' : String(value)
-const normalize = (value?: string | null) => value?.trim().toLocaleLowerCase('en-US') ?? ''
-
-const getStatus = (value?: string | null) => {
-  const normalized = normalize(value)
-  if (['success', 'succeeded', 'ok', 'healthy', 'passed', 'pass', 'completed', 'complete'].includes(normalized)) return { label: '正常', tone: 'success' as const, icon: CheckCircle2 }
-  if (['running', 'processing'].includes(normalized)) return { label: '実行中', tone: 'info' as const, icon: Activity }
-  if (['pending', 'queued', 'idle'].includes(normalized)) return { label: '待機', tone: 'muted' as const, icon: Activity }
-  if (normalized === 'paused') return { label: '一時停止', tone: 'warning' as const, icon: Pause }
-  if (['warning', 'warn', 'degraded', 'throttled'].includes(normalized)) return { label: '警告', tone: 'warning' as const, icon: TriangleAlert }
-  if (['error', 'failed', 'failure', 'unavailable', 'disconnected', 'critical', 'fatal'].includes(normalized)) return { label: 'エラー', tone: 'danger' as const, icon: CircleAlert }
-  return { label: value?.trim() || '—', tone: 'muted' as const, icon: Activity }
-}
-
 const mutationError = (error: unknown) => error instanceof ApiError && error.status === 403
   ? 'この変更操作はローカルまたは信頼済みネットワークからのみ実行できます。'
   : getErrorMessage(error)
 const isAbort = (error: unknown, signal: AbortSignal) => signal.aborted || error instanceof ApiError && error.message.includes('キャンセル')
 
-function StatusBadge({ children, tone = 'muted', icon: Icon }: { children: ReactNode; tone?: 'success' | 'warning' | 'danger' | 'info' | 'muted'; icon?: typeof Activity }) {
-  return <span className={`dashboard-detail__badge dashboard-detail__badge--${tone}`}>{Icon && <Icon size={13} aria-hidden="true" />}<span>{children}</span></span>
-}
-
-function DetailSkeleton() { return <div className="dashboard-detail__loading" aria-hidden="true"><span className="dashboard-detail__spinner" /></div> }
-function DetailState({ status, error, onRetry }: { status: DetailStatus; error: string | null; onRetry: () => void }) {
-  if (status === 'loading') return <DetailSkeleton />
-  if (!error) return null
-  return <div className="dashboard-detail__error" role="alert"><CircleAlert size={15} aria-hidden="true" /><span>{error}</span><IconButton variant="ghost" tone="danger" size="compact" type="button" aria-label="再試行" onClick={onRetry} disabled={status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton></div>
-}
-function DetailSection({ title, count, children }: { title: string; count?: ReactNode; children: ReactNode }) { return <section className="dashboard-detail__section"><div className="dashboard-detail__section-heading"><h2>{title}</h2>{count !== undefined && <span className="dashboard-detail__count">{count}</span>}</div>{children}</section> }
-function ActionFeedback({ status, message }: { status: MutationStatus; message: string | null }) { if (!message && status !== 'pending') return null; return <span className="dashboard-detail__feedback" role="status" aria-live="polite">{status === 'pending' && <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" />}{status === 'success' && <Check size={14} aria-hidden="true" />}{status === 'error' && <CircleAlert size={14} aria-hidden="true" />}<span>{status === 'pending' ? '処理中' : message}</span></span> }
-
-type ResourceQuery<T> = { data: T | null; status: DetailStatus; error: string | null; ready: boolean; refresh: () => Promise<void>; poll: (signal: AbortSignal) => Promise<void>; update: (updater: (current: T | null) => T | null) => void; generatedAt: string | null }
-function useResource<T>(apiRevision: number, route: string, title: string, load: (signal: AbortSignal) => Promise<DashboardApiResponse<T>>): ResourceQuery<T> {
-  const [data, setData] = useState<T | null>(null)
-  const dataRef = useRef<T | null>(null)
-  const requestRef = useRef<AbortController | null>(null)
-  const [status, setStatus] = useState<DetailStatus>('idle')
-  const [error, setError] = useState<string | null>(null)
-  const [ready, setReady] = useState(false)
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
-  const refreshInternal = useCallback((reset = false, pollSignal?: AbortSignal): Promise<void> => {
-    if (pollSignal?.aborted) return Promise.resolve()
-    requestRef.current?.abort()
-    const controller = new AbortController(); requestRef.current = controller
-    const hasData = dataRef.current !== null
-    if (reset) setReady(false)
-    setStatus(hasData ? 'refreshing' : 'loading'); setError(null)
-    const onPollAbort = pollSignal ? () => controller.abort() : null
-    if (pollSignal && onPollAbort) pollSignal.addEventListener('abort', onPollAbort, { once: true })
-    return load(controller.signal).then((response) => { if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? `${title}の取得に失敗しました。`, { category: 'server' }); const next = response.data ?? null; dataRef.current = next; setData(next); setGeneratedAt((next as { generatedAt?: string | null } | null)?.generatedAt ?? null); setReady(true); setStatus('success') }).catch((requestError: unknown) => { if (!isAbort(requestError, controller.signal)) { setReady(true); setStatus(hasData ? 'success' : 'error'); setError(getErrorMessage(requestError)) } }).finally(() => { if (pollSignal && onPollAbort) pollSignal.removeEventListener('abort', onPollAbort); if (requestRef.current === controller) { requestRef.current = null; if (pollSignal?.aborted && hasData) setStatus('success') } })
-  }, [load, title])
-  const update = useCallback((updater: (current: T | null) => T | null) => { setData((current) => { const next = updater(current); dataRef.current = next; setGeneratedAt((next as { generatedAt?: string | null } | null)?.generatedAt ?? null); return next }) }, [])
-  useEffect(() => { void refreshInternal(true); return () => { requestRef.current?.abort(); requestRef.current = null } }, [apiRevision, route, refreshInternal])
-  const refresh = useCallback(() => refreshInternal(false), [refreshInternal])
-  const poll = useCallback((signal: AbortSignal) => refreshInternal(false, signal), [refreshInternal])
-  return { data, status, error, ready, refresh, poll, update, generatedAt }
-}
 
 function useMutationControllers(apiRevision: number) {
   const controllers = useRef(new Set<AbortController>())
@@ -152,7 +95,7 @@ function useMutationControllers(apiRevision: number) {
 
 const serviceName = (service: DashboardService) => service === 'webpilot' ? 'WebPilot' : 'ImageWorker'
 
-export function ServiceDetails({ service, apiRevision }: { service: DashboardService; apiRevision: number }) {
+export function ServiceDetails({ service, apiRevision, refreshRevision = 0 }: { service: DashboardService; apiRevision: number; refreshRevision?: number }) {
   const [config, setConfig] = useState<ServiceConfigResponse | null>(null)
   const configRef = useRef<ServiceConfigResponse | null>(null)
   const [status, setStatus] = useState<DetailStatus>('loading')
@@ -169,7 +112,17 @@ export function ServiceDetails({ service, apiRevision }: { service: DashboardSer
   const controllers = useRef(new Set<AbortController>())
   const title = serviceName(service)
 
-  useEffect(() => { const controller = new AbortController(); setStatus(configRef.current ? 'refreshing' : 'loading'); setError(null); void getServiceConfig(service, controller.signal).then((response) => { if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? `${title}を取得できませんでした。`, { category: 'server' }); const next = response.data ?? EMPTY_SERVICE; configRef.current = next; setConfig(next); setBaseUrl(next.baseUrl ?? ''); setApiKey(''); setKeyTouched(false); setTestResult(next.lastTestResult ?? null); setStatus('success') }).catch((requestError: unknown) => { if (!isAbort(requestError, controller.signal)) { setStatus(configRef.current ? 'success' : 'error'); setError(getErrorMessage(requestError)) } }); return () => controller.abort() }, [apiRevision, reload, service, title])
+  useEffect(() => {
+    configRef.current = null
+    setConfig(null)
+    setStatus('loading')
+    setError(null)
+    setBaseUrl('')
+    setApiKey('')
+    setKeyTouched(false)
+    setTestResult(null)
+  }, [apiRevision])
+  useEffect(() => { const controller = new AbortController(); setStatus(configRef.current ? 'refreshing' : 'loading'); setError(null); void getServiceConfig(service, controller.signal).then((response) => { if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? `${title}を取得できませんでした。`, { category: 'server' }); const next = response.data ?? EMPTY_SERVICE; configRef.current = next; setConfig(next); setBaseUrl(next.baseUrl ?? ''); setApiKey(''); setKeyTouched(false); setTestResult(next.lastTestResult ?? null); setStatus('success') }).catch((requestError: unknown) => { if (!isAbort(requestError, controller.signal)) { setStatus(configRef.current ? 'success' : 'error'); setError(getErrorMessage(requestError)) } }); return () => controller.abort() }, [apiRevision, refreshRevision, reload, service, title])
   useEffect(() => () => { controllers.current.forEach((controller) => controller.abort()); controllers.current.clear() }, [apiRevision, service])
 
   const create = () => { const controller = new AbortController(); controllers.current.add(controller); return controller }
@@ -209,73 +162,13 @@ const numericDraft = (value?: number | null) => value == null ? '' : String(valu
 const parseNumeric = (value: string, minimum = 0) => { if (!value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) && parsed >= minimum ? parsed : undefined }
 const issueInResult = (result: MaintenanceCheckResultDetailDto | null | undefined) => ['warning', 'warn', 'error', 'failed', 'failure'].includes(normalize(result?.status)) || Object.keys(result?.issuePages ?? {}).length > 0
 
-function ActionDialog({ open, title, value, pending, confirmLabel, triggerRef, onConfirm, onDismiss }: { open: boolean; title: string; value?: ReactNode; pending: boolean; confirmLabel: string; triggerRef?: RefObject<HTMLElement | null>; onConfirm: () => void; onDismiss: () => void }) {
-  const onRequestClose = useCallback((reason: CloseReason) => {
-    if (pending || reason === 'submit') return false
-    onDismiss()
-    return true
-  }, [onDismiss, pending])
-
-  return (
-    <Dialog
-      open={open}
-      className="dashboard-detail__dialog"
-      aria-labelledby="dashboard-action-dialog-title"
-      onRequestClose={onRequestClose}
-      resolveRestoreFocus={() => triggerRef?.current ?? null}
-      dismissible={!pending}
-    >
-      {({ requestClose }) => (
-        <>
-          <DialogHeader><h2 id="dashboard-action-dialog-title">{title}</h2></DialogHeader>
-          <DialogBody>{value && <div>{value}</div>}</DialogBody>
-          <DialogFooter className="dashboard-detail__dialog-actions">
-            <Button variant="outline" tone="neutral" size="compact" type="button" disabled={pending} onClick={() => requestClose('close-button')}><X size={15} aria-hidden="true" />キャンセル</Button>
-            <Button variant="solid" tone="accent" size="compact" type="button" aria-busy={pending} disabled={pending} onClick={onConfirm}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={15} aria-hidden="true" /> : <Check size={15} aria-hidden="true" />}{pending ? '処理中' : confirmLabel}</Button>
-          </DialogFooter>
-        </>
-      )}
-    </Dialog>
-  )
-}
-
-function BookCacheDialog({ open, pending, bookId, triggerRef, onBookIdChange, onSubmit, onDismiss }: { open: boolean; pending: boolean; bookId: string; triggerRef: RefObject<HTMLElement | null>; onBookIdChange: (value: string) => void; onSubmit: (event: FormEvent) => void; onDismiss: () => void }) {
-  const onRequestClose = useCallback((reason: CloseReason) => {
-    if (pending || reason === 'submit') return false
-    onDismiss()
-    return true
-  }, [onDismiss, pending])
-
-  return (
-    <Dialog
-      open={open}
-      className="dashboard-detail__dialog"
-      aria-labelledby="cache-remove-dialog-title"
-      onRequestClose={onRequestClose}
-      resolveRestoreFocus={() => triggerRef.current ?? null}
-      dismissible={!pending}
-    >
-      {({ requestClose }) => (
-        <form className="dashboard-detail__dialog-form" onSubmit={onSubmit}>
-          <DialogHeader><h2 id="cache-remove-dialog-title">Cache 個別削除</h2></DialogHeader>
-          <DialogBody><p>BookIdだけを指定します。</p><label>BookId<input value={bookId} onChange={(event) => onBookIdChange(event.target.value)} required /></label></DialogBody>
-          <DialogFooter className="dashboard-detail__dialog-actions">
-            <Button variant="outline" tone="neutral" size="compact" type="button" onClick={() => requestClose('close-button')} disabled={pending}>キャンセル</Button>
-            <Button variant="solid" tone="danger" size="compact" type="submit" disabled={pending} aria-busy={pending}>{pending ? <LoaderCircle className="dashboard-detail__spin" size={14} aria-hidden="true" /> : <Trash2 size={14} aria-hidden="true" />}削除</Button>
-          </DialogFooter>
-        </form>
-      )}
-    </Dialog>
-  )
-}
-
 function RunDetail({ data, filter }: { data: MaintenanceRunDetailResponse; filter: 'all' | 'issues' }) {
   const run = data.run
   const tasks = (data.tasks ?? []).filter((task) => filter === 'all' || Object.values(task.checkResults ?? {}).some(issueInResult))
-  return <div className="dashboard-detail__stack">{run && <div className="dashboard-detail__meta"><StatusBadge tone={getStatus(run.status).tone} icon={getStatus(run.status).icon}>{textValue(run.status)}</StatusBadge><span>{textValue(run.storageSyncMode)}</span><span>{formatNumber(run.processedBooks)} / {formatNumber(run.totalBooks)}</span></div>}{run?.results && <ul className="dashboard-detail__task-list">{Object.entries(run.results).map(([name, result]) => result && <li className="dashboard-detail__task" key={name}><strong>{name}</strong><span>OK {formatNumber(result.ok)}</span><span>Warning {formatNumber(result.warning)}</span><span>Error {formatNumber(result.error)}</span><span>Skipped {formatNumber(result.skipped)}</span><span>Repaired {formatNumber(result.repaired)}</span></li>)}</ul>}<ul className="dashboard-detail__task-list">{tasks.map((task, index) => <li className="dashboard-detail__task" key={`${task.groupId}-${task.bookId}-${index}`}><div className="dashboard-detail__meta"><code>{textValue(task.groupId)}</code><code>{textValue(task.bookId)}</code><StatusBadge tone={getStatus(task.status).tone} icon={getStatus(task.status).icon}>{textValue(task.status)}</StatusBadge></div><span>{formatDateTime(task.completedAt)}</span>{task.checkResults && <ul className="dashboard-detail__issue-list">{Object.entries(task.checkResults).map(([name, result]) => result && <li key={name}><span>{name}</span><StatusBadge tone={getStatus(result.status).tone}>{textValue(result.status)}</StatusBadge><span>{textValue(result.message)}</span></li>)}</ul>}</li>)}</ul>{!tasks.length && <span className="dashboard-detail__empty">—</span>}</div>
+  return <div className="dashboard-detail__stack">{run && <div className="dashboard-detail__meta"><StatusBadge tone={getDashboardStatus(run.status).tone} icon={getDashboardStatus(run.status).icon}>{textValue(run.status)}</StatusBadge><span>{textValue(run.storageSyncMode)}</span><span>{formatNumber(run.processedBooks)} / {formatNumber(run.totalBooks)}</span></div>}{run?.results && <ul className="dashboard-detail__task-list">{Object.entries(run.results).map(([name, result]) => result && <li className="dashboard-detail__task" key={name}><strong>{name}</strong><span>OK {formatNumber(result.ok)}</span><span>Warning {formatNumber(result.warning)}</span><span>Error {formatNumber(result.error)}</span><span>Skipped {formatNumber(result.skipped)}</span><span>Repaired {formatNumber(result.repaired)}</span></li>)}</ul>}<ul className="dashboard-detail__task-list">{tasks.map((task, index) => <li className="dashboard-detail__task" key={`${task.groupId}-${task.bookId}-${index}`}><div className="dashboard-detail__meta"><code>{textValue(task.groupId)}</code><code>{textValue(task.bookId)}</code><StatusBadge tone={getDashboardStatus(task.status).tone} icon={getDashboardStatus(task.status).icon}>{textValue(task.status)}</StatusBadge></div><span>{formatDateTime(task.completedAt)}</span>{task.checkResults && <ul className="dashboard-detail__issue-list">{Object.entries(task.checkResults).map(([name, result]) => result && <li key={name}><span>{name}</span><StatusBadge tone={getDashboardStatus(result.status).tone}>{textValue(result.status)}</StatusBadge><span>{textValue(result.message)}</span></li>)}</ul>}</li>)}</ul>{!tasks.length && <span className="dashboard-detail__empty">—</span>}</div>
 }
 
-export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
+export function MaintenanceDetails({ apiRevision, refreshRevision = 0 }: { apiRevision: number; refreshRevision?: number }) {
   const [snapshot, setSnapshot] = useState<DashboardMaintenanceResponse | null>(null)
   const snapshotRef = useRef<DashboardMaintenanceResponse | null>(null)
   const [issues, setIssues] = useState<MaintenanceIssueDto[]>([])
@@ -305,7 +198,24 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
   const release = (controller: AbortController) => controllers.current.delete(controller)
 
   useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
-  useEffect(() => () => { readController.current?.abort(); controllers.current.forEach((controller) => controller.abort()); controllers.current.clear(); detailControllers.current.forEach((controller) => controller.abort()); detailControllers.current.clear() }, [apiRevision])
+  useEffect(() => {
+    snapshotRef.current = null
+    setSnapshot(null)
+    setIssues([])
+    setReady(false)
+    setError(null)
+    setIssueError(null)
+  }, [apiRevision])
+  useEffect(() => {
+    const controllersAtSetup = controllers.current
+    const detailControllersAtSetup = detailControllers.current
+    return () => {
+      controllersAtSetup.forEach((controller) => controller.abort())
+      controllersAtSetup.clear()
+      detailControllersAtSetup.forEach((controller) => controller.abort())
+      detailControllersAtSetup.clear()
+    }
+  }, [apiRevision])
   const reloadData = useCallback((pollSignal?: AbortSignal, reset = false): Promise<void> => {
     if (pollSignal?.aborted) return Promise.resolve()
     readController.current?.abort()
@@ -340,7 +250,15 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
       if (!controller.signal.aborted) setReady(true)
     })
   }, [])
-  useEffect(() => { void reloadData(undefined, true); return () => { controllers.current.forEach((controller) => controller.abort()) } }, [apiRevision, reload, reloadData])
+  useEffect(() => {
+    void reloadData(undefined, true)
+    const readControllerAtSetup = readController.current
+    const controllersAtSetup = controllers.current
+    return () => {
+      readControllerAtSetup?.abort()
+      controllersAtSetup.forEach((controller) => controller.abort())
+    }
+  }, [apiRevision, refreshRevision, reload, reloadData])
   const poll = useCallback((signal: AbortSignal) => {
     const activeRead = readController.current
     return activeRead && !activeRead.signal.aborted ? Promise.resolve() : reloadData(signal)
@@ -384,9 +302,9 @@ export function MaintenanceDetails({ apiRevision }: { apiRevision: number }) {
   )
 }
 
-export function CacheDetails({ apiRevision }: { apiRevision: number }) {
+export function CacheDetails({ apiRevision, refreshRevision = 0 }: { apiRevision: number; refreshRevision?: number }) {
   const load = useCallback((signal: AbortSignal) => getCacheMetrics(signal), [])
-  const query = useResource(apiRevision, 'cache', 'Cache', load)
+  const query = useDashboardResource(apiRevision, 'cache', 'Cache', load, refreshRevision)
   const { create, release } = useMutationControllers(apiRevision)
   const [clearOpen, setClearOpen] = useState(false)
   const [removeOpen, setRemoveOpen] = useState(false)
@@ -395,18 +313,87 @@ export function CacheDetails({ apiRevision }: { apiRevision: number }) {
   const [message, setMessage] = useState<string | null>(null)
   const clearTriggerRef = useRef<HTMLButtonElement>(null)
   const removeTriggerRef = useRef<HTMLButtonElement>(null)
-  const poll = useCallback((signal: AbortSignal) => query.poll(signal), [query.poll])
-  useVisiblePolling({ intervalMs: 5_000, enabled: query.ready, poll })
-  const clear = async () => { if (mutation === 'pending') return; const controller = create(); setMutation('pending'); setMessage(null); try { const response = await clearDashboardCache(controller.signal); if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? 'Cacheのクリアに失敗しました。', { category: 'server' }); setMutation('success'); setMessage(response.message ?? 'クリア済み'); setClearOpen(false); query.refresh() } catch (error: unknown) { if (!isAbort(error, controller.signal)) { setMutation('error'); setMessage(mutationError(error)) } } finally { release(controller); if (!controller.signal.aborted) setMutation((current) => current === 'pending' ? 'idle' : current) } }
-  const remove = async (event: FormEvent) => { event.preventDefault(); if (mutation === 'pending') return; if (!bookId.trim()) { setMutation('error'); setMessage('BookIdを入力してください。'); return } const controller = create(); setMutation('pending'); setMessage(null); try { const response = await removeDashboardBookCache(bookId.trim(), controller.signal); if (controller.signal.aborted) return; if (response.success === false) throw new ApiError(response.message ?? 'Cacheエントリの削除に失敗しました。', { category: 'server' }); setMutation('success'); setMessage(response.message ?? '削除済み'); setRemoveOpen(false); setBookId(''); query.refresh() } catch (error: unknown) { if (!isAbort(error, controller.signal)) { setMutation('error'); setMessage(mutationError(error)) } } finally { release(controller); if (!controller.signal.aborted) setMutation((current) => current === 'pending' ? 'idle' : current) } }
+  useVisiblePolling({ intervalMs: 5_000, enabled: query.ready, poll: query.poll })
+
+  const refreshAfterMutation = async () => {
+    await query.refresh()
+  }
+
+  const clear = async () => {
+    if (mutation === 'pending') return
+    const controller = create()
+    setMutation('pending')
+    setMessage(null)
+    try {
+      const response = await clearDashboardCache(controller.signal)
+      if (controller.signal.aborted) return
+      if (response.success === false) throw new ApiError(response.message ?? 'Cacheのクリアに失敗しました。', { category: 'server' })
+      const start = response.data
+      const status = start?.status
+      query.update((current) => current ? { ...current, clearStatus: status ?? current.clearStatus } : current)
+      setMutation('success')
+      setClearOpen(false)
+      await refreshAfterMutation()
+    } catch (error: unknown) {
+      if (isCacheClearConflict(error)) {
+        setMutation('success')
+        setClearOpen(false)
+        await refreshAfterMutation()
+      } else if (!isAbort(error, controller.signal)) {
+        setMutation('error')
+        setMessage(mutationError(error))
+      }
+    } finally {
+      release(controller)
+      if (!controller.signal.aborted) setMutation((current) => current === 'pending' ? 'idle' : current)
+    }
+  }
+
+  const remove = async (event: FormEvent) => {
+    event.preventDefault()
+    if (mutation === 'pending') return
+    if (!bookId.trim()) {
+      setMutation('error')
+      setMessage('BookIdを入力してください。')
+      return
+    }
+    const controller = create()
+    setMutation('pending')
+    setMessage(null)
+    try {
+      const response = await removeDashboardBookCache(bookId.trim(), controller.signal)
+      if (controller.signal.aborted) return
+      if (response.success === false) throw new ApiError(response.message ?? 'Cacheエントリの削除に失敗しました。', { category: 'server' })
+      setMutation('success')
+      setMessage(response.message ?? '削除済み')
+      setRemoveOpen(false)
+      setBookId('')
+      await refreshAfterMutation()
+    } catch (error: unknown) {
+      if (!isAbort(error, controller.signal)) {
+        setMutation('error')
+        setMessage(mutationError(error))
+      }
+    } finally {
+      release(controller)
+      if (!controller.signal.aborted) setMutation((current) => current === 'pending' ? 'idle' : current)
+    }
+  }
+
   if (query.status === 'loading') return <DetailSkeleton />
   const metrics = query.data ?? EMPTY_CACHE
+  const clearState = metrics.clearStatus?.state
+  const clearLabel = cacheClearStateLabel(clearState)
+  const clearTone = cacheClearStateTone(clearState)
+  const clearStatus = metrics.clearStatus
+  const progressMax = clearStatus?.totalEntries ?? 0
+  const progressValue = Math.min(progressMax, clearStatus?.processedEntries ?? 0)
   return (
     <div className="dashboard-detail__content" aria-busy={query.status === 'refreshing'}>
-      <div className="dashboard-detail__toolbar"><StatusBadge tone="info" icon={HardDrive}>Cache</StatusBadge><IconButton variant="ghost" tone="neutral" size="compact" type="button" aria-label="Cacheを更新" onClick={query.refresh} disabled={query.status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton></div>
-      <DetailState status={query.status} error={query.error} onRetry={query.refresh} />
-      <DetailSection title="Metrics"><div className="dashboard-detail__metrics"><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Size</span><strong>{formatBytes(metrics.sizeBytes)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Entries</span><strong>{formatNumber(metrics.entryCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hit rate</span><strong>{metrics.hitRate == null ? '—' : `${formatNumber(metrics.hitRate * 100)}%`}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hits</span><strong>{formatNumber(metrics.hitCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Misses</span><strong>{formatNumber(metrics.missCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Evictions</span><strong>{formatNumber(metrics.evictionCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Strategy</span><strong>{textValue(metrics.strategy)}</strong></div></div><div className="dashboard-detail__meta"><span>更新 {formatDateTime(metrics.generatedAt)}</span></div></DetailSection>
-      <DetailSection title="操作"><div className="dashboard-detail__actions"><Button ref={clearTriggerRef} variant="solid" tone="danger" size="default" type="button" onClick={() => setClearOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Clear all</Button><Button ref={removeTriggerRef} variant="outline" tone="neutral" size="default" type="button" onClick={() => setRemoveOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Book</Button><ActionFeedback status={mutation} message={message} /></div></DetailSection>
+      <div className="dashboard-detail__toolbar"><StatusBadge tone="info" icon={HardDrive}>Cache</StatusBadge>{clearLabel && <StatusBadge tone={clearTone}>{clearLabel}</StatusBadge>}<IconButton variant="ghost" tone="neutral" size="compact" type="button" aria-label="Cacheを更新" onClick={() => void query.refresh()} disabled={query.status === 'refreshing'}><RefreshCw size={14} aria-hidden="true" /></IconButton></div>
+      <DetailState status={query.status} error={query.error} onRetry={() => void query.refresh()} />
+      <DetailSection title="Metrics"><div className="dashboard-detail__metrics"><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Size</span><strong>{formatBytes(metrics.sizeBytes)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Entries</span><strong>{formatNumber(metrics.entryCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hit rate</span><strong>{metrics.hitRate == null ? '—' : `${formatNumber(metrics.hitRate * 100)}%`}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Hits</span><strong>{formatNumber(metrics.hitCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Misses</span><strong>{formatNumber(metrics.missCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Evictions</span><strong>{formatNumber(metrics.evictionCount)}</strong></div><div className="dashboard-detail__metric"><span className="dashboard-detail__metric-label">Strategy</span><strong>{textValue(metrics.strategy)}</strong></div></div><div className="dashboard-detail__meta"><span>更新 {formatDateTime(metrics.generatedAt)}</span>{clearStatus && <span className="dashboard-detail__cache-clear-status"><strong>{clearLabel ?? '—'}</strong>{progressMax > 0 && <span>{formatNumber(progressValue)} / {formatNumber(progressMax)}</span>}{clearStatus.error && <span>{clearStatus.error}</span>}</span>}</div>{clearStatus && progressMax > 0 && <progress className="dashboard-detail__progress-native" max={progressMax} value={progressValue} aria-label="Cache clear progress" />}</DetailSection>
+      <DetailSection title="操作"><div className="dashboard-detail__actions"><Button ref={clearTriggerRef} variant="solid" tone="danger" size="default" type="button" onClick={() => setClearOpen(true)} disabled={mutation === 'pending' || clearState === 'Running'}><Trash2 size={14} aria-hidden="true" />Clear all</Button><Button ref={removeTriggerRef} variant="outline" tone="neutral" size="default" type="button" onClick={() => setRemoveOpen(true)} disabled={mutation === 'pending'}><Trash2 size={14} aria-hidden="true" />Book</Button><ActionFeedback status={mutation} message={message} /></div></DetailSection>
       <ActionDialog open={clearOpen} title="Cache を全件クリア" value={<><ShieldAlert size={16} aria-hidden="true" />全件削除</>} pending={mutation === 'pending'} confirmLabel="クリア" triggerRef={clearTriggerRef} onConfirm={() => void clear()} onDismiss={() => setClearOpen(false)} /><BookCacheDialog open={removeOpen} pending={mutation === 'pending'} bookId={bookId} triggerRef={removeTriggerRef} onBookIdChange={setBookId} onSubmit={(event) => void remove(event)} onDismiss={() => setRemoveOpen(false)} />
     </div>
   )

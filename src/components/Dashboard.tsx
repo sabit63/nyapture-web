@@ -1,9 +1,6 @@
 import {
-  Activity,
-  CheckCircle2,
   ChevronRight,
   CircleAlert,
-  CircleHelp,
   Database,
   FolderOpen,
   Gauge,
@@ -27,17 +24,33 @@ import type {
   DashboardLogsResponse,
   DashboardSummaryResponse,
   DataFolderSummary,
+  DataStoreSummary,
   ImageWorkerSummary,
   MaintenanceSummary,
-  MongoSummary,
   WebPilotSummary,
 } from '../models/dashboard'
 import { useVisiblePolling } from '../hooks/use-visible-polling'
-import { DashboardDetails, getDashboardRouteTitle, type DashboardDetailRoute } from './DashboardDetails'
+import { DashboardDetails } from './DashboardDetails'
+import {
+  formatBytes,
+  formatCount,
+  formatDateTime,
+  getDashboardStatus,
+  LOADING_STATUS,
+  normalize,
+  ratio,
+  STATUS_ICONS,
+  UNKNOWN_STATUS,
+  type DashboardStatusPresentation,
+} from '../features/dashboard'
+import { getDashboardRouteTitle, resolveDashboardRoute } from '../features/dashboard/dashboard-routes'
 import { Button } from './ui'
 import './dashboard.css'
 
-export type DashboardRoute = 'home' | DashboardDetailRoute
+export type { DashboardRoute } from '../features/dashboard/dashboard-routes'
+// Keep the legacy helper import path stable for route-aware callers.
+// oxlint-disable-next-line react/only-export-components
+export { resolveDashboardRoute } from '../features/dashboard/dashboard-routes'
 
 export interface DashboardProps {
   /** Parent shell can pass the current pathname; omitted in the browser uses window.location.pathname. */
@@ -46,102 +59,18 @@ export interface DashboardProps {
   apiRevision: number
 }
 
-const DASHBOARD_PATHS: Record<string, DashboardRoute> = {
-  '/dashboard': 'home',
-  '/dashboard/datastore': 'mongodb',
-  '/dashboard/mongodb': 'mongodb',
-  '/dashboard/datafolder': 'datafolder',
-  '/dashboard/webpilot': 'webpilot',
-  '/dashboard/image-worker': 'image-worker',
-  '/dashboard/maintenance': 'maintenance',
-  '/dashboard/cache': 'cache',
-  '/dashboard/web-cache': 'web-cache',
-  '/dashboard/logs': 'logs',
-}
-
-type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'muted'
-
-interface StatusPresentation {
-  label: string
-  tone: StatusTone
-  icon: LucideIcon
-}
-
-const STATUS_ICONS: Record<StatusTone, LucideIcon> = {
-  success: CheckCircle2,
-  warning: TriangleAlert,
-  danger: CircleAlert,
-  info: Activity,
-  muted: CircleHelp,
-}
-
-const UNKNOWN_STATUS: StatusPresentation = {
-  label: '不明',
-  tone: 'muted',
-  icon: STATUS_ICONS.muted,
-}
-
-const LOADING_STATUS: StatusPresentation = {
-  label: '取得中',
-  tone: 'muted',
-  icon: STATUS_ICONS.muted,
-}
+type StatusPresentation = DashboardStatusPresentation
 
 const EMPTY_SUMMARY: DashboardSummaryResponse = {}
 const EMPTY_LOGS: DashboardLogsResponse = { entries: [] }
 
-const normalize = (value?: string | null) => value?.trim().toLocaleLowerCase('en-US') ?? ''
+const getStatus = getDashboardStatus
 
-const getStatus = (value?: string | null): StatusPresentation => {
-  switch (normalize(value)) {
-    case 'available':
-    case 'connected':
-    case 'success':
-    case 'succeeded':
-    case 'ok':
-    case 'healthy':
-    case 'passed':
-    case 'pass':
-    case 'completed':
-    case 'complete':
-      return { label: '正常', tone: 'success', icon: STATUS_ICONS.success }
-    case 'degraded':
-    case 'warning':
-    case 'warn':
-    case 'throttled':
-      return { label: '警告', tone: 'warning', icon: STATUS_ICONS.warning }
-    case 'error':
-    case 'failed':
-    case 'failure':
-    case 'unavailable':
-    case 'disconnected':
-      return { label: 'エラー', tone: 'danger', icon: STATUS_ICONS.danger }
-    case 'critical':
-    case 'fatal':
-      return { label: '重大', tone: 'danger', icon: STATUS_ICONS.danger }
-    case 'notapplicable':
-    case 'not applicable':
-    case 'notsupported':
-    case 'not supported':
-      return { label: '対象外', tone: 'info', icon: STATUS_ICONS.info }
-    case 'running':
-      return { label: '実行中', tone: 'info', icon: STATUS_ICONS.info }
-    case 'paused':
-      return { label: '一時停止', tone: 'warning', icon: STATUS_ICONS.warning }
-    case 'configured':
-      return { label: '設定済み', tone: 'success', icon: STATUS_ICONS.success }
-    case 'idle':
-      return { label: '待機', tone: 'muted', icon: STATUS_ICONS.muted }
-    default:
-      return UNKNOWN_STATUS
-  }
-}
-
-const getMongoStatus = (summary?: MongoSummary | null): StatusPresentation => {
+const getDataStoreStatus = (summary?: DataStoreSummary | null): StatusPresentation => {
   if (!summary) return UNKNOWN_STATUS
   if (summary.isConnected === true) return { label: '接続中', tone: 'success', icon: STATUS_ICONS.success }
   if (summary.isConnected === false) return { label: '切断', tone: 'danger', icon: STATUS_ICONS.danger }
-  return UNKNOWN_STATUS
+  return summary.availability ? getStatus(summary.availability) : UNKNOWN_STATUS
 }
 
 const getAvailabilityStatus = (summary?: DataFolderSummary | null): StatusPresentation => {
@@ -190,40 +119,6 @@ const getLogStatus = (level?: string | null): StatusPresentation => {
     default:
       return UNKNOWN_STATUS
   }
-}
-
-const formatCount = (value?: number | null) => (
-  typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('ja-JP') : '—'
-)
-
-const formatBytes = (value?: number | null) => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
-  if (Math.abs(value) < 1_000) return `${value.toLocaleString('ja-JP')} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let normalized = Math.abs(value)
-  let unitIndex = -1
-  while (normalized >= 1_000 && unitIndex < units.length - 1) {
-    normalized /= 1_000
-    unitIndex += 1
-  }
-  return `${value < 0 ? '-' : ''}${normalized.toLocaleString('ja-JP', { maximumFractionDigits: 1 })} ${units[unitIndex]}`
-}
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '未取得'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '未取得'
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-const ratio = (value?: number | null) => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return null
-  return Math.min(1, Math.max(0, value))
 }
 
 const usageRatio = (summary?: DataFolderSummary | null) => {
@@ -335,7 +230,7 @@ function DashboardHome({
 
       {summaryError && <div className="dashboard__error dashboard__error--inline" role="alert"><CircleAlert size={17} aria-hidden="true" /><p>{summaryError}</p><Button variant="outline" tone="danger" size="compact" className="dashboard__retry-button" type="button" disabled={isRefreshing} onClick={onRefresh}>再試行</Button></div>}
       <section className="dashboard__section" aria-labelledby="dashboard-overview-title"><div className="dashboard__section-heading"><div><h2 id="dashboard-overview-title">システム概要</h2></div><span className="dashboard__section-count">8項目</span></div><div className="dashboard__kpi-grid dashboard__summary-grid">
-        <SummaryCard loading={isInitialLoading} href="/dashboard/mongodb" title="MongoDB" icon={Database} status={getMongoStatus(summary?.mongoDb)} error={sectionError(errors, ['mongoDb', 'mongodb'])}><strong>{summary?.mongoDb?.serverVersion ?? '—'}</strong><span>{summary?.mongoDb?.databaseName ?? '接続情報未取得'}</span></SummaryCard>
+        <SummaryCard loading={isInitialLoading} href="/dashboard/datastore" title="DataStore" icon={Database} status={getDataStoreStatus(summary?.dataStore)} error={sectionError(errors, ['dataStore', 'datastore', 'mongoDb', 'mongodb'])}><strong>{summary?.dataStore?.providerVersion ?? '—'}</strong><span>{summary?.dataStore?.storeName ?? '接続情報未取得'}</span></SummaryCard>
         <SummaryCard loading={isInitialLoading} href="/dashboard/datafolder" title="DataFolder" icon={FolderOpen} status={getAvailabilityStatus(summary?.dataFolder)} error={sectionError(errors, ['dataFolder', 'datafolder'])}><strong>{dataFolderPercent === null ? '—' : `${dataFolderPercent}%`}</strong><span>空き {formatBytes(summary?.dataFolder?.freeBytes)} / {formatBytes(summary?.dataFolder?.totalBytes)}</span></SummaryCard>
         <SummaryCard loading={isInitialLoading} href="/dashboard/webpilot" title="WebPilot" icon={Server} status={getServiceStatus(summary?.webPilot)} error={sectionError(errors, ['webPilot', 'webpilot'])}><strong>{summary?.webPilot?.isConfigured ? '設定済み' : '未設定'}</strong><span>{summary?.webPilot?.lastTestStatus ? `最終テスト: ${summary.webPilot.lastTestStatus}` : '疎通結果未取得'}</span></SummaryCard>
         <SummaryCard loading={isInitialLoading} href="/dashboard/image-worker" title="ImageWorker" icon={Image} status={getServiceStatus(summary?.imageWorker)} error={sectionError(errors, ['imageWorker', 'image-worker'])}><strong>{summary?.imageWorker?.isConfigured ? '設定済み' : '未設定'}</strong><span>{summary?.imageWorker?.lastTestStatus ? `最終テスト: ${summary.imageWorker.lastTestStatus}` : '疎通結果未取得'}</span></SummaryCard>
@@ -348,12 +243,6 @@ function DashboardHome({
       <section className="dashboard__section" aria-labelledby="dashboard-activity-title"><div className="dashboard__section-heading"><div><h2 id="dashboard-activity-title">最新のアクティビティ</h2></div></div><article className="dashboard__card dashboard__activity-card">{logsError && <p className="dashboard__inline-notice dashboard__inline-notice--warning"><TriangleAlert size={13} aria-hidden="true" />{logsError}</p>}{latestLogs.length > 0 ? <ul className="dashboard__activity-list">{latestLogs.map((entry, index) => <ActivityEntry entry={entry} key={entry.sequence ?? `${entry.timestamp}-${entry.message}-${index}`} />)}</ul> : <p className="dashboard__empty">ログはありません。</p>}</article></section>
     </section>
   )
-}
-
-export const resolveDashboardRoute = (path?: string): DashboardRoute => {
-  const source = path ?? (typeof window === 'undefined' ? '/dashboard' : window.location.pathname)
-  const pathname = (source.split(/[?#]/)[0] || '/').replace(/\/+$/, '') || '/'
-  return DASHBOARD_PATHS[pathname] ?? 'home'
 }
 
 export function Dashboard({ path, apiRevision }: DashboardProps) {

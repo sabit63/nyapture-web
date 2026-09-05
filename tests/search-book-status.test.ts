@@ -96,6 +96,20 @@ test('a same-timestamp nonterminal status cannot regress a downloaded card', () 
   assert.equal(result.books[0].status, 'Downloaded')
 })
 
+test('a timestamp-less nonterminal status keeps a completed card and requests reconciliation', () => {
+  const card = makeCard('Downloaded')
+  const result = applySearchBookDownloadStatus(
+    [card],
+    makeStatus({ executionState: 'Running', lastUpdated: undefined }),
+    new Map(),
+  )
+
+  assert.equal(result.accepted, false)
+  assert.equal(result.changed, false)
+  assert.equal(result.needsReconciliation, true)
+  assert.equal(result.books[0].status, 'Downloaded')
+})
+
 test('a later completion updates an existing downloaded card reload key', () => {
   const card = makeCard('Downloaded')
   const nextUpdatedAt = '2026-09-05T00:01:00.000Z'

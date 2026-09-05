@@ -1,12 +1,12 @@
 import {
-  deleteBook,
+  deleteBookPhysical,
   getBookDeletionJob,
   getErrorMessage,
 } from '../../api'
 import type { BookCardModel, BookDeletionJob, BookDeletionJobStatus } from '../../models'
 
 export type BookDeletionOutcome = {
-  status: 'succeeded' | 'pending' | 'failed'
+  status: 'succeeded' | 'pending' | 'failed' | 'aborted'
   message?: string
 }
 
@@ -36,15 +36,40 @@ const deletionOutcomeFromJob = (job: BookDeletionJob): BookDeletionOutcome => {
   return { status: 'failed', message: '削除ジョブの状態が不正です。' }
 }
 
+const createAbortError = () => {
+  const error = new Error('削除ジョブの監視がキャンセルされました。')
+  error.name = 'AbortError'
+  return error
+}
+
+const waitForNextPoll = (delay: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
+  if (signal?.aborted) {
+    reject(createAbortError())
+    return
+  }
+
+  const timer = setTimeout(() => {
+    signal?.removeEventListener('abort', onAbort)
+    resolve()
+  }, delay)
+  const onAbort = () => {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+    reject(createAbortError())
+  }
+  signal?.addEventListener('abort', onAbort, { once: true })
+})
+
 export const deleteBookAndWait = async (
   book: Pick<BookCardModel, 'apiGroupId' | 'apiBookId'>,
+  signal?: AbortSignal,
 ): Promise<BookDeletionOutcome> => {
   const groupId = book.apiGroupId?.trim()
   const bookId = book.apiBookId?.trim()
   if (!groupId || !bookId) return { status: 'failed', message: 'Book識別子がありません。' }
 
   try {
-    const response = await deleteBook(groupId, bookId)
+    const response = await deleteBookPhysical(groupId, bookId, signal)
     if (response.success === false) {
       return { status: 'failed', message: response.message ?? '削除ジョブを登録できませんでした。' }
     }
@@ -59,10 +84,10 @@ export const deleteBookAndWait = async (
     while (true) {
       const remaining = deadline - Date.now()
       if (remaining <= 0) return { status: 'pending' }
-      await new Promise<void>((resolve) => window.setTimeout(resolve, Math.min(DELETION_POLL_INTERVAL_MS, remaining)))
+      await waitForNextPoll(Math.min(DELETION_POLL_INTERVAL_MS, remaining), signal)
       if (Date.now() >= deadline) return { status: 'pending' }
 
-      const nextResponse = await getBookDeletionJob(response.data.jobId)
+      const nextResponse = await getBookDeletionJob(response.data.jobId, signal)
       if (nextResponse.success === false) {
         return { status: 'failed', message: nextResponse.message ?? '削除ジョブの状態を取得できませんでした。' }
       }
@@ -73,6 +98,9 @@ export const deleteBookAndWait = async (
       if (nextOutcome.status !== 'pending') return nextOutcome
     }
   } catch (error) {
+    if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      return { status: 'aborted' }
+    }
     return { status: 'failed', message: getErrorMessage(error) }
   }
 }

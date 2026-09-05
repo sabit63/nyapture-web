@@ -1,5 +1,7 @@
-import { HITOMI_APPENDS, TAG_TYPE_ORDER } from '../../models'
+import { HITOMI_APPENDS, isValidLocalDate, TAG_TYPE_ORDER } from '../../models'
 import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria } from '../../models'
+
+export { isValidLocalDate }
 
 export type SearchSyncFreshness = 'idle' | 'syncing' | 'fresh' | 'stale'
 
@@ -209,7 +211,11 @@ export const validateCriteria = (criteria: SearchCriteria, isMissingTagSearch = 
   if (isMissingTagSearch && !criteria.missingTagTypes?.length) {
     errors.missingTags = '1種類以上選択してください。'
   }
-  if (criteria.dateFrom && criteria.dateTo && criteria.dateFrom > criteria.dateTo) {
+  if (criteria.dateFrom && !isValidLocalDate(criteria.dateFrom)) {
+    errors.date = '開始日は有効な日付を入力してください。'
+  } else if (criteria.dateTo && !isValidLocalDate(criteria.dateTo)) {
+    errors.date = '終了日は有効な日付を入力してください。'
+  } else if (criteria.dateFrom && criteria.dateTo && criteria.dateFrom > criteria.dateTo) {
     errors.date = '開始日は終了日以前にしてください。'
   }
 

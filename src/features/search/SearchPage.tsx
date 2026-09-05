@@ -124,6 +124,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     openTagSearchDestination,
     refreshWebBook,
     downloadWebBook,
+    openWebBookDetail,
     deleteLibraryBook,
     goToResultPage,
   } = controller
@@ -134,6 +135,7 @@ export function SearchPage({ controller }: SearchPageProps) {
 
   const isSearchLoading = searchState === 'loading'
   const showSearchLoader = isSearchLoading && searchLoaderVisible
+  const showNoResults = searchState === 'success' && visibleBooks.length === 0
   const displayedCriteriaTags = applyTagEntityMetadata(criteria.tags, searchResponseTags)
   useDocumentTitle(formatSearchPageTitle({
     isWebSearch,
@@ -354,8 +356,8 @@ export function SearchPage({ controller }: SearchPageProps) {
           <p className="sr-only" role="status" aria-live="polite">{searchLoadingAnnouncement}</p>
         )}
 
-        {controller.isMissingTagSearch && searchState === 'success' && visibleBooks.length === 0 && (
-          <StatePanel title="条件に一致する本がありません" description="タグの種類や検索条件を変更してください。" role="status" />
+        {showNoResults && (
+          <StatePanel title="条件に一致する本がありません" role="status" />
         )}
 
         {searchState === 'error' && (
@@ -374,7 +376,7 @@ export function SearchPage({ controller }: SearchPageProps) {
             title={searchLoadingAnnouncement}
             icon={<LoaderCircle className="results-spinner" size={30} strokeWidth={2.1} />}
           />
-        ) : (
+        ) : showNoResults ? null : (
           <div className={`results-stage ${showSearchLoader ? 'results-stage--loading-visible' : ''}`}>
             <div
               key={searchResultGeneration}
@@ -393,6 +395,9 @@ export function SearchPage({ controller }: SearchPageProps) {
                   onTagSearch={searchByTag}
                   onTagSearchDestinationRequest={openTagSearchDestination}
                   isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
+                  onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
+                    ? (trigger) => openWebBookDetail(book, trigger)
+                    : undefined}
                   onDelete={(trigger) => deleteLibraryBook(book, trigger)}
                   onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
                   onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}

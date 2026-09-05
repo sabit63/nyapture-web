@@ -1,11 +1,13 @@
 import { requestJson } from './client'
 import type {
   CacheMetricsResponse,
+  CacheClearStartResponse,
   ConnectionTestResult,
   DashboardApiResponse,
   DashboardLogsResponse,
   DashboardMaintenanceResponse,
   DashboardSummaryResponse,
+  DataStoreDiagnosticsResponse,
   DataFolderResponse,
   DomainIntervalsResponse,
   DomainIntervalsUpdateRequest,
@@ -35,6 +37,8 @@ export type ServiceConfigUpdateRequest = WebPilotConfigUpdateRequest | ImageWork
 
 /** Mutation endpoints return the non-data NyaApiResponse envelope. */
 export type DashboardMutationResponse = ApiEnvelope<null>
+/** Starting a cache clear is an asynchronous 202 response. */
+export type DashboardCacheClearResponse = ApiEnvelope<CacheClearStartResponse>
 
 const segment = (value: string) => encodeURIComponent(value)
 
@@ -77,8 +81,14 @@ export const retryDashboardJob = (jobId: string, signal?: AbortSignal) => (
 /** @deprecated Use retryDashboardJob from this module. */
 export const retryDashboardDownloadJob = retryDashboardJob
 
-// ───────── MongoDB / DataFolder ─────────
+// ───────── DataStore / MongoDB / DataFolder ─────────
 
+/** Provider-neutral data-store diagnostics endpoint. */
+export const getDataStoreDiagnostics = (signal?: AbortSignal) => (
+  requestJson<ApiEnvelope<DataStoreDiagnosticsResponse>>('/api/dashboard/datastore', { signal })
+)
+
+/** @deprecated Use getDataStoreDiagnostics. */
 export const getMongoDbDiagnostics = (signal?: AbortSignal) => (
   requestJson<ApiEnvelope<MongoDbDiagnosticsResponse>>('/api/dashboard/mongodb', { signal })
 )
@@ -174,7 +184,7 @@ export const getCacheMetrics = (signal?: AbortSignal) => (
 )
 
 export const clearDashboardCache = (signal?: AbortSignal) => (
-  requestJson<DashboardMutationResponse>('/api/dashboard/cache', {
+  requestJson<DashboardCacheClearResponse>('/api/dashboard/cache', {
     method: 'DELETE',
     signal,
   })

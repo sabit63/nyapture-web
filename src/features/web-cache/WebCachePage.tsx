@@ -6,6 +6,7 @@ import { deleteCacheBook, enqueueCacheBook, getCacheBook, getCacheConfig, search
 import { isDownloadCandidate } from '../search/download-candidate'
 import { InternalLink, navigate, useRouterLocation } from '../../app/client-router'
 import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
+import { useRouteContentCommitted } from '../../app/use-route-content-committed'
 import { BookCard } from '../../components/BookCard'
 import { TagChip } from '../../components/TagChip'
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, type BookDownloadStatus, type BookTag } from '../../models'
@@ -98,6 +99,7 @@ export function WebCachePage(props: Props) {
 
 function CachePageSession({ displaySettings, notify, onTagSearchDestinationRequest }: Props) {
   const location = useRouterLocation()
+  useRouteContentCommitted(location.search)
   const applied = useMemo(() => parseCacheSearch(location.search), [location.search])
   const [draft, setDraft] = useState(applied)
   const [groupsText, setGroupsText] = useState(applied.groupIds.join(', '))

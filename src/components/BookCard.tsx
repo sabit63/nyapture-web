@@ -9,8 +9,8 @@ import {
 import { useCallback, useId, useRef, useState } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 
-import type { ApiBookCardModel } from '../api'
 import { requestBlob } from '../api'
+import type { ApiBookCardModel } from '../api'
 import { InternalLink, navigate, shouldInterceptNavigationClick } from '../app/client-router'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
@@ -19,13 +19,13 @@ import { Button } from './ui/Button'
 import { Dialog, DialogBody, DialogHeader } from './ui/Dialog'
 import { IconButton } from './ui/IconButton'
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
-import type { BookCardModel, BookTag } from '../models'
+import type { BookTag } from '../models'
 import './book-card.css'
 
 const formatDisplayDate = (uploadedTime: string) => uploadedTime.slice(0, 16).replace('T', ' ').replaceAll('-', '/')
 
 export type BookCardProps = {
-  book: BookCardModel
+  book: ApiBookCardModel
   selectMode: boolean
   selected: boolean
   onToggle: () => void
@@ -35,7 +35,7 @@ export type BookCardProps = {
   onDelete?: (trigger: HTMLButtonElement) => void
   onRefresh?: () => void
   onDownload?: () => void
-  onOpen?: () => void
+  onOpen?: (trigger?: HTMLElement) => void
   openDisabled?: boolean
   actionsDisabled?: boolean
   downloadDisabled?: boolean
@@ -70,8 +70,8 @@ export function BookCard({
   const tagsCloseButtonRef = useRef<HTMLButtonElement>(null)
   const tagsId = useId()
   const [tagsOpen, setTagsOpen] = useState(false)
-  const thumbnailRequest = (book as ApiBookCardModel).thumbnailRequest
-  const thumbnailReloadKey = (book as ApiBookCardModel).thumbnailReloadKey
+  const thumbnailRequest = book.thumbnailRequest
+  const thumbnailReloadKey = book.thumbnailReloadKey
   const sourceLabel = book.sourceLabel?.trim() || undefined
   const loadThumbnail = useCallback((signal: AbortSignal) => {
     if (!thumbnailRequest) return Promise.reject(new Error('Thumbnail request is unavailable'))
@@ -82,7 +82,11 @@ export function BookCard({
     ...book.tags.filter((tag) => tag.type === 'Groups'),
   ].slice(0, 2)
   const hiddenTagCount = Math.max(0, book.tags.length - inlineTags.length)
-  const viewerUrl = `/book/viewer?id=${encodeURIComponent(book.bookId)}&gid=${encodeURIComponent(book.groupId)}`
+  const apiGroupId = book.apiGroupId?.trim()
+  const apiBookId = book.apiBookId?.trim()
+  const viewerUrl = apiGroupId && apiBookId
+    ? `/book/viewer?id=${encodeURIComponent(apiBookId)}&gid=${encodeURIComponent(apiGroupId)}`
+    : undefined
   const isDownloading = book.status === 'Downloading'
   const isDownloaded = book.status === 'Downloaded'
   const isWebBook = book.status === 'WebBook' || book.status === 'WebBookInPage'
@@ -146,7 +150,7 @@ export function BookCard({
             className="book-cover__open-button"
             aria-label={`${book.title}を表示`}
             disabled={openDisabled}
-            onClick={onOpen}
+            onClick={(event) => onOpen(event.currentTarget)}
           />
         )}
         {book.totalPage > 0 && <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>}
@@ -218,11 +222,13 @@ export function BookCard({
           </time>
           <h3>
             {onOpen ? (
-              <button type="button" className="book-card__title-button" disabled={openDisabled} onClick={onOpen}>
+              <button type="button" className="book-card__title-button" disabled={openDisabled} onClick={(event) => onOpen(event.currentTarget)}>
                 {book.title}
               </button>
-            ) : (
+            ) : viewerUrl ? (
               <InternalLink href={viewerUrl}>{book.title}</InternalLink>
+            ) : (
+              book.title
             )}
           </h3>
         </div>

@@ -24,7 +24,6 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
     advancedErrors,
     tagType,
     tagInput,
-    tagInputFocused,
     highlightedTagIndex,
     tagCandidates,
     showTagCandidates,

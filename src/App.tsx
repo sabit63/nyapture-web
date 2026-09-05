@@ -3,23 +3,26 @@ import {
   Radio,
   Settings,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AppShell } from './app/AppShell'
 import { navigateBackOrFallback, RouterRuntime, useRouterLocation } from './app/client-router'
-import { Dashboard } from './components/Dashboard'
-import { DownloadManager } from './components/DownloadManager'
-import { WebCachePage } from './features/web-cache/WebCachePage'
+import { RouteBoundary } from './app/RouteBoundary'
 import { useSnackbar } from './components/Snackbar'
-import { IconButton } from './components/ui'
+import { IconButton, StatePanel } from './components/ui'
 import { SearchHeader, SearchPage, useSearchController } from './features/search'
 import { API_CONNECTION_STATE_LABELS, useApiSettings } from './features/settings'
 import { AppOverlays } from './features/shell/AppOverlays'
 import { useAppShellController } from './features/shell/useAppShellController'
-import { BookViewerRoute, resolveBookViewerRoute } from './features/viewer/BookViewerRoute'
+import { resolveBookViewerRoute } from './features/viewer/viewer-route'
 import { useBookDownloadHubConnection } from './realtime/use-book-download-hub'
 import './components/search-dialogs.css'
 import './components/search-page.css'
+
+const Dashboard = lazy(() => import('./components/Dashboard').then((module) => ({ default: module.Dashboard })))
+const DownloadManager = lazy(() => import('./components/DownloadManager').then((module) => ({ default: module.DownloadManager })))
+const WebCachePage = lazy(() => import('./features/web-cache/WebCachePage').then((module) => ({ default: module.WebCachePage })))
+const BookViewerRoute = lazy(() => import('./features/viewer/BookViewerRoute').then((module) => ({ default: module.BookViewerRoute })))
 
 function App() {
   const routerLocation = useRouterLocation()
@@ -144,6 +147,8 @@ function App() {
         </>
       )}
     >
+      <RouteBoundary key={currentPath}>
+      <Suspense fallback={<StatePanel title="画面を読み込み中" role="status" />}>
       {isDownloadManager ? (
         <DownloadManager apiRevision={apiSettingsController.apiRevision} />
       ) : isWebCache ? (
@@ -170,6 +175,8 @@ function App() {
       ) : (
         <SearchPage controller={searchController} />
       )}
+      </Suspense>
+      </RouteBoundary>
 
       <AppOverlays
         searchController={searchController}

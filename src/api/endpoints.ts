@@ -87,7 +87,8 @@ export const updateBookTitle = (
   })
 )
 
-export const deleteBook = (groupId: string, bookId: string, signal?: AbortSignal) => (
+/** Permanently remove a library book, including its page storage and metadata. */
+export const deleteBookPhysical = (groupId: string, bookId: string, signal?: AbortSignal) => (
   requestJson<BookDeletionJobResponse>(`/api/book/${segment(groupId)}/${segment(bookId)}`, {
     method: 'DELETE',
     query: { remove: true },
@@ -95,6 +96,9 @@ export const deleteBook = (groupId: string, bookId: string, signal?: AbortSignal
     signal,
   })
 )
+
+/** @deprecated Use deleteBookPhysical to make the deletion disposition explicit. */
+export const deleteBook = deleteBookPhysical
 
 export const getBookDeletionJob = (jobId: string, signal?: AbortSignal) => (
   requestJson<BookDeletionJobResponse>(`/api/book/deletion-jobs/${segment(jobId)}`, { signal })

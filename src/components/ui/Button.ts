@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react'
+import { type ButtonHTMLAttributes } from 'react'
 
 export type ButtonSize = 'default' | 'compact'
 export type ButtonSolidTone = 'accent' | 'danger' | 'success' | 'warning'
@@ -49,14 +49,4 @@ export function buttonClassName(style: ButtonStyle = {}, className?: string): st
   return classes.join(' ')
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
-  className,
-  type = 'button',
-  variant,
-  tone,
-  size,
-  ...props
-}, ref) {
-  const style = { variant, tone, size } as ButtonStyle
-  return <button ref={ref} className={buttonClassName(style, className)} type={type} {...props} />
-})
+export { Button } from './ButtonControl'

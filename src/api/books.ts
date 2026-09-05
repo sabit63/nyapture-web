@@ -11,7 +11,7 @@ import type {
   TagEntity,
   TagSet,
 } from '../models'
-import { NYA_BOOK_STATUSES, NYA_TAG_TYPES } from '../models'
+import { localDateToIso, NYA_BOOK_STATUSES, NYA_TAG_TYPES } from '../models'
 import type { ApiImageRequestDescriptor } from './client'
 import type { WebBookCacheBookDto, WebBookCacheSearchRequest } from './endpoints'
 
@@ -176,7 +176,7 @@ export const mapWebCacheBookToCard = (
 }
 
 const asDateTime = (date: string, endOfDay = false) => date
-  ? new Date(`${date}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}`).toISOString()
+  ? localDateToIso(date, endOfDay)
   : undefined
 
 export const buildBookSearchFilter = (

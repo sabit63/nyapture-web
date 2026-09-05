@@ -1,5 +1,29 @@
 # Nyapture Web
 
+## Development and validation
+
+Use the declared package manager, pnpm 11.25.0.
+
+```sh
+pnpm install
+pnpm dev
+pnpm test
+pnpm lint
+pnpm build
+```
+
+`pnpm build` includes TypeScript checks. `pnpm check` runs lint and type checks
+without bundling. If the tsx CLI cannot create its IPC pipe in a sandbox, run
+`node --import tsx --test tests/*.test.ts` instead of `pnpm test`.
+
+The local-only UI fixture can be started with
+`node --import tsx tests/fixtures/review-api.ts`; run Vite with
+`VITE_NYA_API_TARGET=http://127.0.0.1:5271 pnpm dev --port 5174` to use it.
+It supplies synthetic data, simulates reset/reload failure, and never forwards
+requests to the real backend. It does not implement SignalR or a complete API.
+
+Review decisions and implementation evidence are in [docs/review](docs/review/README.md).
+
 ## Docker deployment
 
 The default setup serves the production build with Nginx on

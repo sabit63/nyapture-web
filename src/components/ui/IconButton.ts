@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react'
+import { type ButtonHTMLAttributes } from 'react'
 
 import {
   type ButtonSize,
@@ -34,14 +34,4 @@ export function iconButtonClassName(style: ButtonStyle = {}, className?: string)
   return classes.join(' ')
 }
 
-export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton({
-  className,
-  type = 'button',
-  variant,
-  tone,
-  size,
-  ...props
-}, ref) {
-  const style = { variant, tone, size } as ButtonStyle
-  return <button ref={ref} className={iconButtonClassName(style, className)} type={type} {...props} />
-})
+export { IconButton } from './IconButtonControl'

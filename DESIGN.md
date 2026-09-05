@@ -149,7 +149,8 @@ The product uses a dark neutral foundation with one magenta interaction accent. 
 ## Layout
 
 - Use a fluid content area with fixed maximum widths for scanability.
-- Desktop uses a persistent navigation drawer; compact layouts use an overlay drawer.
+- All widths use an overlay navigation drawer. Opening it makes the page inert,
+  traps keyboard focus, and locks body scrolling; Escape restores trigger focus.
 - All spacing follows the 4px base scale. Prefer 8px between tightly related controls, 16px inside compact surfaces, and 24px between major groups.
 - Pages share a consistent sequence: page identity, relevant status/actions, filters, primary content, then pagination or supporting detail.
 - Responsive changes follow four conceptual ranges: mobile, tablet, compact desktop, and wide desktop. A page may omit a breakpoint only when its layout does not change there.
@@ -171,9 +172,9 @@ single source of truth when adding or changing page layouts.
 
 - Mobile: `<640px` — overlay drawer, 16px page gutter, 56px topbar.
 - Tablet: `640–879px` — overlay drawer, 24px page gutter, 56px topbar.
-- Compact desktop: `880–1199px` — persistent 224px drawer, 32px page gutter,
+- Compact desktop: `880–1199px` — overlay 248px drawer, 32px page gutter,
   64px topbar.
-- Wide desktop: `>=1200px` — persistent 248px drawer, 40px page gutter,
+- Wide desktop: `>=1200px` — overlay 272px drawer, 40px page gutter,
   64px topbar.
 
 The only responsive boundaries are `640px`, `880px`, and `1200px`. CSS is
@@ -188,7 +189,7 @@ mobile-first and uses `min-width` media queries at those boundaries.
 - `--layout-grid-gap`: `16px` between repeated content items.
 - `--layout-control-gap`: `8px` between related controls.
 - `--layout-tight-gap`: `4px` for tightly coupled labels and indicators.
-- `--shell-content-offset`: `0px / 0px / 224px / 248px` from mobile through wide.
+- Navigation never reserves a content offset. Mobile/tablet drawer width is 288px.
 
 Margins, padding, gaps, and structural insets must use this 4px scale. One-pixel
 borders, outlines, shadows, transforms, aspect ratios, safe-area insets,

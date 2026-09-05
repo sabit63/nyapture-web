@@ -10,6 +10,8 @@ export type SearchBookStatusApplyResult = {
   matchedKey?: string
   accepted: boolean
   changed: boolean
+  /** A timestamp-less nonterminal event followed a completed card. */
+  needsReconciliation?: boolean
 }
 
 /**
@@ -124,6 +126,16 @@ export const applySearchBookDownloadStatus = (
 
   const currentBook = books[index]
   const isCompletion = normalizedStatus.executionState === 'Completed'
+  const isTerminalStatus = isCompletion || normalizedStatus.book.status === 'Downloaded'
+  if (currentBook.status === 'Downloaded' && nextTimestamp === undefined && !isTerminalStatus) {
+    return {
+      books,
+      matchedKey,
+      accepted: false,
+      changed: false,
+      needsReconciliation: true,
+    }
+  }
   if (
     currentTimestamp !== undefined
     && nextTimestamp !== undefined

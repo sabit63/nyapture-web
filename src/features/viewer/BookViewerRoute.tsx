@@ -4,33 +4,12 @@ import type { RefObject } from 'react'
 import { ApiError, getBook, getErrorMessage, mapEBookToCard } from '../../api'
 import type { ApiBookCardModel } from '../../api'
 import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
+import { useRouteContentCommitted } from '../../app/use-route-content-committed'
 import { BookViewerPage } from '../../components/BookViewerPage'
 import type { BookTag } from '../../models'
 import { applyTagDisplayNameOverrides, type TagDisplayNameOverrides } from '../search/tag-display-name'
 
-export type BookViewerRouteState = 'missing' | 'loading' | 'notFound' | 'error' | 'ready'
-
-export type BookViewerRouteData = {
-  state: 'missing' | 'ready'
-  groupId?: string
-  bookId?: string
-  identity: string
-}
-
-const hasBookIdentifier = (value: string | undefined) => Boolean(value?.trim())
-
-export const resolveBookViewerRoute = (search: string): BookViewerRouteData => {
-  const params = new URLSearchParams(search)
-  const idParam = params.get('id')
-  const gidParam = params.get('gid')
-  const identity = `${idParam ?? ''}\u0000${gidParam ?? ''}`
-
-  if (idParam === null || gidParam === null || !hasBookIdentifier(idParam) || !hasBookIdentifier(gidParam)) {
-    return { state: 'missing', identity }
-  }
-
-  return { state: 'ready', groupId: gidParam, bookId: idParam, identity }
-}
+import type { BookViewerRouteData, BookViewerRouteState } from './viewer-route'
 
 export type BookViewerRouteProps = {
   route: BookViewerRouteData
@@ -68,6 +47,7 @@ export function BookViewerRoute({
   }, [])
 
   const readyBook = viewerState === 'ready' && viewerBookIdentity === route.identity ? viewerBook : undefined
+  useRouteContentCommitted(readyBook)
   const displayBook = useMemo(() => {
     if (!readyBook || tagDisplayNameOverrides.size === 0) return readyBook
     const tags = applyTagDisplayNameOverrides(readyBook.tags, tagDisplayNameOverrides)
@@ -95,6 +75,7 @@ export function BookViewerRoute({
     setViewerBookIdentity('')
     getBook(route.groupId, route.bookId, controller.signal)
       .then((response) => {
+        if (controller.signal.aborted) return
         const book = response.books?.[0]
         if (!book) {
           setViewerState('notFound')
@@ -114,7 +95,7 @@ export function BookViewerRoute({
         setViewerState('error')
       })
     return () => controller.abort()
-  }, [apiRevision, route.bookId, route.groupId, route.state, viewerRevision])
+  }, [apiRevision, route.bookId, route.groupId, route.identity, route.state, viewerRevision])
 
   return (
     <BookViewerPage

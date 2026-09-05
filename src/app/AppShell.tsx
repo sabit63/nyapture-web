@@ -1,7 +1,7 @@
 import { ArrowLeft, Menu, X } from 'lucide-react'
 import { type ReactNode, type RefObject } from 'react'
 
-import nyaIcon from '../assets/icon.png'
+import nyaIcon from '../assets/icon-96.png'
 import { Button, buttonClassName } from '../components/ui/Button'
 import { IconButton } from '../components/ui/IconButton'
 import { isNavigationItemActive, navigationGroups } from './navigation'
@@ -34,9 +34,9 @@ export function AppShell({
 }: AppShellProps) {
   return (
     <div className="app-shell">
-      <a className="skip-link" href="#main-content">本文へ移動</a>
+      <a className="skip-link" href="#main-content" inert={drawerOpen}>本文へ移動</a>
 
-      <header className="topbar">
+      <header className="topbar" inert={drawerOpen}>
         <div className="topbar__brand">
           <IconButton
             ref={menuButtonRef}
@@ -81,10 +81,13 @@ export function AppShell({
         tone="neutral"
         size="compact"
         aria-label="ナビゲーションを閉じる"
+        inert={!drawerOpen}
+        aria-hidden={!drawerOpen}
+        tabIndex={-1}
         onClick={onCloseDrawer}
       />
 
-      <aside id="primary-navigation" className={`drawer ${drawerOpen ? 'drawer--open' : ''}`} aria-label="メインナビゲーション">
+      <aside id="primary-navigation" className={`drawer ${drawerOpen ? 'drawer--open' : ''}`} role="dialog" aria-modal={drawerOpen || undefined} inert={!drawerOpen} aria-hidden={!drawerOpen} aria-label="メインナビゲーション" tabIndex={-1}>
         <div className="drawer__mobile-head">
           <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
           <span>Nyapture</span>
@@ -138,7 +141,7 @@ export function AppShell({
         </nav>
       </aside>
 
-      <main id="main-content" className="main-content" tabIndex={-1}>
+      <main id="main-content" className="main-content" tabIndex={-1} inert={drawerOpen}>
         {children}
       </main>
     </div>

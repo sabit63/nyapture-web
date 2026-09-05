@@ -2,6 +2,11 @@ import type { BookCardModel } from '../../models'
 
 export type SearchBookIdentity = Pick<BookCardModel, 'groupId' | 'bookId' | 'url'>
 
+export type SearchBookSelectionState<T> = {
+  books: readonly T[]
+  selected: readonly string[]
+}
+
 const identityKey = (book: SearchBookIdentity) => `${book.groupId}\u0000${book.bookId}`
 
 const normalizedUrl = (book: SearchBookIdentity) => book.url.trim()
@@ -47,3 +52,31 @@ export const replaceSearchBookByIdentity = <T extends SearchBookIdentity>(
   if (index < 0) return [...books]
   return books.map((book, currentIndex) => currentIndex === index ? refreshed : book)
 }
+
+/** Replace a card and remap its selection key as one state transition. */
+export const replaceSearchBookAndSelection = <T extends SearchBookIdentity>(
+  state: SearchBookSelectionState<T>,
+  original: SearchBookIdentity,
+  refreshed: T,
+): SearchBookSelectionState<T> => {
+  const index = findSearchBookIndex(state.books, original, refreshed)
+  if (index < 0) return { books: [...state.books], selected: [...state.selected] }
+
+  const current = state.books[index]
+  const sourceKeys = new Set([identityKey(original), identityKey(current)])
+  const refreshedKey = identityKey(refreshed)
+  const selected = [...new Set(state.selected.map((key) => sourceKeys.has(key) ? refreshedKey : key))]
+  return {
+    books: state.books.map((book, currentIndex) => currentIndex === index ? refreshed : book),
+    selected,
+  }
+}
+
+/** Apply multiple replacements while preserving selection remapping atomically. */
+export const replaceSearchBooksAndSelection = <T extends SearchBookIdentity>(
+  state: SearchBookSelectionState<T>,
+  replacements: readonly { original: SearchBookIdentity; refreshed: T }[],
+): SearchBookSelectionState<T> => replacements.reduce<SearchBookSelectionState<T>>(
+  (current, replacement) => replaceSearchBookAndSelection(current, replacement.original, replacement.refreshed),
+  { books: [...state.books], selected: [...state.selected] },
+)

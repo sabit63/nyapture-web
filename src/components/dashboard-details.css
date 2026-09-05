@@ -215,6 +215,28 @@
   font-weight: 700;
 }
 
+.dashboard-detail__cache-clear-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--layout-tight-gap, var(--space-1));
+  color: var(--color-text-muted);
+}
+
+.dashboard-detail__cache-clear-status strong {
+  color: var(--color-text);
+}
+
+.dashboard-detail__cache-clear-status > span:last-child {
+  color: var(--color-danger-text);
+}
+
+.dashboard-detail__progress-native {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--color-info-fill);
+}
+
 .dashboard-detail__field-error { color: var(--color-danger-text); }
 
 .dashboard-detail label {

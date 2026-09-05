@@ -1,3 +1,5 @@
+import { useCacheSyncStatus } from './use-cache-sync-status'
+import { useCacheDraft } from './use-cache-draft'
 import {
   Activity,
   Check,
@@ -25,7 +27,6 @@ import {
 import {
   cancelCacheSync,
   getCacheConfig,
-  getCacheStatus,
   resetCacheConfig,
   runCacheSync,
   saveCacheConfig,
@@ -43,8 +44,6 @@ import {
 import type {
   WebBookCacheConfigDto,
   WebBookCacheConfigResponse,
-  WebBookCacheSiteConfigDto,
-  WebBookCacheStatusResponse,
   WebBookCacheSyncStartResponse,
   WebBookCacheValidationResponse,
   WebBookCacheSiteTestResponse,
@@ -55,11 +54,8 @@ import {
   createCacheSyncRequest,
   getValidationMessagesFromError,
   isCurrentCacheRequest,
-  shouldPollCacheStatus,
-  startSerialCachePolling,
   validateWebCacheDraft,
   validationMessages,
-  type WebBookAutoDownloadDraft,
   type WebCacheConfigDraft,
 } from './management-state'
 import './web-cache-management.css'
@@ -125,8 +121,6 @@ const responseRuntimeOverride = (value: WebBookCacheConfigResponse | WebBookCach
   !!(value && typeof value === 'object' && 'hasRuntimeOverride' in value && value.hasRuntimeOverride)
 )
 
-const responseStatus = (value: WebBookCacheStatusResponse | null | undefined) => value ?? null
-
 const updateNumber = (event: ChangeEvent<HTMLInputElement>) => (
   event.target.value === '' ? Number.NaN : Number(event.target.value)
 )
@@ -178,14 +172,13 @@ function Toggle({ label, checked, onChange, disabled = false }: {
 }
 
 export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
-  const [serverConfig, setServerConfig] = useState<WebCacheConfigDraft | null>(null)
-  const [draft, setDraft] = useState<WebCacheConfigDraft | null>(null)
+  const { serverConfig, setServerConfig, draft, setDraft, draftRef, allowedGroupIdsText, setAllowedGroupIdsText, excludedTagsText, setExcludedTagsText, applyEditableConfig, updateDraft, updateGlobalNumber, updateAutoDownload, updateSite } = useCacheDraft()
   const [hasRuntimeOverride, setHasRuntimeOverride] = useState(false)
-  const [status, setStatus] = useState<WebBookCacheStatusResponse | null>(null)
+  const { status, setStatus, statusLoading, statusError, loadStatus } = useCacheSyncStatus(apiRevision)
   const [configLoading, setConfigLoading] = useState(true)
-  const [statusLoading, setStatusLoading] = useState(true)
   const [configError, setConfigError] = useState<string | null>(null)
-  const [statusError, setStatusError] = useState<string | null>(null)
+  const [configUncertain, setConfigUncertain] = useState(false)
+  const configUncertainRef = useRef(false)
   const [validationIssues, setValidationIssues] = useState<Array<{ path?: string; message: string }>>([])
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [validating, setValidating] = useState(false)
@@ -197,24 +190,15 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
   const [syncForce, setSyncForce] = useState(false)
   const [testingGroupId, setTestingGroupId] = useState<string | null>(null)
   const [siteTests, setSiteTests] = useState<Record<string, SiteTestResult>>({})
-  const [allowedGroupIdsText, setAllowedGroupIdsText] = useState('')
-  const [excludedTagsText, setExcludedTagsText] = useState('')
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
 
   const mountedRef = useRef(true)
   const revisionRef = useRef(apiRevision)
   const generationRef = useRef(0)
-  const draftRef = useRef<WebCacheConfigDraft | null>(null)
   const configControllerRef = useRef<AbortController | null>(null)
-  const statusControllerRef = useRef<AbortController | null>(null)
   const mutationControllerRef = useRef<AbortController | null>(null)
-  const statusRequestIdRef = useRef(0)
   const configRequestIdRef = useRef(0)
   const mutationBusyRef = useRef(false)
-
-  useEffect(() => {
-    draftRef.current = draft
-  }, [draft])
 
   const isActive = useCallback((generation: number, revision = apiRevision) => (
     mountedRef.current
@@ -222,17 +206,8 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     && revisionRef.current === revision
   ), [apiRevision])
 
-  const applyEditableConfig = useCallback((config: WebBookCacheConfigDto) => {
-    const nextDraft = cloneWebCacheConfig(config)
-    draftRef.current = nextDraft
-    setDraft(nextDraft)
-    setAllowedGroupIdsText(nextDraft.autoDownload.allowedGroupIds.join('\n'))
-    setExcludedTagsText(nextDraft.autoDownload.excludedTags.join('\n'))
-  }, [])
-
   const abortRequests = useCallback(() => {
     configControllerRef.current?.abort()
-    statusControllerRef.current?.abort()
     mutationControllerRef.current?.abort()
   }, [])
 
@@ -245,39 +220,24 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     setConfigError(null)
     try {
       const result = await getCacheConfig(controller.signal)
-      if (!isActive(generation) || !isCurrentCacheRequest(apiRevision, revisionRef.current, requestId, configRequestIdRef.current)) return
+      if (!isActive(generation) || !isCurrentCacheRequest(apiRevision, revisionRef.current, requestId, configRequestIdRef.current)) return 'stale' as const
       if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? 'Web Cache設定を取得できませんでした。')
       const nextConfig = responseConfig(result)
       setServerConfig(nextConfig)
       setHasRuntimeOverride(responseRuntimeOverride(result))
-      if (!preserveDraft || draftRef.current === null) applyEditableConfig(nextConfig)
+      if (!preserveDraft || configUncertainRef.current || draftRef.current === null) applyEditableConfig(nextConfig)
+      if (configUncertainRef.current) setFeedback(null)
+      configUncertainRef.current = false
+      setConfigUncertain(false)
+      return 'success' as const
     } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      setConfigError(errorMessage(error))
+      if (!isActive(generation) || controller.signal.aborted) return 'stale' as const
+      setConfigError(configUncertainRef.current ? 'リセット済み・設定の再取得に失敗しました' : errorMessage(error))
+      return 'error' as const
     } finally {
       if (isActive(generation) && requestId === configRequestIdRef.current) setConfigLoading(false)
     }
-  }, [apiRevision, applyEditableConfig, isActive])
-
-  const loadStatus = useCallback(async (generation = generationRef.current, silent = false) => {
-    const requestId = ++statusRequestIdRef.current
-    statusControllerRef.current?.abort()
-    const controller = new AbortController()
-    statusControllerRef.current = controller
-    if (!silent) setStatusLoading(true)
-    setStatusError(null)
-    try {
-      const result = await getCacheStatus(controller.signal)
-      if (!isActive(generation) || !isCurrentCacheRequest(apiRevision, revisionRef.current, requestId, statusRequestIdRef.current)) return
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? '同期状態を取得できませんでした。')
-      setStatus(responseStatus(result))
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      setStatusError(errorMessage(error))
-    } finally {
-      if (isActive(generation) && requestId === statusRequestIdRef.current) setStatusLoading(false)
-    }
-  }, [apiRevision, isActive])
+  }, [apiRevision, applyEditableConfig, draftRef, isActive, setServerConfig])
 
   useEffect(() => {
     mountedRef.current = true
@@ -286,9 +246,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     abortRequests()
     setServerConfig(null)
     setDraft(null)
-    setStatus(null)
     setConfigError(null)
-    setStatusError(null)
     setFeedback(null)
     setValidationIssues([])
     setValidating(false)
@@ -302,30 +260,12 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     setExcludedTagsText('')
     mutationBusyRef.current = false
     setConfigLoading(true)
-    setStatusLoading(true)
     void loadConfig(false, generation)
-    void loadStatus(generation)
     return () => {
       mountedRef.current = false
       abortRequests()
     }
-  }, [abortRequests, apiRevision, loadConfig, loadStatus])
-
-  const statusIsRunning = shouldPollCacheStatus(status)
-
-  useEffect(() => {
-    if (!statusIsRunning) return
-    const generation = generationRef.current
-    const stopPolling = startSerialCachePolling(
-      () => loadStatus(generation, true),
-      (callback, delay) => window.setTimeout(callback, delay),
-      (timer) => window.clearTimeout(timer),
-    )
-    return () => {
-      stopPolling()
-      statusControllerRef.current?.abort()
-    }
-  }, [loadStatus, statusIsRunning])
+  }, [abortRequests, apiRevision, loadConfig, setDraft, setServerConfig, setAllowedGroupIdsText, setExcludedTagsText])
 
   useEffect(() => {
     if (!status?.isRunning && cancelPending) setCancelPending(false)
@@ -343,36 +283,6 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
   const issueFor = useCallback((path: string) => (
     localIssues.find((item) => item.path === path)?.message
   ), [localIssues])
-
-  const updateDraft = useCallback((updater: (current: WebCacheConfigDraft) => WebCacheConfigDraft) => {
-    setDraft((current) => {
-      if (!current) return current
-      const next = updater(current)
-      draftRef.current = next
-      return next
-    })
-  }, [])
-
-  const updateGlobalNumber = useCallback((field: 'intervalMinutes' | 'initialLookbackDays' | 'maxPagesPerRun' | 'maxDetailsPerRun', value: number) => {
-    updateDraft((current) => ({ ...current, [field]: value }))
-  }, [updateDraft])
-
-  const updateAutoDownload = useCallback(<K extends keyof WebBookAutoDownloadDraft>(field: K, value: WebBookAutoDownloadDraft[K]) => {
-    updateDraft((current) => ({
-      ...current,
-      autoDownload: {
-        ...current.autoDownload,
-        [field]: value,
-      },
-    }))
-  }, [updateDraft])
-
-  const updateSite = useCallback(<K extends keyof WebBookCacheSiteConfigDto>(index: number, field: K, value: WebBookCacheSiteConfigDto[K]) => {
-    updateDraft((current) => ({
-      ...current,
-      sites: current.sites.map((site, siteIndex) => siteIndex === index ? { ...site, [field]: value } : site),
-    }))
-  }, [updateDraft])
 
   const addSite = useCallback(() => {
     updateDraft((current) => ({
@@ -415,7 +325,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
   }, [])
 
   const save = useCallback(async () => {
-    if (!draft || !canSaveWebCacheConfig(draft, saving, validating)) return
+    if (configUncertain || !draft || !canSaveWebCacheConfig(draft, saving, validating)) return
     const issues = validateWebCacheDraft(draft)
     if (issues.length > 0) {
       setValidationIssues(issues)
@@ -467,7 +377,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
         setSaving(false)
       }
     }
-  }, [apiRevision, applyEditableConfig, beginMutation, draft, endMutation, isActive, saving, validating])
+  }, [apiRevision, applyEditableConfig, beginMutation, configUncertain, draft, endMutation, isActive, saving, setServerConfig, validating])
 
   const reset = useCallback(async () => {
     if (resetting) return
@@ -480,8 +390,11 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
       const result = await resetCacheConfig(controller.signal)
       if (!isActive(generation) || controller.signal.aborted) return
       if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? 'Web Cache設定をリセットできませんでした。')
-      await loadConfig(false, generation)
+      configUncertainRef.current = true
+      setConfigUncertain(true)
+      const refreshed = await loadConfig(false, generation)
       if (!isActive(generation) || controller.signal.aborted) return
+      if (refreshed !== 'success') return
       setFeedback({ tone: 'success', message: 'Web Cache設定を初期値へリセットしました。' })
     } catch (error) {
       if (!isActive(generation) || controller.signal.aborted) return
@@ -519,7 +432,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
       endMutation(controller)
       if (isActive(generation) && !controller.signal.aborted) setSyncing(false)
     }
-  }, [beginMutation, cancelPending, endMutation, isActive, loadStatus, status?.isRunning, syncForce, syncGroupId, syncing])
+  }, [beginMutation, cancelPending, endMutation, isActive, loadStatus, status?.isRunning, syncForce, syncGroupId, syncing, setStatus])
 
   const cancel = useCallback(async () => {
     if (cancelPending || !status?.isRunning) return
@@ -595,7 +508,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     draft !== null && serverConfig !== null && JSON.stringify(draft) !== JSON.stringify(serverConfig)
   ), [draft, serverConfig])
   const resetDisabled = resetting || saving || validating || syncing || cancelPending
-  const saveDisabled = !canSaveWebCacheConfig(draft, saving, validating) || localIssues.length > 0 || resetting
+  const saveDisabled = configUncertain || !canSaveWebCacheConfig(draft, saving, validating) || localIssues.length > 0 || resetting
   const statusTone = status?.isRunning ? 'info' : statusError ? 'danger' : 'success'
 
   return (

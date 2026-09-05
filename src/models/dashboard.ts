@@ -14,6 +14,17 @@ export type DashboardApiResponse<T> = {
 
 // ───────── Summary ─────────
 
+export type DataStoreObservationAvailability = 'Available' | 'NotApplicable' | 'Unavailable'
+
+export type DataStoreSummary = {
+  generatedAt?: string | null
+  isConnected?: boolean | null
+  providerVersion?: string | null
+  storeName?: string | null
+  availability?: DataStoreObservationAvailability | null
+  diagnosticCode?: string | null
+}
+
 export type MongoSummary = {
   isConnected?: boolean | null
   serverVersion?: string | null
@@ -62,6 +73,8 @@ export type LogsSummary = {
 
 export type DashboardSummaryResponse = {
   generatedAt?: string | null
+  dataStore?: DataStoreSummary | null
+  /** @deprecated The API keeps this field for MongoDB-compatible clients. */
   mongoDb?: MongoSummary | null
   dataFolder?: DataFolderSummary | null
   downloads?: DownloadsSummary | null
@@ -73,7 +86,54 @@ export type DashboardSummaryResponse = {
   errors?: Record<string, string> | null
 }
 
-// ───────── MongoDB ─────────
+// ───────── DataStore / MongoDB ─────────
+
+export type DataStoreTopologyDto = {
+  availability?: DataStoreObservationAvailability | null
+  state?: string | null
+  diagnosticCode?: string | null
+}
+
+export type DataStoreIndexDto = {
+  name?: string | null
+  definition?: string | null
+  isUnique?: boolean | null
+  availability?: DataStoreObservationAvailability | null
+  diagnosticCode?: string | null
+}
+
+export type DataStoreResourceDto = {
+  name?: string | null
+  recordCount?: number | null
+  sizeBytes?: number | null
+  indexCount?: number | null
+  availability?: DataStoreObservationAvailability | null
+  diagnosticCode?: string | null
+  indexes?: DataStoreIndexDto[] | null
+}
+
+export type DataStoreStatisticsDto = {
+  bookCount?: number | null
+  tagCount?: number | null
+  observedAt?: string | null
+  indexCount?: number | null
+  dataSizeBytes?: number | null
+  storeName?: string | null
+  availableStoreNames?: string[] | null
+}
+
+export type DataStoreDiagnosticsResponse = {
+  generatedAt?: string | null
+  isConnected?: boolean | null
+  providerVersion?: string | null
+  storeName?: string | null
+  availability?: DataStoreObservationAvailability | null
+  diagnosticCode?: string | null
+  error?: string | null
+  topology?: DataStoreTopologyDto | null
+  resources?: DataStoreResourceDto[] | null
+  statistics?: DataStoreStatisticsDto | null
+}
 
 export type MongoDbDiagnosticsResponse = {
   generatedAt?: string | null
@@ -319,6 +379,27 @@ export type CacheMetricsResponse = {
   evictionCount?: number | null
   lastClearedAt?: string | null
   strategy?: string | null
+  clearStatus?: CacheClearStatusResponse | null
+}
+
+export type CacheClearState = 'Idle' | 'Running' | 'Completed' | 'Failed'
+
+export type CacheClearStatusResponse = {
+  runId?: string | null
+  state?: CacheClearState | null
+  totalEntries?: number | null
+  processedEntries?: number | null
+  deletedEntries?: number | null
+  failedEntries?: number | null
+  startedAt?: string | null
+  finishedAt?: string | null
+  error?: string | null
+}
+
+export type CacheClearStartResponse = {
+  started?: boolean | null
+  message?: string | null
+  status?: CacheClearStatusResponse | null
 }
 
 export type DashboardLogEntryDto = {

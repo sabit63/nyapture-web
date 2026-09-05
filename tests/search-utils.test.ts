@@ -2,9 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import type { SearchCriteria } from '../src/models'
+import { buildBookSearchFilter } from '../src/api/books'
 import {
   createSearchUrlForDestination,
   createTagSearchDestinationUrls,
+  isValidLocalDate,
+  validateCriteria,
 } from '../src/features/search/search-utils'
 
 const emptyCriteria = (): SearchCriteria => ({
@@ -143,4 +146,24 @@ test('tag destination URLs preserve disabled Japanese and current Hitomi append'
   assert.deepEqual(urls.hitomi.searchParams.getAll('tag'), ['Tags:tag'])
   assert.equal(urls.hitomi.searchParams.get('japanese'), 'off')
   assert.equal(urls.hitomi.searchParams.get('append'), 'Male')
+})
+
+test('calendar validation rejects malformed and impossible URL dates before building a request', () => {
+  assert.equal(isValidLocalDate('2024-02-29'), true)
+  assert.equal(isValidLocalDate('2023-02-29'), false)
+  assert.equal(isValidLocalDate('2024-02-30'), false)
+  assert.equal(isValidLocalDate('not-a-date'), false)
+
+  const invalid = { ...emptyCriteria(), dateFrom: '2024-02-30' }
+  assert.equal(validateCriteria(invalid).date, '開始日は有効な日付を入力してください。')
+  assert.equal(buildBookSearchFilter(invalid, 'uploaded', 'desc').lowerUploadedTime, undefined)
+})
+
+test('calendar range validation still rejects reversed valid dates', () => {
+  const errors = validateCriteria({
+    ...emptyCriteria(),
+    dateFrom: '2025-02-03',
+    dateTo: '2025-01-02',
+  })
+  assert.equal(errors.date, '開始日は終了日以前にしてください。')
 })

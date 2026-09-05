@@ -1,5 +1,6 @@
 import { Snackbar } from '../../components/Snackbar'
 import { AdvancedSearchDialog } from '../search/AdvancedSearchDialog'
+import { WebBookDetailDialog } from '../search/WebBookDetailDialog'
 import { TagSearchDestinationDialog } from '../search/TagSearchDestinationDialog'
 import type { SearchController } from '../search/useSearchController'
 import { LibraryDeleteDialog } from '../library/LibraryDeleteDialog'
@@ -22,6 +23,7 @@ export function AppOverlays({
   return (
     <>
       <AdvancedSearchDialog controller={searchController} />
+      <WebBookDetailDialog controller={searchController} />
       <TagSearchDestinationDialog controller={searchController} />
       <ApiSettingsDialog controller={apiSettingsController} />
       <LibraryDeleteDialog

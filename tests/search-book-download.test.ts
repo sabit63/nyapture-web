@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   findSearchBookIndex,
+  replaceSearchBookAndSelection,
   replaceSearchBookByIdentity,
   type SearchBookIdentity,
 } from '../src/features/search/search-book-download'
@@ -66,4 +67,16 @@ test('duplicate URLs are not used to guess a replacement card', () => {
     bookId: 'placeholder-book',
     url: duplicateUrl,
   }), -1)
+})
+
+test('card replacement remaps its selection key in the same transition', () => {
+  const state = {
+    books: [original],
+    selected: [`${original.groupId}\u0000${original.bookId}`],
+  }
+
+  const next = replaceSearchBookAndSelection(state, original, refreshed)
+
+  assert.deepEqual(next.books, [refreshed])
+  assert.deepEqual(next.selected, [`${refreshed.groupId}\u0000${refreshed.bookId}`])
 })
