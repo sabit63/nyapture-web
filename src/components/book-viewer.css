@@ -1,6 +1,6 @@
 .book-viewer {
   --book-viewer-page-width: min(100%, var(--container-reader));
-  --book-viewer-sheet-width: 980px;
+  --book-viewer-sheet-width: 760px;
   position: relative;
   min-height: calc(100vh - var(--topbar-height));
   min-width: 0;
