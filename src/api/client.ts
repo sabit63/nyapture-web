@@ -38,8 +38,8 @@ const defaultApiUrl = () => {
 
 export const DEFAULT_API_SETTINGS: ApiSettings = {
   apiUrl: defaultApiUrl(),
-  apiKey: '',
-  editKey: '',
+  apiKey: import.meta.env?.VITE_NYA_API_KEY ?? '',
+  editKey: import.meta.env?.VITE_NYA_EDIT_KEY ?? '',
   timeoutSeconds: 30,
   proxy: {
     enabled: false,

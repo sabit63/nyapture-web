@@ -3,9 +3,11 @@ services:
     build:
       context: .
       args:
+        VITE_NYA_API_KEY: ${NYA_API_KEY:-}
         VITE_NYA_API_URL: ${VITE_NYA_API_URL:-}
+        VITE_NYA_EDIT_KEY: ${NYA_EDIT_KEY:-}
     ports:
-      - '${NYA_WEB_PORT:-8080}:80'
+      - '${NYA_WEB_BIND:-127.0.0.1}:${NYA_WEB_PORT:-8080}:80'
     environment:
       NYA_API_TARGET: ${NYA_API_TARGET:-http://host.docker.internal:5270}
     extra_hosts:
