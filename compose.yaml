@@ -1,0 +1,13 @@
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_NYA_API_URL: ${VITE_NYA_API_URL:-}
+    ports:
+      - '${NYA_WEB_PORT:-8080}:80'
+    environment:
+      NYA_API_TARGET: ${NYA_API_TARGET:-http://host.docker.internal:5270}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped

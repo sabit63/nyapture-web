@@ -29,8 +29,15 @@ export type ApiSettingsInput = Omit<Partial<ApiSettings>, 'proxy'> & {
   proxy?: Partial<ApiProxySettings> | null
 }
 
+const defaultApiUrl = () => {
+  const configuredUrl = import.meta.env?.VITE_NYA_API_URL?.trim()
+  if (configuredUrl) return configuredUrl
+  if (typeof window !== 'undefined') return window.location.origin
+  return 'http://localhost:5270'
+}
+
 export const DEFAULT_API_SETTINGS: ApiSettings = {
-  apiUrl: 'http://localhost:5270',
+  apiUrl: defaultApiUrl(),
   apiKey: '',
   editKey: '',
   timeoutSeconds: 30,
