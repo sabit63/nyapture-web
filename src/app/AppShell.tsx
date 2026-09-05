@@ -5,6 +5,7 @@ import nyaIcon from '../assets/icon.png'
 import { Button, buttonClassName } from '../components/ui/Button'
 import { IconButton } from '../components/ui/IconButton'
 import { isNavigationItemActive, navigationGroups } from './navigation'
+import { InternalLink } from './client-router'
 
 export type AppShellProps = {
   currentPath: string
@@ -60,10 +61,10 @@ export function AppShell({
               <ArrowLeft size={20} aria-hidden="true" />
             </IconButton>
           ) : (
-            <a className="brand" href="/search" aria-label="Nyapture ホーム">
+            <InternalLink className="brand" href="/search" aria-label="Nyapture ホーム">
               <span className="brand__mark"><img className="brand__image" src={nyaIcon} alt="" /></span>
               <span className="brand__name">Nyapture</span>
-            </a>
+            </InternalLink>
           )}
         </div>
 
@@ -102,7 +103,7 @@ export function AppShell({
                   return (
                     <li key={item.label}>
                       {item.href ? (
-                        <a
+                        <InternalLink
                           href={item.href}
                           className={buttonClassName(
                             { variant: 'ghost', tone: 'neutral', size: 'default' },
@@ -113,7 +114,7 @@ export function AppShell({
                         >
                           <Icon size={18} />
                           <span>{item.label}</span>
-                        </a>
+                        </InternalLink>
                       ) : (
                         <Button
                           className="nav-item"

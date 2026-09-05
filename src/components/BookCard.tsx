@@ -11,6 +11,7 @@ import type { MouseEvent } from 'react'
 
 import type { ApiBookCardModel } from '../api'
 import { requestBlob } from '../api'
+import { InternalLink, navigate, shouldInterceptNavigationClick } from '../app/client-router'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
 import { Thumbnail } from './Thumbnail'
@@ -31,7 +32,6 @@ export type BookCardProps = {
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   isDownloadCandidate?: boolean
-  isWebSearch: boolean
   onDelete?: (trigger: HTMLButtonElement) => void
   onRefresh?: () => void
   onDownload?: () => void
@@ -45,7 +45,6 @@ export function BookCard({
   onTagSearch,
   onTagSearchDestinationRequest,
   isDownloadCandidate = false,
-  isWebSearch,
   onDelete,
   onRefresh,
   onDownload,
@@ -67,17 +66,37 @@ export function BookCard({
   ].slice(0, 2)
   const hiddenTagCount = Math.max(0, book.tags.length - inlineTags.length)
   const viewerUrl = `/book/viewer?id=${encodeURIComponent(book.bookId)}&gid=${encodeURIComponent(book.groupId)}`
-  const downloadDisabled = book.status === 'Downloaded' || book.status === 'Downloading'
-  const downloadLabel = book.status === 'Downloaded'
-    ? `${book.title}はダウンロード済み`
-    : book.status === 'Downloading'
-      ? `${book.title}はダウンロード中`
-      : `${book.title}をダウンロード`
+  const isDownloading = book.status === 'Downloading'
+  const isDownloaded = book.status === 'Downloaded'
+  const isWebBook = book.status === 'WebBook' || book.status === 'WebBookInPage'
+  const canRefresh = !isDownloading && !isDownloaded && typeof onRefresh === 'function'
+  const canDownload = !isDownloading && !isDownloaded && typeof onDownload === 'function'
+  const canDelete = !isWebBook && typeof onDelete === 'function'
 
   const handleThumbnailClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!selectMode) return
+    if (event.target instanceof Element && event.target.closest('button,[role="button"]')) {
+      event.preventDefault()
+      return
+    }
+    if (selectMode) {
+      event.preventDefault()
+      onToggle()
+      return
+    }
+    if (typeof window === 'undefined') return
+    if (!shouldInterceptNavigationClick({
+      button: event.button,
+      defaultPrevented: event.defaultPrevented,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      href: event.currentTarget.href,
+      currentHref: window.location.href,
+      currentOrigin: window.location.origin,
+    })) return
     event.preventDefault()
-    onToggle()
+    navigate(event.currentTarget.href)
   }
 
   const openTagsDialog = () => setTagsOpen(true)
@@ -88,22 +107,23 @@ export function BookCard({
         src={book.thumbnailUrl}
         load={thumbnailRequest ? loadThumbnail : undefined}
         reloadKey={thumbnailReloadKey}
+        loadingPolicy={{ mode: 'page', viewports: 3 }}
         alt={`${book.title}の表紙`}
         linkHref={viewerUrl}
         linkAriaLabel={`${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
         linkTabIndex={selectMode ? -1 : undefined}
-        linkOnClick={selectMode ? handleThumbnailClick : undefined}
+        linkOnClick={handleThumbnailClick}
         fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
         fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
         variant={book.cover}
       >
-        <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>
+        {book.totalPage > 0 && <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>}
         <BookStatusBadge status={book.status} />
         {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
-        {selectMode ? (
+        {selectMode && !isDownloading ? (
           <IconButton
             className="card-select card-select--control"
-            variant="ghost"
+            variant="outline"
             tone="neutral"
             size="compact"
             aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`}
@@ -112,42 +132,46 @@ export function BookCard({
           >
             {selected && <Check size={15} />}
           </IconButton>
-        ) : isWebSearch ? (
+        ) : (canRefresh || canDownload || canDelete) ? (
           <div className="card-actions" aria-label={`${book.title}の操作`}>
-            <IconButton
-              className="card-action card-action--control"
-              variant="ghost"
-              tone="neutral"
-              size="compact"
-              aria-label={`${book.title}を再読み込み`}
-              onClick={() => onRefresh?.()}
-            >
-              <RefreshCw size={16} aria-hidden="true" />
-            </IconButton>
-            <IconButton
-              className="card-action card-action--control"
-              variant="ghost"
-              tone="neutral"
-              size="compact"
-              aria-label={downloadLabel}
-              disabled={downloadDisabled}
-              onClick={() => onDownload?.()}
-            >
-              <Download size={16} aria-hidden="true" />
-            </IconButton>
+            {canRefresh && (
+              <IconButton
+                className="card-action card-action--control"
+                variant="outline"
+                tone="neutral"
+                size="compact"
+                aria-label={`${book.title}を再読み込み`}
+                onClick={() => onRefresh?.()}
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+              </IconButton>
+            )}
+            {canDownload && (
+              <IconButton
+                className="card-action card-action--control"
+                variant="outline"
+                tone="neutral"
+                size="compact"
+                aria-label={`${book.title}をダウンロード`}
+                onClick={() => onDownload?.()}
+              >
+                <Download size={16} aria-hidden="true" />
+              </IconButton>
+            )}
+            {canDelete && (
+              <IconButton
+                className="card-action card-action--control card-action--delete"
+                variant="outline"
+                tone="danger"
+                size="compact"
+                aria-label={`${book.title}を削除`}
+                onClick={(event) => onDelete?.(event.currentTarget)}
+              >
+                <Trash2 size={17} aria-hidden="true" />
+              </IconButton>
+            )}
           </div>
-        ) : (
-          <IconButton
-            className="card-action card-action--control card-action--delete"
-            variant="ghost"
-            tone="danger"
-            size="compact"
-            aria-label={`${book.title}を削除`}
-            onClick={(event) => onDelete?.(event.currentTarget)}
-          >
-            <Trash2 size={17} aria-hidden="true" />
-          </IconButton>
-        )}
+        ) : null}
       </Thumbnail>
       <div className="book-card__body">
         <div className="book-card__title-row">
@@ -155,7 +179,7 @@ export function BookCard({
             <CalendarDays size={11} aria-hidden="true" />
             {formatDisplayDate(book.uploadedTime)}
           </time>
-          <h3><a href={viewerUrl}>{book.title}</a></h3>
+          <h3><InternalLink href={viewerUrl}>{book.title}</InternalLink></h3>
         </div>
         <div className="book-tags" aria-label="主要タグ">
           {inlineTags.map((tag) => (

@@ -7,6 +7,7 @@ import {
   getTagAdditionalName,
   upsertTagAdditionalNames,
 } from '../../api'
+import { InternalLink } from '../../app/client-router'
 import { getTagLabel, TAG_TYPE_LABELS } from '../../models'
 import {
   Button,
@@ -147,7 +148,7 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
 
           <DialogBody className="tag-search-destination-dialog__body">
             <div className="tag-search-destination-dialog__actions">
-              <a
+              <InternalLink
                 ref={primaryActionRef}
                 className={buttonClassName({ variant: 'outline', tone: 'neutral' }, 'tag-search-destination-dialog__action')}
                 href={selection.libraryUrl}
@@ -161,8 +162,8 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
                   <strong>通常検索</strong>
                 </span>
                 <ExternalLink aria-hidden="true" />
-              </a>
-              <a
+              </InternalLink>
+              <InternalLink
                 className={buttonClassName({ variant: 'outline', tone: 'accent' }, 'tag-search-destination-dialog__action')}
                 href={selection.hitomiUrl}
                 target="_blank"
@@ -175,7 +176,7 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
                   <strong>Hitomi検索</strong>
                 </span>
                 <ExternalLink aria-hidden="true" />
-              </a>
+              </InternalLink>
             </div>
 
             <details

@@ -3,9 +3,10 @@ import {
   Radio,
   Settings,
 } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AppShell } from './app/AppShell'
+import { navigateBackOrFallback, RouterRuntime, useRouterLocation } from './app/client-router'
 import { Dashboard } from './components/Dashboard'
 import { DownloadManager } from './components/DownloadManager'
 import { useSnackbar } from './components/Snackbar'
@@ -20,38 +21,32 @@ import './components/search-dialogs.css'
 import './components/search-page.css'
 
 function App() {
-  const currentPath = window.location.pathname
+  const routerLocation = useRouterLocation()
+  const currentPath = routerLocation.pathname
   const isWebSearch = currentPath === '/hitomila/search'
   const isLibrarySearch = currentPath === '/search'
   const isBookViewer = currentPath === '/book/viewer'
   const isDownloadManager = currentPath === '/download/book'
   const isDashboard = currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')
-  const viewerRoute = isBookViewer ? resolveBookViewerRoute(window.location.search) : undefined
-  const navigateBack = () => {
-    try {
-      const referrer = document.referrer ? new URL(document.referrer) : null
-      const safeReferrer = referrer
-        && referrer.origin === window.location.origin
-        && referrer.pathname !== '/book/viewer'
-      if (safeReferrer && window.history.length > 1) {
-        window.history.back()
-        return
-      }
-    } catch {
-      // Fall through to the stable search destination when the referrer is malformed.
-    }
-    window.location.assign('/search')
-  }
+  const viewerRoute = isBookViewer ? resolveBookViewerRoute(routerLocation.search) : undefined
   const { notice, notify, dismiss } = useSnackbar()
   const shellController = useAppShellController()
   const apiSettingsController = useApiSettings(notify)
   const [bookViewerDetailsOpen, setBookViewerDetailsOpen] = useState(false)
   const [bookViewerReady, setBookViewerReady] = useState(false)
   const bookViewerDetailsTriggerRef = useRef<HTMLButtonElement>(null)
+  const lastRouterRevisionRef = useRef(0)
   const handleBookViewerReadyChange = useCallback((ready: boolean) => {
     setBookViewerReady(ready)
     if (!ready) setBookViewerDetailsOpen(false)
   }, [])
+  const navigateBack = useCallback(() => navigateBackOrFallback('/search'), [])
+  useEffect(() => {
+    if (routerLocation.revision === 0 || lastRouterRevisionRef.current === routerLocation.revision) return
+    lastRouterRevisionRef.current = routerLocation.revision
+    shellController.onNavigate()
+    if (apiSettingsController.apiSettingsOpen) apiSettingsController.requestApiSettingsClose('programmatic')
+  }, [apiSettingsController, routerLocation.revision, shellController])
   const realtimeEnabled = isLibrarySearch || isWebSearch || isDownloadManager
   const hubConnectionState = useBookDownloadHubConnection(realtimeEnabled, apiSettingsController.apiRevision)
   const searchController = useSearchController({
@@ -146,7 +141,7 @@ function App() {
       )}
     >
       {isDownloadManager ? (
-        <DownloadManager apiRevision={apiSettingsController.apiRevision} hubConnectionState={hubConnectionState} />
+        <DownloadManager apiRevision={apiSettingsController.apiRevision} />
       ) : isDashboard ? (
         <Dashboard path={currentPath} apiRevision={apiSettingsController.apiRevision} />
       ) : isBookViewer && viewerRoute ? (
@@ -171,6 +166,7 @@ function App() {
         notice={notice}
         onDismiss={dismiss}
       />
+      <RouterRuntime />
     </AppShell>
   )
 }

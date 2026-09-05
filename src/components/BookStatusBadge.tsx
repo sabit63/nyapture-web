@@ -137,6 +137,22 @@ export function BookStatusBadge({ status, variant = 'card' }: BookStatusBadgePro
     variant === 'inline' && 'book-status-badge--inline',
   ].filter(Boolean).join(' ')
 
+  if (variant === 'inline') {
+    return (
+      <span className={badgeClassName} data-book-status={resolvedStatus}>
+        <span className="book-status-badge__dot" aria-hidden="true" />
+        {resolvedStatus === 'Downloaded' ? (
+          <span className="sr-only">状態: {presentation.label}</span>
+        ) : (
+          <>
+            <span className="sr-only">状態: </span>
+            <span>{presentation.label}</span>
+          </>
+        )}
+      </span>
+    )
+  }
+
   return (
     <>
       {variant === 'card' && presentation.effect !== 'none' && (

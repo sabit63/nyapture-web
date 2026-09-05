@@ -54,7 +54,7 @@
   letter-spacing: -.025em;
 }
 
-.download-manager__connection {
+.download-manager__system-activity {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -64,39 +64,6 @@
   font-size: .73rem;
   font-variant-numeric: tabular-nums;
 }
-
-.download-manager__connection-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-success-fill);
-  box-shadow: 0 0 0 4px var(--color-success-soft);
-}
-
-.download-manager__connection.is-reconnecting .download-manager__connection-dot {
-  background: var(--color-warning-fill);
-  box-shadow: 0 0 0 4px var(--color-warning-soft);
-  animation: download-connection-pulse 1.2s ease-in-out infinite;
-}
-
-.download-manager__connection.is-stopped .download-manager__connection-dot {
-  background: var(--color-danger-fill);
-  box-shadow: 0 0 0 4px #ef5b6c18;
-}
-
-@keyframes download-connection-pulse {
-  50% { opacity: .35; }
-}
-
-.download-manager__connection-loading {
-  width: 54px;
-  height: 10px;
-  display: inline-block;
-  border-radius: var(--radius-full);
-  background: #ffffff0d;
-}
-
-.download-manager__connection-divider { color: #5e5e6d; }
 
 .download-manager__global-actions {
   display: flex;
@@ -492,6 +459,5 @@
   .download-card,
   .download-card__progress > span { transition: none; }
   .download-manager__skeleton { animation: none; }
-  .download-manager__connection-dot { animation: none; }
   .is-spinning { animation: none; }
 }

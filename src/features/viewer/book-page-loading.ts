@@ -1,6 +1,8 @@
 export const BOOK_PAGE_REQUEST_WIDTHS = [640, 1024, 1600] as const
 export const BOOK_PAGE_MAX_CONCURRENCY = 4
+export const BOOK_PAGE_MAX_PIPELINE = 6
 export const BOOK_PAGE_MAX_AUTO_RETRIES = 2
+export const BOOK_PAGE_DECODE_TIMEOUT_MS = 30_000
 
 export type BookPageRequestWidth = (typeof BOOK_PAGE_REQUEST_WIDTHS)[number]
 export type BookPagePhase = 'deferred' | 'queued' | 'loading' | 'decoding' | 'retryWaiting' | 'loaded' | 'error'
@@ -32,6 +34,11 @@ type PendingRequest = {
   enqueueSequence: number
   controller?: AbortController
   candidateUrl?: string
+  pipelineSlotHeld?: boolean
+  decodeTimer?: unknown
+  decodeDeadline?: number
+  decodeRemainingMs?: number
+  decodeArmId?: number
 }
 
 type PageRecord = {
@@ -172,11 +179,14 @@ export class BookPageLoader {
   private currentPage = 1
   private requestWidth?: BookPageRequestWidth
   private activeCount = 0
+  private activePipelineCount = 0
   private enqueueSequence = 0
   private drainScheduled = false
   private attachmentGeneration = 0
   private wakeTimer?: unknown
   private disposed = false
+  private backgrounded = false
+  private decodeArmSequence = 0
 
   constructor(private readonly options: BookPageLoaderOptions) {
     this.loadPage = options.loadPage
@@ -209,6 +219,25 @@ export class BookPageLoader {
 
   getActiveCount() {
     return this.activeCount
+  }
+
+  getPipelineCount() {
+    return this.activePipelineCount
+  }
+
+  getActivePipelineCount() {
+    return this.activePipelineCount
+  }
+
+  setBackgrounded(backgrounded: boolean) {
+    if (this.disposed || this.backgrounded === backgrounded) return
+    this.backgrounded = backgrounded
+    this.records.forEach((record) => {
+      const pending = record.pendingRequest
+      if (!pending || pending.phase !== 'decoding') return
+      if (backgrounded) this.pauseDecodeTimer(pending)
+      else this.armDecodeTimer(record, pending)
+    })
   }
 
   getQueuedCount() {
@@ -287,6 +316,8 @@ export class BookPageLoader {
       return
     }
 
+    this.clearDecodeTimer(pending)
+    this.releasePipelineSlot(pending)
     const measuredRatio = asFinitePositive(naturalWidth) && asFinitePositive(naturalHeight)
       ? naturalWidth / naturalHeight
       : record.aspectRatio
@@ -317,9 +348,11 @@ export class BookPageLoader {
       this.releaseUnreferencedUrl(record, candidateUrl)
       return
     }
+    this.clearDecodeTimer(pending)
     this.releaseUrl(candidateUrl)
     pending.candidateUrl = undefined
     record.pendingRequest = undefined
+    this.releasePipelineSlot(pending)
     this.handleFailure(record, { category: 'server' }, pending.targetWidth)
   }
 
@@ -330,8 +363,13 @@ export class BookPageLoader {
     this.queuedPages.clear()
     this.records.forEach((record) => {
       record.generation += 1
-      record.pendingRequest?.controller?.abort()
-      if (record.pendingRequest?.candidateUrl) this.releaseUrl(record.pendingRequest.candidateUrl)
+      const pending = record.pendingRequest
+      pending?.controller?.abort()
+      if (pending) {
+        this.clearDecodeTimer(pending)
+        this.releasePipelineSlot(pending)
+      }
+      if (pending?.candidateUrl) this.releaseUrl(pending.candidateUrl)
       if (record.displayedAsset) this.releaseUrl(record.displayedAsset.objectUrl)
       record.pendingRequest = undefined
       record.displayedAsset = undefined
@@ -379,6 +417,7 @@ export class BookPageLoader {
       record.retryDeadline = this.now() + record.retryRemainingMs
       record.retryRemainingMs = undefined
     }
+    if (wasInLoadRange && !isInLoadRange) this.cancelDecodeOutsideLoadRange(record)
     if (!this.isEffectivelyRetained(record)) {
       this.evict(record)
     } else if (isInLoadRange) {
@@ -388,6 +427,20 @@ export class BookPageLoader {
       this.publish(record)
     }
     this.scheduleWakeTimer()
+  }
+
+  private cancelDecodeOutsideLoadRange(record: PageRecord) {
+    const pending = record.pendingRequest
+    if (!pending || pending.phase !== 'decoding') return
+    record.generation += 1
+    this.clearDecodeTimer(pending)
+    if (pending.candidateUrl) {
+      this.releaseUrl(pending.candidateUrl)
+      pending.candidateUrl = undefined
+    }
+    record.pendingRequest = undefined
+    this.releasePipelineSlot(pending)
+    this.publish(record)
   }
 
   private admit(record: PageRecord) {
@@ -442,6 +495,7 @@ export class BookPageLoader {
       targetWidth,
       generation: ++record.generation,
       enqueueSequence: ++this.enqueueSequence,
+      pipelineSlotHeld: false,
     }
     this.queuedPages.add(record.pageNumber)
     this.publish(record)
@@ -460,6 +514,8 @@ export class BookPageLoader {
     record.generation += 1
     if (pending?.phase === 'queued') this.queuedPages.delete(record.pageNumber)
     if (pending?.phase === 'fetching') pending.controller?.abort()
+    if (pending) this.clearDecodeTimer(pending)
+    if (pending) this.releasePipelineSlot(pending)
     if (pending?.candidateUrl) this.releaseUrl(pending.candidateUrl)
     if (record.displayedAsset) this.releaseUrl(record.displayedAsset.objectUrl)
     record.displayedAsset = undefined
@@ -469,7 +525,10 @@ export class BookPageLoader {
 
   private drainQueue() {
     if (this.disposed) return
-    while (this.activeCount < BOOK_PAGE_MAX_CONCURRENCY) {
+    while (
+      this.activeCount < BOOK_PAGE_MAX_CONCURRENCY
+      && this.activePipelineCount < BOOK_PAGE_MAX_PIPELINE
+    ) {
       const candidates = [...this.queuedPages].flatMap((pageNumber) => {
         const record = this.records.get(pageNumber)
         const pending = record?.pendingRequest
@@ -500,7 +559,9 @@ export class BookPageLoader {
     const controller = new AbortController()
     pending.phase = 'fetching'
     pending.controller = controller
+    pending.pipelineSlotHeld = true
     this.activeCount += 1
+    this.activePipelineCount += 1
     this.publish(record)
 
     Promise.resolve()
@@ -512,15 +573,32 @@ export class BookPageLoader {
           || record.pendingRequest !== pending
           || pending.generation !== record.generation
           || !this.isEffectivelyRetained(record)
-        ) return
+        ) {
+          this.releasePipelineSlot(pending)
+          return
+        }
+        if (!this.isInLoadRange(record)) {
+          record.pendingRequest = undefined
+          this.releasePipelineSlot(pending)
+          this.publish(record)
+          return
+        }
         const candidateUrl = this.createObjectUrl(blob)
         this.ownedUrls.add(candidateUrl)
         pending.phase = 'decoding'
         pending.controller = undefined
         pending.candidateUrl = candidateUrl
+        pending.decodeRemainingMs = BOOK_PAGE_DECODE_TIMEOUT_MS
         this.publish(record)
+        this.armDecodeTimer(record, pending)
       })
       .catch((error) => {
+        this.clearDecodeTimer(pending)
+        if (pending.candidateUrl) {
+          this.releaseUrl(pending.candidateUrl)
+          pending.candidateUrl = undefined
+        }
+        this.releasePipelineSlot(pending)
         if (record.pendingRequest !== pending) return
         record.pendingRequest = undefined
         if (controller.signal.aborted || this.disposed || pending.generation !== record.generation) {
@@ -532,12 +610,92 @@ export class BookPageLoader {
       .finally(() => {
         this.activeCount = Math.max(0, this.activeCount - 1)
         if (record.pendingRequest === pending && pending.phase === 'fetching') {
+          this.releasePipelineSlot(pending)
           record.pendingRequest = undefined
           this.publish(record)
         }
         if (this.isInLoadRange(record) && !record.pendingRequest) this.admit(record)
         this.scheduleDrain()
       })
+  }
+
+  private armDecodeTimer(record: PageRecord, pending: PendingRequest) {
+    if (
+      this.disposed
+      || this.backgrounded
+      || record.pendingRequest !== pending
+      || pending.phase !== 'decoding'
+      || !pending.pipelineSlotHeld
+    ) return
+    const remainingMs = Math.max(0, pending.decodeRemainingMs ?? BOOK_PAGE_DECODE_TIMEOUT_MS)
+    if (pending.decodeTimer !== undefined) this.clearTimer(pending.decodeTimer)
+    pending.decodeTimer = undefined
+    pending.decodeDeadline = undefined
+    const armId = ++this.decodeArmSequence
+    pending.decodeArmId = armId
+    pending.decodeRemainingMs = undefined
+    if (remainingMs === 0) {
+      queueMicrotask(() => this.decodeTimedOut(record, pending, armId))
+      return
+    }
+    pending.decodeDeadline = this.now() + remainingMs
+    pending.decodeTimer = this.setTimer(() => {
+      if (pending.decodeArmId !== armId) return
+      pending.decodeTimer = undefined
+      pending.decodeDeadline = undefined
+      this.decodeTimedOut(record, pending, armId)
+    }, remainingMs)
+  }
+
+  private pauseDecodeTimer(pending: PendingRequest) {
+    if (pending.decodeTimer !== undefined) {
+      const currentTime = this.now()
+      const deadline = pending.decodeDeadline ?? currentTime
+      pending.decodeRemainingMs = Math.max(0, deadline - currentTime)
+      this.clearTimer(pending.decodeTimer)
+      pending.decodeTimer = undefined
+    }
+    pending.decodeArmId = undefined
+    if (pending.decodeRemainingMs === undefined) {
+      pending.decodeRemainingMs = BOOK_PAGE_DECODE_TIMEOUT_MS
+    }
+    pending.decodeDeadline = undefined
+  }
+
+  private clearDecodeTimer(pending: PendingRequest) {
+    if (pending.decodeTimer !== undefined) {
+      this.clearTimer(pending.decodeTimer)
+      pending.decodeTimer = undefined
+    }
+    pending.decodeDeadline = undefined
+    pending.decodeRemainingMs = undefined
+    pending.decodeArmId = undefined
+  }
+
+  private decodeTimedOut(record: PageRecord, pending: PendingRequest, armId: number) {
+    if (
+      this.disposed
+      || this.backgrounded
+      || record.pendingRequest !== pending
+      || pending.phase !== 'decoding'
+      || pending.decodeArmId !== armId
+      || !pending.pipelineSlotHeld
+    ) return
+    this.clearDecodeTimer(pending)
+    if (pending.candidateUrl) {
+      this.releaseUrl(pending.candidateUrl)
+      pending.candidateUrl = undefined
+    }
+    record.pendingRequest = undefined
+    this.releasePipelineSlot(pending)
+    this.handleFailure(record, { category: 'timeout' }, pending.targetWidth)
+  }
+
+  private releasePipelineSlot(pending: PendingRequest) {
+    if (!pending.pipelineSlotHeld) return
+    pending.pipelineSlotHeld = false
+    this.activePipelineCount = Math.max(0, this.activePipelineCount - 1)
+    this.scheduleDrain()
   }
 
   private scheduleDrain() {

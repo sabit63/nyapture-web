@@ -36,10 +36,7 @@ import {
 } from '../api'
 import type { BookDownloadStatus, BookDownloadSystemStatus, NyaApiResponse } from '../models'
 import { bookDownloadHubClient } from '../realtime/book-download-hub'
-import type {
-  BookDownloadHubConnectionState,
-  BookDownloadHubStatusEventKind,
-} from '../realtime/book-download-hub'
+import type { BookDownloadHubStatusEventKind } from '../realtime/book-download-hub'
 import { Snackbar, useSnackbar } from './Snackbar'
 import { Thumbnail } from './Thumbnail'
 import { Button, IconButton, StatePanel } from './ui'
@@ -94,15 +91,6 @@ const STATUS_PRESENTATIONS: Record<DownloadStatus, StatusPresentation> = {
   cancelled: { label: 'キャンセル', icon: Ban },
   completed: { label: '完了', icon: CircleCheck },
   unknown: { label: '状態不明', icon: CircleHelp },
-}
-
-const HUB_CONNECTION_LABELS: Record<BookDownloadHubConnectionState, string> = {
-  idle: 'リアルタイム未接続',
-  connecting: 'リアルタイム接続中',
-  connected: 'リアルタイム接続済み',
-  reconnecting: 'リアルタイム再接続中',
-  disconnected: 'リアルタイム切断・表示更新停止',
-  error: 'リアルタイム接続エラー・表示更新停止',
 }
 
 const PRIORITY_LABELS = ['最優先', '高', '通常']
@@ -419,11 +407,10 @@ function getCounts(downloads: DownloadJob[]) {
 export interface DownloadManagerProps {
   /** Changes whenever the active API client settings are replaced. */
   apiRevision: number
-  hubConnectionState: BookDownloadHubConnectionState
 }
 
-export function DownloadManager({ apiRevision, hubConnectionState }: DownloadManagerProps) {
-  useDocumentTitle(formatPageTitle('ダウンロード管理'))
+export function DownloadManager({ apiRevision }: DownloadManagerProps) {
+  useDocumentTitle(formatPageTitle('ダウンロード'))
   const [downloads, setDownloads] = useState<DownloadJob[]>([])
   const [systemStatus, setSystemStatus] = useState<BookDownloadSystemStatus | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -473,7 +460,7 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
     ? 'システム状態未取得'
     : systemStatus.isSystemRunning
       ? 'システム処理中'
-      : 'システム待機中'
+      : null
 
   const setPending = (key: string, pending: boolean) => {
     if (pending) pendingActionsRef.current.add(key)
@@ -911,12 +898,6 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
     setSearchQuery('')
   }
 
-  const hubConnectionClass = hubConnectionState === 'connected'
-    ? ''
-    : hubConnectionState === 'connecting' || hubConnectionState === 'reconnecting'
-      ? 'is-reconnecting'
-      : 'is-stopped'
-
   return (
     <section
       className="download-manager"
@@ -929,13 +910,12 @@ export function DownloadManager({ apiRevision, hubConnectionState }: DownloadMan
             <CloudDownload size={22} strokeWidth={2.1} />
           </span>
           <div>
-            <h1 id="download-manager-title">ダウンロード管理</h1>
-            <p className={`download-manager__connection ${hubConnectionClass}`} role="status" aria-live="polite">
-              <span className="download-manager__connection-dot" aria-hidden="true" />
-              <span>{HUB_CONNECTION_LABELS[hubConnectionState]}</span>
-              <span className="download-manager__connection-divider" aria-hidden="true">•</span>
-              <span>{systemActivityLabel}</span>
-            </p>
+            <h1 id="download-manager-title">ダウンロード</h1>
+            {systemActivityLabel && (
+              <p className="download-manager__system-activity" role="status" aria-live="polite">
+                {systemActivityLabel}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1191,6 +1171,7 @@ function DownloadCard({
           src={canLoadBookThumbnail ? undefined : legacyThumbnailUrl}
           load={canLoadBookThumbnail ? loadBookThumbnail : undefined}
           reloadKey={download.completedPages > 0 ? 1 : 0}
+          loadingPolicy={{ mode: 'range', viewports: 4 }}
           alt={`${download.title}の表紙`}
           className="download-card__thumbnail"
           variant={download.cover}

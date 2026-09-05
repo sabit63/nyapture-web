@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { RefObject } from 'react'
 
 import { ApiError, getBook, getErrorMessage, mapEBookToCard } from '../../api'
@@ -60,6 +60,12 @@ export function BookViewerRoute({
   const [viewerError, setViewerError] = useState('')
   const [viewerRevision, setViewerRevision] = useState(0)
   const [viewerBookIdentity, setViewerBookIdentity] = useState('')
+  const updateViewerBookTitle = useCallback((groupId: string, bookId: string, title: string) => {
+    setViewerBook((current) => {
+      if (!current || current.groupId !== groupId || current.bookId !== bookId) return current
+      return { ...current, title }
+    })
+  }, [])
 
   const readyBook = viewerState === 'ready' && viewerBookIdentity === route.identity ? viewerBook : undefined
   const displayBook = useMemo(() => {
@@ -117,6 +123,7 @@ export function BookViewerRoute({
       routeIdentity={route.identity}
       errorMessage={viewerError}
       onRetry={() => setViewerRevision((current) => current + 1)}
+      onTitleChange={updateViewerBookTitle}
       onTagSearch={onTagSearch}
       onTagSearchDestinationRequest={onTagSearchDestinationRequest}
       detailsOpen={detailsOpen}

@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getErrorMessage } from '../api'
+import { InternalLink } from '../app/client-router'
 import { useDocumentTitle, formatPageTitle } from '../app/page-title'
 import { getDashboardLogEntries, getDashboardSummary } from '../api/dashboard'
 import type {
@@ -275,12 +276,12 @@ function SummaryCard({ href, title, icon: Icon, status, loading = false, error, 
     ? { label: '警告', tone: 'warning' as const, icon: STATUS_ICONS.warning }
     : loading ? LOADING_STATUS : status
   return (
-    <a className="dashboard__card dashboard__summary-card dashboard__link-card" href={href}>
+    <InternalLink className="dashboard__card dashboard__summary-card dashboard__link-card" href={href}>
       <div className="dashboard__card-heading"><span className="dashboard__card-icon" aria-hidden="true"><Icon size={18} /></span><h3>{title}</h3><StatusBadge status={displayedStatus} compact /></div>
       <div className="dashboard__summary-card-body">{loading ? <><span className="dashboard__summary-value-skeleton" aria-hidden="true" /><span className="dashboard__summary-loading-label" role="status">取得中</span></> : children}</div>
       {error && <p className="dashboard__card-error"><CircleAlert size={13} aria-hidden="true" />{error}</p>}
       <ChevronRight className="dashboard__summary-card-chevron" size={16} aria-hidden="true" />
-    </a>
+    </InternalLink>
   )
 }
 

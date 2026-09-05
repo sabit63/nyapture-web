@@ -1,22 +1,26 @@
 import {
   ArrowUp,
-  ChevronDown,
   ImageOff,
+  LoaderCircle,
+  Pencil,
   RotateCcw,
+  X,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, RefObject, SyntheticEvent } from 'react'
-import { getBookPageBlob } from '../api'
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent, RefObject, SyntheticEvent } from 'react'
+import { ApiError, getBookPageBlob, getErrorMessage, updateBookTitle } from '../api'
 import {
   BookPageLoader,
   getBookPageRequestWidth,
   INITIAL_BOOK_PAGE_SNAPSHOT,
 } from '../features/viewer/book-page-loading'
 import type { BookCardModel, BookTag, NyaTagType } from '../models'
+import { InternalLink } from '../app/client-router'
 import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
 import { Button, buttonClassName } from './ui/Button'
+import { Dialog, DialogBody, DialogFooter, DialogHeader } from './ui/Dialog'
 import { IconButton } from './ui/IconButton'
 import './book-viewer.css'
 
@@ -28,6 +32,7 @@ export type BookViewerPageProps = {
   book?: BookCardModel
   errorMessage?: string
   onRetry?: () => void
+  onTitleChange: (groupId: string, bookId: string, title: string) => void
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   detailsOpen: boolean
@@ -113,6 +118,7 @@ function BookViewerPage({
   book,
   errorMessage,
   onRetry,
+  onTitleChange,
   onTagSearch,
   onTagSearchDestinationRequest,
   detailsOpen,
@@ -138,6 +144,7 @@ function BookViewerPage({
       <BookViewerReady
         book={book}
         headingRef={headingRef}
+        onTitleChange={onTitleChange}
         onTagSearch={onTagSearch}
         onTagSearchDestinationRequest={onTagSearchDestinationRequest}
         detailsOpen={detailsOpen}
@@ -182,7 +189,7 @@ function BookViewerPage({
             : '指定されたBookはライブラリまたは検索結果にありません。'}
       </p>
       {isError && onRetry && <Button variant="solid" tone="accent" onClick={onRetry}>再試行</Button>}
-      <a className={buttonClassName({ variant: 'outline', tone: 'neutral' })} href="/search">検索へ戻る</a>
+      <InternalLink className={buttonClassName({ variant: 'outline', tone: 'neutral' })} href="/search">検索へ戻る</InternalLink>
     </section>
   )
 }
@@ -190,6 +197,7 @@ function BookViewerPage({
 function BookViewerReady({
   book,
   headingRef,
+  onTitleChange,
   onTagSearch,
   onTagSearchDestinationRequest,
   detailsOpen,
@@ -198,6 +206,7 @@ function BookViewerReady({
 }: {
   book: BookCardModel
   headingRef: RefObject<HTMLHeadingElement | null>
+  onTitleChange: (groupId: string, bookId: string, title: string) => void
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   detailsOpen: boolean
@@ -210,6 +219,8 @@ function BookViewerReady({
   const tagGroups = useMemo(() => groupBookTags(book.tags), [book.tags])
   const [currentPage, setCurrentPage] = useState(totalPages > 0 ? 1 : 0)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [titleEditOpen, setTitleEditOpen] = useState(false)
+  const titleEditTriggerRef = useRef<HTMLButtonElement>(null)
   const readerRef = useRef<HTMLElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const detailsPanelRef = useRef<HTMLDivElement>(null)
@@ -229,6 +240,13 @@ function BookViewerReady({
   }), [book.bookId, book.groupId, totalPages])
 
   useEffect(() => pageLoader.attach(), [pageLoader])
+
+  useEffect(() => {
+    const updateVisibility = () => pageLoader.setBackgrounded(document.hidden)
+    updateVisibility()
+    document.addEventListener('visibilitychange', updateVisibility)
+    return () => document.removeEventListener('visibilitychange', updateVisibility)
+  }, [pageLoader])
 
   useEffect(() => {
     setCurrentPage(totalPages > 0 ? 1 : 0)
@@ -488,6 +506,7 @@ function BookViewerReady({
   }, [detailsOpen])
 
   const closeDetails = useCallback(() => {
+    setTitleEditOpen(false)
     const dialog = dialogRef.current
     if (dialog?.open) dialog.close()
     else onDetailsOpenChange(false)
@@ -497,6 +516,10 @@ function BookViewerReady({
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
   }
+
+  const openTitleEdit = useCallback(() => {
+    setTitleEditOpen(true)
+  }, [])
 
   const handleDetailsKeyDown = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
     if (event.key === 'Escape') {
@@ -603,12 +626,30 @@ function BookViewerReady({
       >
         <div ref={detailsPanelRef} className="book-viewer__details-panel">
           <header className="book-viewer__details-header">
-            <div>
+            <div className="book-viewer__details-title">
               <h2 id="book-viewer-details-title">{book.title}</h2>
             </div>
-            <button className="book-viewer__shrink" type="button" data-details-initial-focus aria-label="情報パネルを縮小" onClick={closeDetails}>
-              <ChevronDown size={20} aria-hidden="true" />
-            </button>
+            <div className="book-viewer__details-actions">
+              <IconButton
+                ref={titleEditTriggerRef}
+                size="default"
+                type="button"
+                aria-label="タイトルを編集"
+                title="タイトルを編集"
+                onClick={openTitleEdit}
+              >
+                <Pencil size={18} aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                size="default"
+                type="button"
+                data-details-initial-focus
+                aria-label="画像情報を閉じる"
+                onClick={closeDetails}
+              >
+                <X size={19} aria-hidden="true" />
+              </IconButton>
+            </div>
           </header>
 
           <div className="book-viewer__details-body">
@@ -653,7 +694,139 @@ function BookViewerReady({
           </div>
         </div>
       </dialog>
+
+      <BookTitleEditDialog
+        open={titleEditOpen}
+        groupId={book.groupId}
+        bookId={book.bookId}
+        title={book.title}
+        triggerRef={titleEditTriggerRef}
+        onTitleChange={onTitleChange}
+        onDismiss={() => setTitleEditOpen(false)}
+      />
     </section>
+  )
+}
+
+function BookTitleEditDialog({
+  open,
+  groupId,
+  bookId,
+  title,
+  triggerRef,
+  onTitleChange,
+  onDismiss,
+}: {
+  open: boolean
+  groupId: string
+  bookId: string
+  title: string
+  triggerRef: RefObject<HTMLButtonElement | null>
+  onTitleChange: (groupId: string, bookId: string, title: string) => void
+  onDismiss: () => void
+}) {
+  const [value, setValue] = useState(title)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    setValue(title)
+    setError('')
+  }, [open, title])
+
+  const requestClose = useCallback(() => {
+    if (pending) return false
+    onDismiss()
+    return true
+  }, [onDismiss, pending])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (pending) return
+    const nextTitle = value.trim()
+    if (!nextTitle) {
+      setError('タイトルを入力してください。')
+      return
+    }
+
+    setPending(true)
+    setError('')
+    try {
+      const response = await updateBookTitle(groupId, bookId, nextTitle)
+      if (response.success === false) {
+        throw new ApiError(response.message ?? 'タイトルの更新に失敗しました。', { category: 'server' })
+      }
+      onTitleChange(groupId, bookId, nextTitle)
+      onDismiss()
+    } catch (requestError: unknown) {
+      setError(getErrorMessage(requestError))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog
+      className="book-viewer__title-edit-dialog"
+      open={open}
+      aria-labelledby="book-viewer-title-edit-title"
+      initialFocusRef={inputRef}
+      resolveRestoreFocus={() => triggerRef.current}
+      dismissible={!pending}
+      onRequestClose={requestClose}
+    >
+      {({ requestClose: requestDialogClose }) => (
+        <form className="book-viewer__title-edit-panel" onSubmit={handleSubmit}>
+          <DialogHeader className="book-viewer__title-edit-header">
+            <h2 id="book-viewer-title-edit-title">タイトルを編集</h2>
+            <IconButton
+              type="button"
+              aria-label="タイトル編集を閉じる"
+              title="タイトル編集を閉じる"
+              onClick={() => requestDialogClose('close-button')}
+              disabled={pending}
+            >
+              <X size={19} aria-hidden="true" />
+            </IconButton>
+          </DialogHeader>
+          <DialogBody className="book-viewer__title-edit-body">
+            <label className="book-viewer__title-edit-field" htmlFor="book-viewer-title-edit-input">
+              タイトル
+              <input
+                ref={inputRef}
+                id="book-viewer-title-edit-input"
+                value={value}
+                onChange={(event) => {
+                  setValue(event.target.value)
+                  if (error) setError('')
+                }}
+                aria-invalid={error ? 'true' : undefined}
+                aria-describedby={error ? 'book-viewer-title-edit-error' : undefined}
+                disabled={pending}
+              />
+            </label>
+            {error && <p id="book-viewer-title-edit-error" className="book-viewer__title-edit-error" role="alert">{error}</p>}
+          </DialogBody>
+          <DialogFooter className="book-viewer__title-edit-footer">
+            <Button
+              variant="outline"
+              tone="neutral"
+              type="button"
+              onClick={() => requestDialogClose('close-button')}
+              disabled={pending}
+            >
+              キャンセル
+            </Button>
+            <Button variant="solid" tone="accent" type="submit" disabled={pending}>
+              {pending && <LoaderCircle className="book-viewer__title-edit-spinner" size={16} aria-hidden="true" />}
+              保存
+            </Button>
+          </DialogFooter>
+        </form>
+      )}
+    </Dialog>
   )
 }
 

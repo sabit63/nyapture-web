@@ -32,7 +32,7 @@
   transition: opacity .16s ease;
 }
 
-.book-cover.is-loaded .book-cover__image { opacity: 1; }
+.book-cover.is-loaded .book-cover__image { opacity: var(--thumbnail-loaded-opacity, 1); }
 
 .book-cover__skeleton {
   position: absolute;

@@ -71,6 +71,20 @@ export const getBook = (groupId: string, bookId: string, signal?: AbortSignal) =
   requestJson<EBookResponse>(`/api/book/${segment(groupId)}/${segment(bookId)}`, { signal })
 )
 
+export const updateBookTitle = (
+  groupId: string,
+  bookId: string,
+  title: string,
+  signal?: AbortSignal,
+) => (
+  requestJson<NyaApiResponse>(`/api/book/${segment(groupId)}/${segment(bookId)}/title`, {
+    method: 'PATCH',
+    body: { title },
+    auth: 'edit',
+    signal,
+  })
+)
+
 export const deleteBook = (groupId: string, bookId: string, signal?: AbortSignal) => (
   requestJson<BookDeletionJobResponse>(`/api/book/${segment(groupId)}/${segment(bookId)}`, {
     method: 'DELETE',

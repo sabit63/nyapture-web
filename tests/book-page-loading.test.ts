@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  BOOK_PAGE_DECODE_TIMEOUT_MS,
+  BOOK_PAGE_MAX_PIPELINE,
   BookPageLoader,
   compareBookPageQueueCandidates,
   getBookPageQueueLane,
@@ -403,4 +405,254 @@ test('development remount keeps the loader alive and final detach disposes it', 
   requests[0].reject(new DOMException('aborted', 'AbortError'))
   await flushPromises()
   assert.equal(loader.getActiveCount(), 0)
+})
+
+test('fetch-through-decode pipeline is capped at six and drains after completion and failure', async () => {
+  const requests: Array<ReturnType<typeof deferred<Blob>>> = []
+  const revoked: string[] = []
+  let nextUrl = 0
+  const loader = new BookPageLoader({
+    totalPages: 8,
+    loadPage: () => {
+      const request = deferred<Blob>()
+      requests.push(request)
+      return request.promise
+    },
+    createObjectUrl: () => `blob:pipeline-${++nextUrl}`,
+    revokeObjectUrl: (url) => revoked.push(url),
+  })
+  loader.setRequestWidth(640)
+  for (let pageNumber = 1; pageNumber <= 8; pageNumber += 1) {
+    loader.setRetentionRange(pageNumber, true)
+    loader.setLoadRange(pageNumber, true)
+  }
+  await flushPromises()
+
+  assert.equal(requests.length, 4)
+  assert.equal(loader.getActiveCount(), 4)
+  assert.equal(loader.getPipelineCount(), 4)
+
+  requests.slice(0, 4).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+  assert.equal(requests.length, 6)
+  assert.equal(loader.getActiveCount(), 2)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+
+  requests.slice(4, 6).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+  assert.equal(loader.getActiveCount(), 0)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+
+  const firstCandidate = loader.getSnapshot(1)
+  loader.candidateLoaded(
+    1,
+    firstCandidate.candidateGeneration!,
+    firstCandidate.candidateUrl!,
+    640,
+    896,
+  )
+  await flushPromises()
+  assert.equal(requests.length, 7)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+
+  const failedCandidate = loader.getSnapshot(2)
+  loader.candidateFailed(2, failedCandidate.candidateGeneration!, failedCandidate.candidateUrl!)
+  await flushPromises()
+  assert.equal(requests.length, 8)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+  assert.ok(revoked.includes('blob:pipeline-2'))
+  loader.dispose()
+})
+
+test('decode timeout revokes the candidate, retries, and drains the next queued page', async () => {
+  const timers: Array<{ callback: () => void; delayMs: number; cleared: boolean; fired: boolean }> = []
+  const requests: Array<ReturnType<typeof deferred<Blob>>> = []
+  const revoked: string[] = []
+  let nextUrl = 0
+  const loader = new BookPageLoader({
+    totalPages: 7,
+    loadPage: () => {
+      const request = deferred<Blob>()
+      requests.push(request)
+      return request.promise
+    },
+    setTimer: (callback, delayMs) => {
+      const timer = { callback, delayMs, cleared: false, fired: false }
+      timers.push(timer)
+      return timer
+    },
+    clearTimer: (timer) => {
+      (timer as (typeof timers)[number]).cleared = true
+    },
+    createObjectUrl: () => `blob:timeout-${++nextUrl}`,
+    revokeObjectUrl: (url) => revoked.push(url),
+    random: () => 0,
+  })
+  loader.setRequestWidth(640)
+  for (let pageNumber = 1; pageNumber <= 7; pageNumber += 1) {
+    loader.setRetentionRange(pageNumber, true)
+    loader.setLoadRange(pageNumber, true)
+  }
+  await flushPromises()
+  requests.slice(0, 4).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+  requests.slice(4, 6).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+
+  assert.equal(requests.length, 6)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+  const decodeTimer = timers.find((timer) => timer.delayMs === BOOK_PAGE_DECODE_TIMEOUT_MS)
+  assert.ok(decodeTimer)
+  decodeTimer.fired = true
+  decodeTimer.callback()
+  await flushPromises()
+
+  assert.equal(requests.length, 7)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+  assert.equal(loader.getSnapshot(1).phase, 'retryWaiting')
+  assert.deepEqual(revoked, ['blob:timeout-1'])
+  assert.equal(timers.filter((timer) => !timer.cleared && !timer.fired).length, 6)
+  loader.dispose()
+  assert.equal(timers.filter((timer) => !timer.cleared && !timer.fired).length, 0)
+})
+
+test('decode timeout pauses with the page and pipeline slot retained in a background tab', async () => {
+  let now = 0
+  const timers: Array<{ callback: () => void; delayMs: number; cleared: boolean; fired: boolean }> = []
+  const request = deferred<Blob>()
+  const revoked: string[] = []
+  const loader = new BookPageLoader({
+    totalPages: 1,
+    loadPage: () => request.promise,
+    now: () => now,
+    setTimer: (callback, delayMs) => {
+      const timer = { callback, delayMs, cleared: false, fired: false }
+      timers.push(timer)
+      return timer
+    },
+    clearTimer: (timer) => {
+      (timer as (typeof timers)[number]).cleared = true
+    },
+    random: () => 0,
+    createObjectUrl: () => 'blob:background',
+    revokeObjectUrl: (url) => revoked.push(url),
+  })
+  loader.setRequestWidth(640)
+  loader.setRetentionRange(1, true)
+  loader.setLoadRange(1, true)
+  await flushPromises()
+  request.resolve(new Blob(['candidate']))
+  await flushPromises()
+
+  const decodeTimer = timers.find((timer) => timer.delayMs === BOOK_PAGE_DECODE_TIMEOUT_MS)
+  assert.ok(decodeTimer)
+  now = 10_000
+  loader.setBackgrounded(true)
+  assert.equal(decodeTimer.cleared, true)
+  decodeTimer.fired = true
+  decodeTimer.callback()
+  await flushPromises()
+  assert.equal(loader.getSnapshot(1).phase, 'decoding')
+  assert.equal(loader.getPipelineCount(), 1)
+  assert.deepEqual(revoked, [])
+
+  loader.setBackgrounded(false)
+  const resumedTimer = timers.at(-1)
+  assert.equal(resumedTimer?.delayMs, BOOK_PAGE_DECODE_TIMEOUT_MS - 10_000)
+  now = BOOK_PAGE_DECODE_TIMEOUT_MS
+  resumedTimer!.fired = true
+  resumedTimer!.callback()
+  await flushPromises()
+  assert.equal(loader.getSnapshot(1).phase, 'retryWaiting')
+  assert.equal(loader.getPipelineCount(), 0)
+  assert.deepEqual(revoked, ['blob:background'])
+  loader.dispose()
+})
+
+test('a stale watchdog callback cannot timeout a candidate after background rearming', async () => {
+  let now = 0
+  const timers: Array<{ callback: () => void; delayMs: number; cleared: boolean }> = []
+  const request = deferred<Blob>()
+  const revoked: string[] = []
+  const loader = new BookPageLoader({
+    totalPages: 1,
+    loadPage: () => request.promise,
+    now: () => now,
+    setTimer: (callback, delayMs) => {
+      const timer = { callback, delayMs, cleared: false }
+      timers.push(timer)
+      return timer
+    },
+    clearTimer: (timer) => {
+      (timer as (typeof timers)[number]).cleared = true
+    },
+    random: () => 0,
+    createObjectUrl: () => 'blob:rearmed',
+    revokeObjectUrl: (url) => revoked.push(url),
+  })
+  loader.setRequestWidth(640)
+  loader.setRetentionRange(1, true)
+  loader.setLoadRange(1, true)
+  await flushPromises()
+  request.resolve(new Blob(['candidate']))
+  await flushPromises()
+
+  const firstTimer = timers.at(-1)!
+  assert.equal(firstTimer.delayMs, BOOK_PAGE_DECODE_TIMEOUT_MS)
+  now = 12_000
+  loader.setBackgrounded(true)
+  loader.setBackgrounded(false)
+  const resumedTimer = timers.at(-1)!
+  assert.equal(resumedTimer.delayMs, BOOK_PAGE_DECODE_TIMEOUT_MS - 12_000)
+  assert.equal(firstTimer.cleared, true)
+
+  firstTimer.callback()
+  await flushPromises()
+  assert.equal(loader.getSnapshot(1).phase, 'decoding')
+  assert.equal(loader.getPipelineCount(), 1)
+  assert.deepEqual(revoked, [])
+
+  now = BOOK_PAGE_DECODE_TIMEOUT_MS
+  resumedTimer.callback()
+  await flushPromises()
+  assert.equal(loader.getSnapshot(1).phase, 'retryWaiting')
+  assert.equal(loader.getPipelineCount(), 0)
+  assert.deepEqual(revoked, ['blob:rearmed'])
+  loader.dispose()
+})
+
+test('undecoded candidates leave the pipeline immediately when they leave the load range', async () => {
+  const requests: Array<ReturnType<typeof deferred<Blob>>> = []
+  const revoked: string[] = []
+  let nextUrl = 0
+  const loader = new BookPageLoader({
+    totalPages: 7,
+    loadPage: () => {
+      const request = deferred<Blob>()
+      requests.push(request)
+      return request.promise
+    },
+    createObjectUrl: () => `blob:eviction-${++nextUrl}`,
+    revokeObjectUrl: (url) => revoked.push(url),
+  })
+  loader.setRequestWidth(640)
+  for (let pageNumber = 1; pageNumber <= 7; pageNumber += 1) {
+    loader.setRetentionRange(pageNumber, true)
+    loader.setLoadRange(pageNumber, true)
+  }
+  await flushPromises()
+  requests.slice(0, 4).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+  requests.slice(4, 6).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+  loader.setLoadRange(1, false)
+  await flushPromises()
+
+  assert.equal(requests.length, 7)
+  assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
+  assert.deepEqual(revoked, ['blob:eviction-1'])
+  assert.equal(loader.getSnapshot(1).phase, 'deferred')
+  loader.dispose()
 })

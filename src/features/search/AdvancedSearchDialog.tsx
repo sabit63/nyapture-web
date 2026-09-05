@@ -195,7 +195,7 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
 
             {isWebSearch && (
               <section className="advanced-dialog__field">
-                <label htmlFor="hitomi-append">HitomiAppend</label>
+                <label htmlFor="hitomi-append">Append</label>
                 <select id="hitomi-append" value={draftHitomiAppend} onChange={(event) => setDraftHitomiAppend(event.target.value as typeof draftHitomiAppend)}>
                   {HITOMI_APPENDS.map((append) => <option key={append} value={append}>{append}</option>)}
                 </select>

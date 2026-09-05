@@ -53,26 +53,102 @@
   pointer-events: none;
 }
 
-.book-status-badge--inline {
-  position: static;
-  z-index: auto;
-  max-width: 100%;
-  box-shadow: none;
-  pointer-events: auto;
-}
-
 .book-status-badge > svg {
   flex: 0 0 auto;
 }
 
-.book-status-badge--info { border-color: #77bcec; background: #1d5f8f; }
-.book-status-badge--candidate { border-color: #92a6b48c; background: #4b647270; color: #d2dde2; }
-.book-status-badge--accent { border-color: #b593de; background: #5b3f7e; }
-.book-status-badge--neutral { border-color: #aab3c1; background: #3c4653; }
-.book-status-badge--danger { border-color: #ff9aa5; background: #a52c3a; }
-.book-status-badge--warning { border-color: #f8d98a; background: #93631c; color: #fff8df; }
-.book-status-badge--destructive { border-color: #f6a5d6; background: #772d63; color: #ffedf9; }
-.book-status-badge--muted { border-color: #b4b4c1; background: #4b4b55; }
+.book-status-badge--info {
+  --book-status-dot-color: #77bcec;
+  border-color: #77bcec;
+  background: #1d5f8f;
+}
+
+.book-status-badge--candidate {
+  --book-status-dot-color: #92a6b4;
+  border-color: #92a6b4;
+  background: #4b6472;
+  color: #d2dde2;
+}
+
+.book-status-badge--accent {
+  --book-status-dot-color: #b593de;
+  border-color: #b593de;
+  background: #5b3f7e;
+}
+
+.book-status-badge--neutral {
+  --book-status-dot-color: #aab3c1;
+  border-color: #aab3c1;
+  background: #3c4653;
+}
+
+.book-status-badge--danger {
+  --book-status-dot-color: #ff9aa5;
+  border-color: #ff9aa5;
+  background: #a52c3a;
+}
+
+.book-status-badge--warning {
+  --book-status-dot-color: #f8d98a;
+  border-color: #f8d98a;
+  background: #93631c;
+  color: #fff8df;
+}
+
+.book-status-badge--destructive {
+  --book-status-dot-color: #f6a5d6;
+  border-color: #f6a5d6;
+  background: #772d63;
+  color: #ffedf9;
+}
+
+.book-status-badge--muted {
+  --book-status-dot-color: #b4b4c1;
+  border-color: #b4b4c1;
+  background: #4b4b55;
+}
+
+.book-status-badge--inline {
+  position: static;
+  z-index: auto;
+  min-width: 0;
+  height: 24px;
+  max-width: 100%;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text);
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: clip;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.book-status-badge__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--book-status-dot-color, #aab3c1);
+}
+
+.book-status-badge--inline[data-book-status='Downloaded'] {
+  --book-status-dot-color: var(--color-success-fill);
+}
+
+.book-status-badge--inline.book-status-badge--animated .book-status-badge__dot {
+  animation: book-status-dot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes book-status-dot-pulse {
+  0%, 100% { opacity: .62; }
+  50% { opacity: 1; }
+}
 
 .book-card {
   position: relative;

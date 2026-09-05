@@ -11,11 +11,14 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { CSSProperties } from 'react'
+import { useEffect, type CSSProperties } from 'react'
 
+import { retryPendingScrollRestoration } from '../../app/client-router'
 import { BookCard } from '../../components/BookCard'
 import { TagChip } from '../../components/TagChip'
 import { Button, IconButton, StatePanel } from '../../components/ui'
+import { HITOMI_APPENDS } from '../../models'
+import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
 import type { SearchController } from './useSearchController'
@@ -90,6 +93,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     searchError,
     searchLoadingAnnouncement,
     searchLoaderVisible,
+    searchResultGeneration,
     visibleBooks,
     displaySettings,
     selectMode,
@@ -101,6 +105,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     resultPage,
     paginationPageCount,
     setResultPage,
+    changeHitomiAppend,
     setHitomiSortPeriod,
     setSortType,
     setSortDirection,
@@ -119,6 +124,10 @@ export function SearchPage({ controller }: SearchPageProps) {
     deleteLibraryBook,
     goToResultPage,
   } = controller
+
+  useEffect(() => {
+    retryPendingScrollRestoration()
+  }, [searchResultGeneration])
 
   const isSearchLoading = searchState === 'loading'
   const showSearchLoader = isSearchLoading && searchLoaderVisible
@@ -139,9 +148,6 @@ export function SearchPage({ controller }: SearchPageProps) {
         <div className="filter-values">
           {criteria.text && (
             <span className="filter-value">検索: {criteria.text}</span>
-          )}
-          {isWebSearch && hitomiAppend !== 'Normal' && (
-            <span className="filter-value">HitomiAppend: {hitomiAppend}</span>
           )}
           {criteria.tags.length > 0 && (
             <span className="filter-value filter-value--tags">
@@ -182,6 +188,19 @@ export function SearchPage({ controller }: SearchPageProps) {
               >
                 日本語
               </Button>
+            )}
+            {isWebSearch && (
+              <label className="hitomi-append-control">
+                <select
+                  value={hitomiAppend}
+                  aria-label="HitomiAppend"
+                  disabled={isSearchLoading}
+                  onChange={(event) => changeHitomiAppend(event.target.value as HitomiAppend)}
+                >
+                  {HITOMI_APPENDS.map((append) => <option key={append} value={append}>{append}</option>)}
+                </select>
+                <ChevronDown size={15} aria-hidden="true" />
+              </label>
             )}
             <label className="sort-control sort-control--type">
               <span>並び順</span>
@@ -321,6 +340,7 @@ export function SearchPage({ controller }: SearchPageProps) {
         ) : (
           <div className={`results-stage ${showSearchLoader ? 'results-stage--loading-visible' : ''}`}>
             <div
+              key={searchResultGeneration}
               className="book-grid"
               style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}
               aria-busy={isSearchLoading}
@@ -342,8 +362,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                       && typeof tag.count === 'number'
                       && tag.count >= 1
                     ))}
-                  isWebSearch={isWebSearch}
-                  onDelete={!isWebSearch ? (trigger) => deleteLibraryBook(book, trigger) : undefined}
+                  onDelete={(trigger) => deleteLibraryBook(book, trigger)}
                   onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
                   onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
                 />
