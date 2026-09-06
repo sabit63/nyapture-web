@@ -5,7 +5,7 @@
   min-height: calc(100vh - var(--topbar-height));
   min-width: 0;
   padding: var(--space-5) 0 0;
-  overflow-x: clip;
+  overflow-x: visible;
 }
 
 .book-viewer__reader {
@@ -29,7 +29,7 @@
 }
 
 .book-viewer__page {
-  width: var(--book-viewer-page-width);
+  width: 100%;
   margin: 0;
   padding: 0;
   border: 0;
@@ -176,11 +176,17 @@
   pointer-events: none;
 }
 
-.icon-button.book-viewer__scroll-top.book-viewer__scroll-top--control {
+.book-viewer__zoom-controls {
   position: fixed;
   z-index: 27;
   right: var(--layout-page-gutter);
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  bottom: calc(var(--space-4) + var(--control-height-default) + var(--space-2) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.icon-button.book-viewer__floating-control {
   width: var(--control-height-default);
   height: var(--control-height-default);
   display: grid;
@@ -196,7 +202,20 @@
   cursor: pointer;
 }
 
-.icon-button.book-viewer__scroll-top.book-viewer__scroll-top--control:hover:not(:disabled) {
+.icon-button.book-viewer__floating-control:disabled {
+  color: var(--color-text-dim);
+  opacity: .52;
+  cursor: not-allowed;
+}
+
+.icon-button.book-viewer__scroll-top {
+  position: fixed;
+  z-index: 27;
+  right: var(--layout-page-gutter);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
+.icon-button.book-viewer__floating-control:hover:not(:disabled) {
   border-color: #6f6f83;
   background: #000000b8;
   color: var(--color-text);

@@ -1,5 +1,5 @@
-import { ArrowUp, ImageOff, RotateCcw } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+import { ArrowUp, ImageOff, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { RefObject, SyntheticEvent } from 'react'
 import type { ApiBookCardModel } from '../../api'
 import { getBookPageBlob } from '../../api'
@@ -30,7 +30,10 @@ export type BookViewerPageProps = {
 
 const PAGE_WIDTH = 1000
 const PAGE_HEIGHT = 1400
+const READER_BASE_WIDTH = 760
 const MAX_PAGE_COUNT = 10_000
+const VIEWER_ZOOM_LEVELS = [50, 75, 100, 125, 150] as const
+const DEFAULT_VIEWER_ZOOM_INDEX = VIEWER_ZOOM_LEVELS.indexOf(100)
 
 const isValidTotalPage = (value: number) =>
   Number.isInteger(value) && value > 0 && value <= MAX_PAGE_COUNT
@@ -172,6 +175,8 @@ function BookViewerReady({
 }) {
   const bookIdentity = useMemo(() => getBookIdentity(book), [book])
   const totalPages = isValidTotalPage(book.totalPage) ? book.totalPage : 0
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_VIEWER_ZOOM_INDEX)
+  const zoomAnchorRef = useRef<{ pageNumber: number; ratio: number; viewportY: number } | null>(null)
   const pageLoader = useMemo(
     () =>
       new BookPageLoader({
@@ -199,6 +204,37 @@ function BookViewerReady({
     totalPages,
     pageLoader,
   )
+  const zoomPercent = VIEWER_ZOOM_LEVELS[zoomIndex]
+  const canZoomOut = zoomIndex > 0
+  const canZoomIn = zoomIndex < VIEWER_ZOOM_LEVELS.length - 1
+
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current
+    zoomAnchorRef.current = null
+    if (!anchor) return
+    const page = readerRef.current?.querySelector<HTMLElement>(`[data-page-number="${anchor.pageNumber}"]`)
+    if (!page) return
+    const rect = page.getBoundingClientRect()
+    const anchorY = rect.top + rect.height * anchor.ratio
+    window.scrollBy({ top: anchorY - anchor.viewportY, behavior: 'auto' })
+  }, [readerRef, zoomIndex])
+
+  const changeZoom = (direction: -1 | 1) => {
+    const nextIndex = Math.min(Math.max(zoomIndex + direction, 0), VIEWER_ZOOM_LEVELS.length - 1)
+    if (nextIndex === zoomIndex) return
+
+    const viewportY = window.innerHeight / 2
+    const page = readerRef.current?.querySelector<HTMLElement>(`[data-page-number="${currentPage}"]`)
+    if (page) {
+      const rect = page.getBoundingClientRect()
+      zoomAnchorRef.current = {
+        pageNumber: currentPage,
+        ratio: rect.height > 0 ? Math.min(Math.max((viewportY - rect.top) / rect.height, 0), 1) : 0,
+        viewportY,
+      }
+    }
+    setZoomIndex(nextIndex)
+  }
 
   const scrollToTop = () => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -225,7 +261,15 @@ function BookViewerReady({
         {book.title}の画像一覧
       </h1>
 
-      <section ref={readerRef} className="book-viewer__reader" aria-labelledby={titleId}>
+      <section
+        ref={readerRef}
+        className="book-viewer__reader"
+        aria-labelledby={titleId}
+        style={{
+          width: `${zoomPercent}%`,
+          maxWidth: `${READER_BASE_WIDTH * zoomPercent / 100}px`,
+        }}
+      >
         {totalPages > 0 ? (
           <div className="book-viewer__pages" aria-label={`${totalPages}ページの画像一覧`}>
             {renderedPages}
@@ -240,18 +284,43 @@ function BookViewerReady({
       </section>
 
       {totalPages > 0 && (
-        <div
-          className="book-viewer__page-indicator"
-          role="img"
-          aria-label={`現在${currentPage}ページ、全${totalPages}ページ`}
-        >
-          {currentPage} / {totalPages}
-        </div>
+        <>
+          <div
+            className="book-viewer__page-indicator"
+            role="img"
+            aria-label={`現在${currentPage}ページ、全${totalPages}ページ`}
+          >
+            {currentPage} / {totalPages}
+          </div>
+          <div className="book-viewer__zoom-controls" role="group" aria-label="画像の表示倍率">
+            <IconButton
+              className="book-viewer__floating-control"
+              variant="ghost"
+              tone="neutral"
+              aria-label={`拡大（現在${zoomPercent}%）`}
+              disabled={!canZoomIn}
+              onClick={() => changeZoom(1)}
+            >
+              <ZoomIn size={18} aria-hidden="true" />
+            </IconButton>
+            <IconButton
+              className="book-viewer__floating-control"
+              variant="ghost"
+              tone="neutral"
+              aria-label={`縮小（現在${zoomPercent}%）`}
+              disabled={!canZoomOut}
+              onClick={() => changeZoom(-1)}
+            >
+              <ZoomOut size={18} aria-hidden="true" />
+            </IconButton>
+            <span className="sr-only" aria-live="polite">表示倍率{zoomPercent}%</span>
+          </div>
+        </>
       )}
 
       {showScrollTop && (
         <IconButton
-          className="book-viewer__scroll-top book-viewer__scroll-top--control"
+          className="book-viewer__floating-control book-viewer__scroll-top"
           variant="ghost"
           tone="neutral"
           aria-label="先頭へ戻る"
