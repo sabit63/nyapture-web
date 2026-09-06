@@ -1,0 +1,175 @@
+{
+  "schema": "morphous.theme.v1",
+  "source": "Generated from a per-system Morphous manifest and prompt records. CSS variables are shadcn/tweakcn-compatible.",
+  "identity": {
+    "slug": "morphous-amethyst",
+    "name": "Morphous Amethyst",
+    "motifName": "Amethyst Crystal",
+    "motifCategory": "mineral",
+    "biome": "Geode Cave",
+    "motif": "amethyst crystal"
+  },
+  "palette": [
+    {
+      "role": "Background",
+      "name": "Quartz White",
+      "hex": "#FAFAFD",
+      "oklch": "oklch(0.986 0.004 286.3)"
+    },
+    {
+      "role": "Ink",
+      "name": "Shadow Charcoal",
+      "hex": "#1F1F28",
+      "oklch": "oklch(0.243 0.017 285.1)"
+    },
+    {
+      "role": "Primary",
+      "name": "Amethyst Violet",
+      "hex": "#7B5FE1",
+      "oklch": "oklch(0.581 0.189 289.0)"
+    },
+    {
+      "role": "Secondary",
+      "name": "Lavender Facet",
+      "hex": "#B69AEF",
+      "oklch": "oklch(0.743 0.123 298.5)"
+    },
+    {
+      "role": "Accent",
+      "name": "Crystal White",
+      "hex": "#FFFFFF",
+      "oklch": "oklch(1.000 0.000 89.9)"
+    },
+    {
+      "role": "Signal",
+      "name": "Geode Glint",
+      "hex": "#9c78c2",
+      "oklch": "oklch(0.636 0.114 305.8)"
+    },
+    {
+      "role": "Surface",
+      "name": "Pale Quartz",
+      "hex": "#F2F0F7",
+      "oklch": "oklch(0.959 0.010 299.2)"
+    },
+    {
+      "role": "Muted",
+      "name": "Geode Gray",
+      "hex": "#DAD7E3",
+      "oklch": "oklch(0.885 0.017 297.5)"
+    },
+    {
+      "role": "Depth",
+      "name": "Shadow Charcoal",
+      "hex": "#1F1F28",
+      "oklch": "oklch(0.243 0.017 285.1)"
+    }
+  ],
+  "light": {
+    "background": "oklch(0.986 0.004 286.3)",
+    "foreground": "oklch(0.243 0.017 285.1)",
+    "card": "oklch(0.959 0.010 299.2)",
+    "card-foreground": "oklch(0.243 0.017 285.1)",
+    "popover": "oklch(0.959 0.010 299.2)",
+    "popover-foreground": "oklch(0.243 0.017 285.1)",
+    "primary": "oklch(0.581 0.189 289.0)",
+    "primary-foreground": "oklch(0.986 0.004 286.3)",
+    "secondary": "oklch(0.970 0.008 293.9)",
+    "secondary-foreground": "oklch(0.243 0.017 285.1)",
+    "muted": "oklch(0.967 0.008 293.9)",
+    "muted-foreground": "oklch(0.243 0.017 285.1)",
+    "accent": "oklch(1.000 0.000 89.9)",
+    "accent-foreground": "oklch(0.243 0.017 285.1)",
+    "destructive": "oklch(0.581 0.189 289.0)",
+    "border": "oklch(0.932 0.012 296.3)",
+    "input": "oklch(0.932 0.012 296.3)",
+    "ring": "oklch(0.743 0.123 298.5)",
+    "chart-1": "oklch(0.581 0.189 289.0)",
+    "chart-2": "oklch(0.743 0.123 298.5)",
+    "chart-3": "oklch(1.000 0.000 89.9)",
+    "chart-4": "oklch(0.636 0.114 305.8)",
+    "chart-5": "oklch(0.243 0.017 285.1)",
+    "sidebar": "oklch(0.967 0.008 301.4)",
+    "sidebar-foreground": "oklch(0.243 0.017 285.1)",
+    "sidebar-primary": "oklch(0.581 0.189 289.0)",
+    "sidebar-primary-foreground": "oklch(0.986 0.004 286.3)",
+    "sidebar-accent": "oklch(0.914 0.029 296.7)",
+    "sidebar-accent-foreground": "oklch(0.581 0.189 289.0)",
+    "sidebar-border": "oklch(0.932 0.012 296.3)",
+    "sidebar-ring": "oklch(0.743 0.123 298.5)",
+    "radius": "0.5rem"
+  },
+  "dark": {
+    "background": "oklch(0.243 0.017 285.1)",
+    "foreground": "oklch(0.986 0.004 286.3)",
+    "card": "oklch(0.243 0.017 285.1)",
+    "card-foreground": "oklch(0.986 0.004 286.3)",
+    "popover": "oklch(0.243 0.017 285.1)",
+    "popover-foreground": "oklch(0.986 0.004 286.3)",
+    "primary": "oklch(0.743 0.123 298.5)",
+    "primary-foreground": "oklch(0.243 0.017 285.1)",
+    "secondary": "oklch(0.403 0.017 290.2)",
+    "secondary-foreground": "oklch(0.986 0.004 286.3)",
+    "muted": "oklch(0.403 0.017 290.2)",
+    "muted-foreground": "oklch(0.941 0.010 299.2)",
+    "accent": "oklch(1.000 0.000 89.9)",
+    "accent-foreground": "oklch(0.243 0.017 285.1)",
+    "destructive": "oklch(0.581 0.189 289.0)",
+    "border": "oklch(1 0 0 / 12%)",
+    "input": "oklch(1 0 0 / 16%)",
+    "ring": "oklch(0.743 0.123 298.5)",
+    "chart-1": "oklch(0.743 0.123 298.5)",
+    "chart-2": "oklch(0.581 0.189 289.0)",
+    "chart-3": "oklch(1.000 0.000 89.9)",
+    "chart-4": "oklch(0.636 0.114 305.8)",
+    "chart-5": "oklch(0.885 0.017 297.5)",
+    "sidebar": "oklch(0.243 0.017 285.1)",
+    "sidebar-foreground": "oklch(0.986 0.004 286.3)",
+    "sidebar-primary": "oklch(0.743 0.123 298.5)",
+    "sidebar-primary-foreground": "oklch(0.243 0.017 285.1)",
+    "sidebar-accent": "oklch(0.403 0.017 290.2)",
+    "sidebar-accent-foreground": "oklch(0.986 0.004 286.3)",
+    "sidebar-border": "oklch(1 0 0 / 12%)",
+    "sidebar-ring": "oklch(0.743 0.123 298.5)",
+    "radius": "0.5rem"
+  },
+  "typography": "Premium English product UI with precise numerals and Japanese guidance tuned for quiet luxury interfaces.",
+  "layout": "Faceted 8px grids, crystal-edge separators, compact dashboard cards, and subtle mineral-grain texture.",
+  "tags": [
+    "amethyst",
+    "mineral",
+    "crystal",
+    "geode",
+    "premium",
+    "dark-ready"
+  ],
+  "assets": {
+    "motif": "/systems/morphous-amethyst/motif.png",
+    "board": "/systems/morphous-amethyst/design-system-light.png",
+    "darkBoard": "/systems/morphous-amethyst/design-system-dark.png",
+    "examples": [],
+    "themeCss": "/systems/morphous-amethyst/theme.css",
+    "themeJson": "/systems/morphous-amethyst/theme.json",
+    "promptsJson": "/systems/morphous-amethyst/prompts.json"
+  },
+  "prompts": [
+    {
+      "id": "transparent-motif",
+      "label": "Transparent amethyst crystal motif",
+      "asset": "/systems/morphous-amethyst/motif.png",
+      "prompt": "Use case: photorealistic-natural\nAsset type: Morphous Amethyst transparent motif chroma-key source\nPrimary request: Create only an amethyst crystal motif for a design-system catalog, isolated as one complete subject on a removable chroma-key background.\nSubject: A natural amethyst geode cluster with sharp violet quartz points, lavender translucent facets, white crystal bases, charcoal cave-shadow crevices, mineral inclusions, and crisp angular edges. Geological accuracy, premium calm identity, no fruit or floral forms.\nComposition/framing: centered complete cutout with generous padding; include full crystal base and points without cropping. Clean studio lighting, no cast shadow.\nChroma-key background: perfectly flat solid #ff00ff background for removal. The background must be one uniform color with no shadows, gradients, texture, reflections, floor plane, or lighting variation. Do not use #ff00ff anywhere in the subject.\nConstraints: no grape cluster, no fantasy magic glow, no jewelry setting, no hand, no cave landscape, no text, no watermark, no loose gemstones, no other minerals dominating."
+    },
+    {
+      "id": "light-design-system",
+      "label": "Light-mode design-system board",
+      "asset": "/systems/morphous-amethyst/design-system-light.png",
+      "prompt": "Use case: ui-mockup\nAsset type: Morphous Amethyst light-mode design-system board\nPrimary request: Generate one comprehensive light-mode design-system board for a Morphous theme named \"Morphous Amethyst\", derived from an amethyst crystal cutout. This board is a source reference for a shadcn/tweakcn-compatible premium UI theme.\nCanvas: wide 16:9 high-resolution board, clean professional UI design-system presentation.\nRequired visible sections: Morphous Amethyst, Amethyst Crystal, Palette, Typography, Components, Navigation, Dashboard, Forms, Table, Command/Search, Status, Texture, Radius, Spacing, Shadow, Tokens.\nReference use: Extract colors and interaction language from violet quartz points, lavender facets, white crystal bases, charcoal geode shadows, and crisp mineral edges. The board must read as amethyst crystal, not grape, labradorite, or generic purple SaaS.\nTypography: English product UI examples with Japanese typography guidance; labels such as Geist, Display, Body, Label, Numbers, 日本語 UI. Keep text short and legible.\nUI coverage: buttons, inputs, select, textarea, checkbox, radio, switch, tabs, badges, alerts, cards, table rows, search command palette, sidebar navigation, dashboard metric cards, line chart, bar chart, empty/loading/error states, spacing, radius, border, shadow, texture samples, simple icons.\nStyle: calm premium system, 8px radius with slight faceted cuts, quartz-white surfaces, amethyst-violet primary actions, lavender muted panels, charcoal borders, crystal-white highlights, precise grid, subtle mineral grain texture, angular divider accents.\nConstraints: no grapes, no wine, no magical fantasy symbols, no generic purple/blue gradients, no neon glow, no unrelated saturated colors, no watermark, no random brand names, no misspelling of \"Morphous Amethyst\", no tiny unreadable paragraphs."
+    },
+    {
+      "id": "dark-design-system",
+      "label": "Dark-mode design-system board",
+      "asset": "/systems/morphous-amethyst/design-system-dark.png",
+      "prompt": "Use case: ui-mockup\nAsset type: Morphous Amethyst dark-mode design-system board\nPrimary request: Generate one comprehensive dark-mode design-system board for the Morphous theme named \"Morphous Amethyst\". It must feel like the light-mode board translated to dark mode and remain derived from the amethyst crystal cutout.\nCanvas: wide 16:9 high-resolution board, clean professional UI design-system presentation.\nRequired visible sections: Morphous Amethyst, Amethyst Crystal, Dark Mode, Palette, Typography, Components, Navigation, Dashboard, Forms, Table, Command/Search, Status, Texture, Radius, Spacing, Shadow, Tokens.\nReference use: Preserve amethyst-violet active states, lavender facets, quartz-white text, charcoal geode surfaces, crystal-edge dividers, mineral grain texture, calm premium spacing, and 8px shadcn/tweakcn grid. Must read as amethyst, not grape or labradorite.\nTypography: English product UI examples with Japanese typography guidance; labels such as Geist, Display, Body, Label, Numbers, 日本語 UI. Keep text short and legible.\nUI coverage: buttons, inputs, select, textarea, checkbox, radio, switch, tabs, badges, alerts, cards, table rows, search command palette, sidebar navigation, dashboard metric cards, line chart, bar chart, empty/loading/error states, spacing, radius, border, shadow, texture samples, simple icons.\nVisual details: cave-charcoal dark backgrounds, shadow-charcoal cards, quartz-white foreground, amethyst-violet buttons, lavender charts, crisp crystal borders, subtle faceted shadows and mineral speckle overlays.\nConstraints: no grapes, no fantasy magic UI, no neon violet, no pure-black-only flat background, no generic purple/blue gradients, no illegible tiny paragraphs, no watermark, no random brand names, no misspelling of \"Morphous Amethyst\"."
+    }
+  ]
+}

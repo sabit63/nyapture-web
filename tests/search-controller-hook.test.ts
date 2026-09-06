@@ -21,7 +21,7 @@ it('composed search controller synchronizes URL state, execution, selection and 
     isMissingTagSearch: false,
     isBookViewer: false,
     apiRevision: 0,
-    displaySettings: { thumbnailColumns: 5 },
+    displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
     hubConnectionState: 'idle',
     notify: () => {},
   }), undefined)
@@ -67,7 +67,7 @@ it('continuous reader navigation preserves its mode and resets stale start ident
     isMissingTagSearch: false,
     isBookViewer: false,
     apiRevision: 0,
-    displaySettings: { thumbnailColumns: 5 },
+    displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
     hubConnectionState: 'idle',
     notify: () => {},
   }), undefined)

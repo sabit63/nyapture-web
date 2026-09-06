@@ -33,14 +33,17 @@ export {
 
 export {
   DEFAULT_THUMBNAIL_COLUMNS,
+  DEFAULT_COLOR_THEME,
   DISPLAY_SETTINGS_STORAGE_KEY,
   DisplaySettingsStorageError,
   MAX_THUMBNAIL_COLUMNS,
   MIN_THUMBNAIL_COLUMNS,
   isThumbnailColumnCount,
+  isColorTheme,
   loadPersistedDisplaySettings,
   normalizeDisplaySettings,
   normalizeThumbnailColumnCount,
+  normalizeColorTheme,
   savePersistedDisplaySettings,
 } from './display-settings-storage'
 
@@ -61,6 +64,7 @@ export type {
 } from './client'
 
 export type {
+  ColorTheme,
   DisplaySettings,
   ThumbnailColumnCount,
 } from './display-settings-storage'

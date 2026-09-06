@@ -60,7 +60,7 @@
   justify-content: center;
   gap: var(--layout-control-gap);
   padding: var(--space-6);
-  background: #2d2d39;
+  background: var(--color-surface-fallback);
   color: #b5b5c2;
   text-align: center;
   font-size: .7rem;
@@ -75,12 +75,12 @@
   padding: var(--space-2);
   border: 1px solid #505061;
   border-radius: var(--radius-control);
-  background: #24242f;
+  background: var(--color-surface-control);
   color: var(--color-text);
   font-size: .68rem;
   cursor: pointer;
 }
 
-.book-cover__fallback button:hover { border-color: #747487; background: #30303d; }
+.book-cover__fallback button:hover { border-color: var(--color-border-strong); background: var(--color-surface-hover-strong); }
 
 @keyframes thumbnail-shimmer { to { transform: translateX(100%); } }

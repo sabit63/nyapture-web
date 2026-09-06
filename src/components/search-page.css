@@ -4,20 +4,20 @@
   align-items: center;
   gap: var(--layout-control-gap);
   padding: 0 var(--space-2) 0 var(--space-3);
-  border: 1px solid #434353;
+  border: 1px solid var(--color-border-search);
   border-radius: var(--radius-control);
-  background: #141923;
+  background: var(--color-surface-search);
   color: var(--color-text-muted);
   transition: border-color .15s ease, box-shadow .15s ease;
 }
 
 .quick-search:focus-within { border-color: var(--color-focus); box-shadow: 0 0 0 3px var(--color-info-soft); }
 .quick-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--color-text); font-size: .875rem; }
-.quick-search input::placeholder { color: #777788; }
+.quick-search input::placeholder { color: var(--color-text-placeholder); }
 .quick-search input::-webkit-search-cancel-button { display: none; }
 .quick-search .search-clear { width: var(--control-height-compact); height: var(--control-height-compact); display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-muted); cursor: pointer; }
 .quick-search .search-clear:hover { background: var(--color-neutral-soft); color: var(--color-text); }
-.quick-search__divider { width: 1px; height: var(--space-5); flex: 0 0 auto; background: #3b3b49; }
+.quick-search__divider { width: 1px; height: var(--space-5); flex: 0 0 auto; background: var(--color-border-divider); }
 .quick-search .search-submit,
 .quick-search .search-detail { width: var(--control-height-compact); height: var(--control-height-compact); display: grid; place-items: center; flex: 0 0 auto; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-text-muted); cursor: pointer; }
 .quick-search .search-submit:hover,
@@ -163,7 +163,7 @@
   padding: var(--space-2) var(--space-4) calc(var(--space-2) + env(safe-area-inset-bottom));
   overflow-x: auto;
   border-radius: 0;
-  background: #181822f2;
+  background: var(--color-surface-pagination);
   scrollbar-width: thin;
 }
 

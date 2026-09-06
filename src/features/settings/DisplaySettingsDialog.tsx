@@ -9,6 +9,24 @@ import {
   IconButton,
 } from '../../components/ui'
 import type { ApiSettingsController } from './useApiSettings'
+import './display-settings-dialog.css'
+
+const COLOR_THEMES = [
+  {
+    id: 'default',
+    label: 'Default',
+    description: 'Nyapture の標準ダークテーマ',
+  },
+  {
+    id: 'amethyst',
+    label: 'Amethyst',
+    description: '紫水晶を基調にしたダークテーマ',
+  },
+] as const satisfies ReadonlyArray<{
+  id: DisplaySettings['colorTheme']
+  label: string
+  description: string
+}>
 
 export type DisplaySettingsDialogProps = {
   controller: ApiSettingsController
@@ -49,6 +67,42 @@ export function DisplaySettingsDialog({ controller }: DisplaySettingsDialogProps
           </DialogHeader>
 
           <DialogBody className="advanced-dialog__body">
+            <section className="api-settings-dialog__section" aria-labelledby="display-settings-theme-title">
+              <h3 id="display-settings-theme-title">カラーテーマ</h3>
+              <fieldset className="display-settings-theme-picker">
+                <legend className="sr-only">カラーテーマを選択</legend>
+                {COLOR_THEMES.map((theme) => (
+                  <label
+                    className="display-settings-theme-card"
+                    data-theme-preview={theme.id}
+                    data-selected={displaySettingsDraft.colorTheme === theme.id || undefined}
+                    key={theme.id}
+                  >
+                    <input
+                      type="radio"
+                      name="color-theme"
+                      value={theme.id}
+                      checked={displaySettingsDraft.colorTheme === theme.id}
+                      onChange={() => {
+                        setDisplaySettingsSaveError('')
+                        setDisplaySettingsDraft((current) => ({ ...current, colorTheme: theme.id }))
+                      }}
+                    />
+                    <span className="display-settings-theme-card__content">
+                      <span className="display-settings-theme-card__swatches" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                        <span />
+                      </span>
+                      <strong>{theme.label}</strong>
+                      <small>{theme.description}</small>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            </section>
+
             <section className="api-settings-dialog__section" aria-labelledby="display-settings-section-title">
               <h3 id="display-settings-section-title">検索結果</h3>
               <section className="advanced-dialog__field">

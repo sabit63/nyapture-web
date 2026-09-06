@@ -182,7 +182,7 @@ it('projects a pending deletion as Shredding in the visible search results', asy
     isMissingTagSearch: false,
     isBookViewer: false,
     apiRevision: 0,
-    displaySettings: { thumbnailColumns: 5 },
+    displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
     hubConnectionState: 'idle',
     notify: () => undefined,
   }), undefined)

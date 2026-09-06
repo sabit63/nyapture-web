@@ -23,7 +23,7 @@
 }
 
 .book-viewer--route-loading .book-viewer__page {
-  border: 1px solid #474755;
+  border: 1px solid var(--color-border-viewer);
   border-radius: 10px;
   box-shadow: 0 13px 34px #07070e38;
 }
@@ -45,7 +45,7 @@
 .book-viewer__page--error {
   aspect-ratio: 5 / 7;
   overflow: hidden;
-  background: #292934;
+  background: var(--color-surface-viewer-page);
   contain: layout paint;
 }
 
@@ -78,7 +78,7 @@
   inset: 0;
   display: block;
   overflow: hidden;
-  background: linear-gradient(110deg, #30303b 18%, #3d3d4a 43%, #30303b 68%);
+  background: linear-gradient(110deg, var(--color-surface-viewer-skeleton-start) 18%, var(--color-surface-viewer-skeleton-mid) 43%, var(--color-surface-viewer-skeleton-start) 68%);
   background-size: 220% 100%;
   animation: book-viewer-skeleton 1.35s linear infinite;
 }
@@ -107,13 +107,13 @@
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-6);
-  background: #2a2a35;
-  color: #bbbaca;
+  background: var(--color-surface-viewer-error);
+  color: var(--color-text-viewer-error);
   font-size: .76rem;
   text-align: center;
 }
 
-.book-viewer__page-error svg { color: #9494a7; }
+.book-viewer__page-error svg { color: var(--color-text-viewer-icon); }
 
 .book-viewer__page-error button {
   display: inline-flex;
@@ -121,7 +121,7 @@
   gap: var(--layout-control-gap);
   min-height: 34px;
   padding: var(--layout-tight-gap) var(--space-3);
-  border: 1px solid #57576a;
+  border: 1px solid var(--color-border-viewer-control);
   border-radius: 7px;
   background: #20202a;
   color: var(--color-text);
@@ -142,9 +142,9 @@
   justify-content: center;
   gap: var(--layout-control-gap);
   padding: var(--space-8);
-  border: 1px dashed #4a4a5a;
+  border: 1px dashed var(--color-border-viewer-empty);
   border-radius: 10px;
-  background: #252530;
+  background: var(--color-surface-viewer-empty);
   color: var(--color-text-muted);
   text-align: center;
 }
@@ -162,9 +162,9 @@
   display: inline-flex;
   align-items: center;
   padding: var(--space-1) var(--space-2);
-  border: 1px solid #ffffff2e;
+  border: 1px solid var(--color-border-overlay-strong);
   border-radius: var(--radius-control);
-  background: #00000099;
+  background: var(--color-overlay);
   color: var(--color-text-muted);
   box-shadow: 0 7px 20px #08081028;
   -webkit-backdrop-filter: blur(10px);
@@ -192,9 +192,9 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid #ffffff2e;
+  border: 1px solid var(--color-border-overlay-strong);
   border-radius: var(--radius-control);
-  background: #00000099;
+  background: var(--color-overlay);
   color: var(--color-text);
   box-shadow: 0 7px 20px #08081028;
   -webkit-backdrop-filter: blur(10px);
@@ -217,7 +217,7 @@
 
 .icon-button.book-viewer__floating-control:hover:not(:disabled) {
   border-color: #6f6f83;
-  background: #000000b8;
+  background: var(--color-overlay-strong);
   color: var(--color-text);
 }
 
@@ -234,7 +234,7 @@
   margin: auto;
   padding: 0;
   overflow: hidden;
-  border: 1px solid #535366;
+  border: 1px solid var(--color-border-viewer-panel);
   border-radius: 14px;
   background: var(--color-surface);
   color: var(--color-text);
@@ -265,7 +265,7 @@
   gap: var(--space-4);
   padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border-subtle);
-  background: #21212b;
+  background: var(--color-surface-viewer-header);
 }
 
 .book-viewer__details-title {
@@ -415,7 +415,7 @@
   border: 1px solid #ffffff35;
   border-radius: 6px;
   box-shadow: none;
-  color: #f8f8fc;
+  color: var(--color-text-overlay);
   font-size: .68rem;
   font-weight: 600;
   line-height: 1.2;
@@ -424,8 +424,8 @@
 }
 
 .book-viewer__meta-chip--source {
-  border-color: #dc6eca;
-  background: #a52a95;
+  border-color: var(--color-accent-source-border);
+  background: var(--color-accent-source-fill);
 }
 
 .book-viewer__meta-chip--page,
@@ -455,7 +455,7 @@
 
 .book-viewer__tag-group + .book-viewer__tag-group {
   margin-top: var(--layout-tight-gap);
-  border-top: 1px solid #ffffff08;
+  border-top: 1px solid var(--color-border-faint);
 }
 
 .book-viewer__tag-group-heading {
@@ -467,7 +467,7 @@
 
 .book-viewer__tag-group-heading h3 {
   margin: 0;
-  color: #c9c9d7;
+  color: var(--color-text-tertiary);
   font-size: .88rem;
   font-weight: 700;
 }
@@ -478,10 +478,10 @@
   display: inline-grid;
   place-items: center;
   padding: 0 var(--space-2);
-  border: 1px solid #56566a;
+  border: 1px solid var(--color-border-badge);
   border-radius: 999px;
-  background: #3b3b4a;
-  color: #eeeef5;
+  background: var(--color-surface-badge);
+  color: var(--color-text-badge);
   font-size: .7rem;
   font-weight: 700;
   line-height: 1;

@@ -2,6 +2,9 @@ export const DISPLAY_SETTINGS_STORAGE_KEY = 'nyapture.display-settings.v1'
 export const DEFAULT_THUMBNAIL_COLUMNS = 5
 export const MIN_THUMBNAIL_COLUMNS = 1
 export const MAX_THUMBNAIL_COLUMNS = 5
+export const DEFAULT_COLOR_THEME = 'default'
+
+export type ColorTheme = 'default' | 'amethyst'
 
 const DISPLAY_SETTINGS_STORAGE_VERSION = 1
 
@@ -9,11 +12,13 @@ export type ThumbnailColumnCount = 1 | 2 | 3 | 4 | 5
 
 export type DisplaySettings = {
   thumbnailColumns: ThumbnailColumnCount
+  colorTheme: ColorTheme
 }
 
 type PersistedDisplaySettings = {
   version: typeof DISPLAY_SETTINGS_STORAGE_VERSION
   thumbnailColumns: ThumbnailColumnCount
+  colorTheme?: ColorTheme
 }
 
 /** A storage operation failed without exposing unrelated persisted data. */
@@ -26,6 +31,7 @@ export class DisplaySettingsStorageError extends Error {
 
 const defaultDisplaySettings = (): DisplaySettings => ({
   thumbnailColumns: DEFAULT_THUMBNAIL_COLUMNS,
+  colorTheme: DEFAULT_COLOR_THEME,
 })
 
 const getLocalStorage = (): Storage | null => {
@@ -53,14 +59,24 @@ export const normalizeThumbnailColumnCount = (value: unknown): ThumbnailColumnCo
   isThumbnailColumnCount(value) ? value : DEFAULT_THUMBNAIL_COLUMNS
 )
 
+export const isColorTheme = (value: unknown): value is ColorTheme => (
+  value === 'default' || value === 'amethyst'
+)
+
+export const normalizeColorTheme = (value: unknown): ColorTheme => (
+  isColorTheme(value) ? value : DEFAULT_COLOR_THEME
+)
+
 export const normalizeDisplaySettings = (settings: Partial<DisplaySettings> = {}): DisplaySettings => ({
   thumbnailColumns: normalizeThumbnailColumnCount(settings.thumbnailColumns),
+  colorTheme: normalizeColorTheme(settings.colorTheme),
 })
 
 const isPersistedDisplaySettings = (value: unknown): value is PersistedDisplaySettings => (
   isRecord(value)
   && value.version === DISPLAY_SETTINGS_STORAGE_VERSION
   && isThumbnailColumnCount(value.thumbnailColumns)
+  && (value.colorTheme === undefined || isColorTheme(value.colorTheme))
 )
 
 const removeInvalidRecord = (storage: Storage) => {
@@ -98,7 +114,7 @@ export const loadPersistedDisplaySettings = (): DisplaySettings => {
     return defaultDisplaySettings()
   }
 
-  return { thumbnailColumns: parsed.thumbnailColumns }
+  return normalizeDisplaySettings(parsed)
 }
 
 /** Persist display settings under their own versioned storage key. */

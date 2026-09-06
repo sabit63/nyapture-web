@@ -1,10 +1,13 @@
 :root {
+  color-scheme: dark;
+
   --color-background: #1f1f29;
   --color-background-deep: #191922;
   --color-surface: #242430;
   --color-surface-raised: #2a2a37;
   --color-surface-hover: #30303e;
   --color-appbar: #18202ef5;
+  --color-appbar-border: #ffffff0c;
   --color-drawer: #1f222d;
   --color-border: #393947;
   --color-border-subtle: #30303c;
@@ -105,6 +108,84 @@
   --color-neutral-border: #393947;
   --color-neutral-soft: #ffffff0a;
 
+  /* Supplemental semantic aliases for legacy component surfaces. Keeping
+     their Default values identical preserves the existing visual language
+     while allowing alternate color themes to remap them consistently. */
+  --color-surface-panel: #292933;
+  --color-surface-panel-raised: #282834;
+  --color-surface-panel-deep: #23232e;
+  --color-surface-input: #1b1b24;
+  --color-surface-progress: #171720;
+  --color-surface-progress-deep: #1c1c24;
+  --color-surface-control: #24242f;
+  --color-surface-hover-strong: #30303d;
+  --color-surface-search: #141923;
+  --color-surface-pagination: #181822f2;
+  --color-surface-fallback: #2d2d39;
+  --color-surface-viewer-page: #292934;
+  --color-surface-viewer-error: #2a2a35;
+  --color-surface-viewer-empty: #252530;
+  --color-surface-viewer-header: #21212b;
+  --color-surface-badge: #3b3b4a;
+  --color-surface-tag-overflow: #2a2a36;
+  --color-surface-hero-start: #282431;
+  --color-surface-hero-end: #23232f;
+  --color-surface-state-end: #23232d;
+  --color-surface-skeleton-start: #383747;
+  --color-surface-skeleton-end: #50465a;
+  --color-surface-viewer-skeleton-start: #30303b;
+  --color-surface-viewer-skeleton-mid: #3d3d4a;
+  --color-surface-detail-skeleton-start: #2b2b36;
+  --color-surface-detail-skeleton-mid: #3c3844;
+  --color-border-strong: #4b4b5c;
+  --color-border-control: #414151;
+  --color-border-overlay: #ffffff0c;
+  --color-border-overlay-strong: #ffffff2e;
+  --color-border-disabled: #ffffff1a;
+  --color-border-faint: #ffffff08;
+  --color-border-spinner: #ffffff24;
+  --color-border-search: #434353;
+  --color-border-divider: #3b3b49;
+  --color-border-badge: #56566a;
+  --color-border-viewer: #474755;
+  --color-border-viewer-panel: #535366;
+  --color-border-viewer-control: #57576a;
+  --color-border-viewer-empty: #4a4a5a;
+  --color-text-strong: #f5f3fa;
+  --color-text-heading: #f4f3f8;
+  --color-text-heading-secondary: #e8e7ef;
+  --color-text-secondary: #d7d6df;
+  --color-text-data: #c9c9d5;
+  --color-text-tertiary: #c9c9d7;
+  --color-text-label: #c9c6d0;
+  --color-text-meta: #aaaab8;
+  --color-text-placeholder: #777788;
+  --color-text-icon: #818192;
+  --color-text-overlay: #f8f8fc;
+  --color-text-viewer-error: #bbbaca;
+  --color-text-viewer-icon: #9494a7;
+  --color-text-badge: #eeeef5;
+  --color-overlay: #00000099;
+  --color-overlay-strong: #000000b8;
+  --color-accent-ambient: #8f2d8130;
+  --color-accent-ambient-soft: #8f2d8128;
+  --color-accent-ambient-strong: #6d286f3a;
+  --color-accent-hover: #f2a6d9;
+  --color-accent-muted: #dc8fc8;
+  --color-accent-muted-hover: #f0c5e3;
+  --color-accent-border-soft: #6e4c68;
+  --color-accent-border-soft-hover: #8a557c;
+  --color-accent-fill-overlay: #c1339ee8;
+  --color-accent-wash-border: #d55ab34a;
+  --color-accent-highlight: #eb80cc;
+  --color-accent-source-border: #dc6eca;
+  --color-accent-source-fill: #a52a95;
+  --color-accent-panel-border: #68516b;
+  --color-accent-panel: #352b3a;
+  --color-accent-panel-hover-border: #9a70a0;
+  --color-accent-panel-hover: #44334a;
+  --color-accent-panel-hover-text: #f7d5ee;
+
   --shadow-raised: 0 12px 30px #08081040;
   --shadow-floating: 0 28px 80px #050509a8;
   --duration-fast: 150ms;
@@ -113,6 +194,119 @@
   --drawer-width: 288px;
   --topbar-height: 56px;
 
+}
+
+/* Morphous Amethyst dark palette. The source manifest's dark values are
+   kept in OKLCH where they have a direct semantic counterpart; depth and
+   soft variants are derived from those same palette anchors. */
+:root[data-color-theme='amethyst'] {
+  color-scheme: dark;
+
+  --color-background: oklch(0.243 0.017 285.1);
+  --color-background-deep: color-mix(in oklch, var(--color-background) 86%, black);
+  --color-surface: oklch(0.243 0.017 285.1);
+  --color-surface-raised: oklch(0.403 0.017 290.2);
+  --color-surface-hover: color-mix(in oklch, var(--color-surface-raised) 78%, white);
+  --color-appbar: color-mix(in oklch, var(--color-background) 84%, black);
+  --color-appbar-border: color-mix(in oklch, var(--color-accent-fill) 28%, transparent);
+  --color-drawer: var(--color-background);
+  --color-border: oklch(1 0 0 / 12%);
+  --color-border-subtle: oklch(1 0 0 / 8%);
+  --color-text: oklch(0.986 0.004 286.3);
+  --color-text-muted: oklch(0.941 0.010 299.2);
+  --color-text-dim: color-mix(in oklch, var(--color-text-muted) 74%, var(--color-background));
+  --color-focus: oklch(0.743 0.123 298.5);
+
+  --color-accent-fill: oklch(0.743 0.123 298.5);
+  --color-accent-on-fill: oklch(0.243 0.017 285.1);
+  --color-accent-text: oklch(0.743 0.123 298.5);
+  --color-accent-border: oklch(0.743 0.123 298.5);
+  --color-accent-soft: color-mix(in oklch, var(--color-accent-fill) 16%, transparent);
+
+  /* Signal tokens intentionally retain their existing colors across themes. */
+  --color-neutral-fill: oklch(0.403 0.017 290.2);
+  --color-neutral-on-fill: oklch(0.986 0.004 286.3);
+  --color-neutral-text: oklch(0.941 0.010 299.2);
+  --color-neutral-border: oklch(1 0 0 / 12%);
+  --color-neutral-soft: oklch(1 0 0 / 8%);
+
+  --color-surface-panel: color-mix(in oklch, var(--color-background) 72%, white);
+  --color-surface-panel-raised: color-mix(in oklch, var(--color-background) 78%, white);
+  --color-surface-panel-deep: color-mix(in oklch, var(--color-background) 84%, black);
+  --color-surface-input: color-mix(in oklch, var(--color-background) 82%, black);
+  --color-surface-progress: color-mix(in oklch, var(--color-background) 76%, black);
+  --color-surface-progress-deep: color-mix(in oklch, var(--color-background) 70%, black);
+  --color-surface-control: var(--color-background);
+  --color-surface-hover-strong: color-mix(in oklch, var(--color-surface-raised) 68%, white);
+  --color-surface-search: var(--color-background);
+  --color-surface-pagination: color-mix(in srgb, var(--color-background) 94%, transparent);
+  --color-surface-fallback: color-mix(in oklch, var(--color-background) 72%, white);
+  --color-surface-viewer-page: var(--color-surface-raised);
+  --color-surface-viewer-error: color-mix(in oklch, var(--color-background) 68%, white);
+  --color-surface-viewer-empty: color-mix(in oklch, var(--color-background) 76%, white);
+  --color-surface-viewer-header: var(--color-background-deep);
+  --color-surface-badge: var(--color-neutral-fill);
+  --color-surface-tag-overflow: var(--color-neutral-fill);
+  --color-surface-hero-start: var(--color-surface-raised);
+  --color-surface-hero-end: var(--color-surface);
+  --color-surface-state-end: color-mix(in oklch, var(--color-background) 86%, black);
+  --color-surface-skeleton-start: var(--color-surface-raised);
+  --color-surface-skeleton-end: var(--color-surface-hover);
+  --color-surface-viewer-skeleton-start: var(--color-surface-raised);
+  --color-surface-viewer-skeleton-mid: var(--color-surface-hover);
+  --color-surface-detail-skeleton-start: var(--color-surface-raised);
+  --color-surface-detail-skeleton-mid: var(--color-surface-hover);
+  --color-border-strong: color-mix(in oklch, var(--color-border) 58%, var(--color-text));
+  --color-border-control: var(--color-border);
+  --color-border-overlay: oklch(1 0 0 / 8%);
+  --color-border-overlay-strong: oklch(1 0 0 / 18%);
+  --color-border-disabled: oklch(1 0 0 / 10%);
+  --color-border-faint: oklch(1 0 0 / 8%);
+  --color-border-spinner: oklch(1 0 0 / 14%);
+  --color-border-search: var(--color-border);
+  --color-border-divider: oklch(1 0 0 / 10%);
+  --color-border-badge: var(--color-border);
+  --color-border-viewer: var(--color-border-strong);
+  --color-border-viewer-panel: var(--color-border);
+  --color-border-viewer-control: var(--color-border-strong);
+  --color-border-viewer-empty: var(--color-border-strong);
+  --color-text-strong: var(--color-text);
+  --color-text-heading: var(--color-text);
+  --color-text-heading-secondary: var(--color-text);
+  --color-text-secondary: oklch(0.941 0.010 299.2);
+  --color-text-data: color-mix(in oklch, var(--color-text-muted) 94%, var(--color-background));
+  --color-text-tertiary: color-mix(in oklch, var(--color-text-muted) 92%, var(--color-background));
+  --color-text-label: color-mix(in oklch, var(--color-text-muted) 92%, var(--color-background));
+  --color-text-meta: color-mix(in oklch, var(--color-text-muted) 86%, var(--color-background));
+  --color-text-placeholder: color-mix(in oklch, var(--color-text-muted) 52%, var(--color-background));
+  --color-text-icon: var(--color-text-dim);
+  --color-text-overlay: var(--color-text);
+  --color-text-viewer-error: var(--color-text-muted);
+  --color-text-viewer-icon: var(--color-text-dim);
+  --color-text-badge: var(--color-text);
+  --color-overlay: color-mix(in srgb, var(--color-background) 62%, transparent);
+  --color-overlay-strong: color-mix(in srgb, var(--color-background) 74%, transparent);
+  --color-accent-ambient: color-mix(in oklch, var(--color-accent-fill) 20%, transparent);
+  --color-accent-ambient-soft: color-mix(in oklch, var(--color-accent-fill) 18%, transparent);
+  --color-accent-ambient-strong: color-mix(in oklch, var(--color-accent-fill) 25%, transparent);
+  --color-accent-hover: color-mix(in oklch, var(--color-accent-text) 84%, white);
+  --color-accent-muted: var(--color-accent-text);
+  --color-accent-muted-hover: var(--color-text);
+  --color-accent-border-soft: color-mix(in oklch, var(--color-accent-fill) 52%, var(--color-background));
+  --color-accent-border-soft-hover: color-mix(in oklch, var(--color-accent-fill) 72%, var(--color-background));
+  --color-accent-fill-overlay: color-mix(in oklch, var(--color-accent-fill) 91%, transparent);
+  --color-accent-wash-border: color-mix(in oklch, var(--color-accent-fill) 30%, transparent);
+  --color-accent-highlight: var(--color-accent-text);
+  --color-accent-source-border: var(--color-accent-hover);
+  --color-accent-source-fill: color-mix(in oklch, var(--color-background) 38%, var(--color-accent-fill));
+  --color-accent-panel-border: color-mix(in oklch, var(--color-accent-fill) 42%, var(--color-background));
+  --color-accent-panel: color-mix(in oklch, var(--color-background) 62%, var(--color-accent-fill));
+  --color-accent-panel-hover-border: color-mix(in oklch, var(--color-accent-fill) 68%, var(--color-background));
+  --color-accent-panel-hover: color-mix(in oklch, var(--color-background) 50%, var(--color-accent-fill));
+  --color-accent-panel-hover-text: var(--color-text);
+
+  --shadow-raised: 0 12px 30px oklch(0 0 0 / 25%);
+  --shadow-floating: 0 28px 80px oklch(0 0 0 / 66%);
 }
 
 @media (min-width: 640px) {

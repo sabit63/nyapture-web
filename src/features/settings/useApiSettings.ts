@@ -12,6 +12,7 @@ import {
 import type { ApiProxyProtocol, ApiSettings, ApiSettingsErrors, DisplaySettings } from '../../api'
 import type { NativeDialogControls } from '../../components/ui'
 import { loadAppSettings, saveAppSettings } from '../../api/app-settings-storage'
+import { applyColorTheme } from '../../app/color-theme'
 
 export type ApiConnectionState = 'idle' | 'pending' | 'success' | 'error'
 
@@ -86,6 +87,10 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
   const draftConnectionAbortRef = useRef<AbortController | null>(null)
   const activeConnectionAbortRef = useRef<AbortController | null>(null)
   const announceActiveConnectionRef = useRef<'save' | 'reset' | null>(null)
+
+  useEffect(() => {
+    applyColorTheme(displaySettingsOpen ? displaySettingsDraft.colorTheme : displaySettings.colorTheme)
+  }, [displaySettings.colorTheme, displaySettingsDraft.colorTheme, displaySettingsOpen])
 
   const clearDraftConnectionCheck = useCallback(() => {
     draftConnectionAbortRef.current?.abort()
