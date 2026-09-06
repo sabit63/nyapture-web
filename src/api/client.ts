@@ -79,6 +79,7 @@ export type ApiErrorOptions = {
   category?: ApiErrorCategory
   cause?: unknown
   validationErrors?: string[]
+  retryAfterSeconds?: number
 }
 
 const ERROR_MESSAGES: Record<ApiErrorCategory, string> = {
@@ -262,16 +263,18 @@ export class ApiError extends Error {
   readonly status?: number
   readonly category: ApiErrorCategory
   readonly validationErrors?: string[]
+  readonly retryAfterSeconds?: number
 
   constructor(message: string, options: ApiErrorOptions = {}) {
     const category = options.category ?? (typeof options.status === 'number' ? categoryForStatus(options.status) : 'unknown')
     // Do not retain a caller/server-provided cause: it could contain a secret
-    // value, and the public error contract only exposes status/category.
+    // value, and the public error contract only exposes sanitized metadata.
     super(redactSecrets(message))
     this.name = 'ApiError'
     this.status = options.status
     this.category = category
     this.validationErrors = options.validationErrors?.map(redactSecrets)
+    this.retryAfterSeconds = options.retryAfterSeconds
   }
 
   toUserMessage() {
@@ -297,6 +300,13 @@ export type ApiRequestOptions = {
   timeoutSeconds?: number
   auth?: 'read' | 'edit'
   headers?: HeadersInit
+}
+
+export type ApiJsonResponse<T> = {
+  body: T
+  status: number
+  retryAfterSeconds?: number
+  location?: string
 }
 
 export type ApiImageRequestDescriptor = {
@@ -363,6 +373,31 @@ const extractResponseMessage = (payload: unknown, response: Response): string =>
   if (typeof payload === 'string' && payload.trim()) return payload.trim()
   return response.statusText || `HTTP ${response.status}`
 }
+
+/** Parse the OpenAPI Retry-After delay-seconds header and bound it for polling. */
+const parseRetryAfterSeconds = (headers: Headers): number | undefined => {
+  const value = headers.get('Retry-After')?.trim()
+  if (!value || !/^\d+$/.test(value)) return undefined
+
+  // BigInt keeps very large, but syntactically valid, integer values precise
+  // before clamping them to the client-supported polling range.
+  const seconds = BigInt(value)
+  if (seconds < 1n) return 1
+  if (seconds > 60n) return 60
+  return Number(seconds)
+}
+
+const createHttpError = (payload: unknown, response: Response, settings: ApiSettings) => (
+  new ApiError(redactWithSettings(extractResponseMessage(payload, response), settings), {
+    status: response.status,
+    category: categoryForStatus(response.status),
+    retryAfterSeconds: parseRetryAfterSeconds(response.headers),
+    validationErrors: isRecord(payload) && isRecord(payload.data) && Array.isArray(payload.data.errors)
+      ? payload.data.errors.filter((value): value is string => typeof value === 'string')
+        .map((value) => redactWithSettings(value, settings))
+      : undefined,
+  })
+)
 
 const abortError = (message: string, category: ApiErrorCategory, cause?: unknown) => (
   new ApiError(message, { category, cause })
@@ -475,16 +510,25 @@ export class ApiClient {
     return this.requestAndConsume(path, options, async (response, isAborted) => {
       const payload = await parseTextPayload(response, isAborted)
       if (!response.ok) {
-        throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
-          status: response.status,
-          category: categoryForStatus(response.status),
-          validationErrors: isRecord(payload) && isRecord(payload.data) && Array.isArray(payload.data.errors)
-            ? payload.data.errors.filter((value): value is string => typeof value === 'string')
-              .map((value) => redactWithSettings(value, this.settings))
-            : undefined,
-        })
+        throw createHttpError(payload, response, this.settings)
       }
       return payload as T
+    })
+  }
+
+  async requestJsonResponse<T>(path: string, options: ApiRequestOptions = {}): Promise<ApiJsonResponse<T>> {
+    return this.requestAndConsume(path, options, async (response, isAborted) => {
+      const payload = await parseTextPayload(response, isAborted)
+      if (!response.ok) throw createHttpError(payload, response, this.settings)
+
+      const retryAfterSeconds = parseRetryAfterSeconds(response.headers)
+      const location = asNonEmptyString(response.headers.get('Location'))
+      return {
+        body: payload as T,
+        status: response.status,
+        ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }),
+        ...(location === undefined ? {} : { location }),
+      }
     })
   }
 
@@ -492,10 +536,7 @@ export class ApiClient {
     return this.requestAndConsume(path, options, async (response, isAborted) => {
       const payload = await parseTextPayload(response, isAborted)
       if (!response.ok) {
-        throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
-          status: response.status,
-          category: categoryForStatus(response.status),
-        })
+        throw createHttpError(payload, response, this.settings)
       }
       return typeof payload === 'string' ? payload : payload === undefined ? '' : JSON.stringify(payload)
     })
@@ -505,10 +546,7 @@ export class ApiClient {
     return this.requestAndConsume(path, options, async (response, isAborted) => {
       if (!response.ok) {
         const payload = await parseTextPayload(response, isAborted)
-        throw new ApiError(redactWithSettings(extractResponseMessage(payload, response), this.settings), {
-          status: response.status,
-          category: categoryForStatus(response.status),
-        })
+        throw createHttpError(payload, response, this.settings)
       }
       try {
         return await response.blob()
@@ -528,6 +566,12 @@ export const requestJson = <T>(
   options?: ApiRequestOptions,
   settingsOverride?: ApiSettingsInput,
 ) => (settingsOverride ? new ApiClient(settingsOverride) : apiClient).requestJson<T>(path, options)
+
+export const requestJsonResponse = <T>(
+  path: string,
+  options?: ApiRequestOptions,
+  settingsOverride?: ApiSettingsInput,
+) => (settingsOverride ? new ApiClient(settingsOverride) : apiClient).requestJsonResponse<T>(path, options)
 
 export const requestText = (
   path: string,

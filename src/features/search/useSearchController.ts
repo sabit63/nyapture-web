@@ -178,6 +178,23 @@ export function useSearchController({
     navigateSearchUrlFromRoute(url, searchExecution.refresh)
   }, [navigateSearchUrlFromRoute, searchExecution.refresh])
 
+  const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}`
+  const searchOperations = useSearchOperations({
+    isWebSearch,
+    apiRevision,
+    routeKey: searchOperationScopeKey,
+    librarySearchBooks,
+    webSearchResultBooks,
+    selected,
+    searchResultsRef: searchResultsStateRef,
+    setLibrarySearchBooks,
+    setSelected,
+    updateWebSearchResultBooks,
+    replaceWebSearchBook,
+    replaceWebSearchBooks,
+    notify,
+  })
+
   const changeHitomiAppend = useCallback((next: HitomiAppend) => {
     if (!isWebSearch || next === hitomiAppend) return
     const url = createSearchUrlForDestination(criteria, {
@@ -270,9 +287,13 @@ export function useSearchController({
   }, [routerLocation.revision])
 
   const displayedSearchResultBooks = useMemo(() => searchResultBooks.map((book) => {
-    const tags = applyTagDisplayNameOverrides(book.tags, tagDisplayNameOverrides)
-    return tags === book.tags ? book : { ...book, tags }
-  }), [searchResultBooks, tagDisplayNameOverrides])
+    const deletionPending = searchOperations.pendingDeletionKeys.has(getBookIdentityKey(book))
+    const projectedBook = deletionPending && book.status !== 'Shredding'
+      ? { ...book, status: 'Shredding' as const }
+      : book
+    const tags = applyTagDisplayNameOverrides(projectedBook.tags, tagDisplayNameOverrides)
+    return tags === projectedBook.tags ? projectedBook : { ...projectedBook, tags }
+  }), [searchOperations.pendingDeletionKeys, searchResultBooks, tagDisplayNameOverrides])
 
   // The missing-tag API evaluates ordinary conditions together with the missing types.
   const filteredBooks = isWebSearch || isMissingTagSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
@@ -481,24 +502,6 @@ export function useSearchController({
     requestClose('submit')
   }, [currentSearchDestination, draftCriteria, draftHitomiAppend, isWebSearch, isMissingTagSearch, navigateSearchUrl])
 
-  const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}`
-  const searchOperations = useSearchOperations({
-    isWebSearch,
-    apiRevision,
-    routeKey: searchOperationScopeKey,
-    librarySearchBooks,
-    webSearchResultBooks,
-    selected,
-    searchResultsRef: searchResultsStateRef,
-    setLibrarySearchBooks,
-    setSelected,
-    updateWebSearchResultBooks,
-    replaceWebSearchBook,
-    replaceWebSearchBooks,
-    refreshSearch: refresh,
-    notify,
-  })
-
   const goToResultPage = useCallback((page: number) => {
     const nextPage = Math.min(totalResultPages, Math.max(1, page))
     setSelected([])
@@ -517,10 +520,13 @@ export function useSearchController({
   const selectAllVisibleBooks = useCallback(() => {
     setSelected((current) => {
       const next = new Set(current)
-      visibleBooks.forEach((book) => next.add(getBookIdentityKey(book)))
+      visibleBooks.forEach((book) => {
+        const key = getBookIdentityKey(book)
+        if (!searchOperations.pendingDeletionKeys.has(key)) next.add(key)
+      })
       return [...next]
     })
-  }, [setSelected, visibleBooks])
+  }, [searchOperations.pendingDeletionKeys, setSelected, visibleBooks])
 
   return {
     applyBookTagChange,

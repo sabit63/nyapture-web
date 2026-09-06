@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
-import { ApiClient, ApiError } from '../src/api/client'
+import { ApiClient, ApiError, requestJsonResponse } from '../src/api/client'
 import { getBookPageBlob } from '../src/api/endpoints'
 
 type FetchInput = Parameters<typeof fetch>[1]
@@ -177,6 +177,91 @@ describe('ApiClient body lifecycle', () => {
     assert.equal(internalSignal?.aborted, false)
     await new Promise<void>((resolve) => setTimeout(resolve, 1_050))
     assert.equal(internalSignal?.aborted, false)
+  })
+})
+
+describe('ApiClient JSON response metadata', () => {
+  it('returns the parsed body, status, Retry-After, and Location', async () => {
+    const client = new ApiClient({ apiUrl: 'http://localhost:5270' })
+    setFetch(async () => new Response(JSON.stringify({ jobId: 'job-1' }), {
+      status: 202,
+      headers: {
+        Location: '/api/book/deletion-jobs/job-1',
+        'Retry-After': '3',
+      },
+    }))
+
+    const result = await client.requestJsonResponse<{ jobId: string }>('/api/book/1/2', { method: 'DELETE' })
+    assert.deepEqual(result, {
+      body: { jobId: 'job-1' },
+      status: 202,
+      retryAfterSeconds: 3,
+      location: '/api/book/deletion-jobs/job-1',
+    })
+  })
+
+  it('exposes Retry-After on HTTP errors through ApiError', async () => {
+    const client = new ApiClient({ apiUrl: 'http://localhost:5270' })
+    setFetch(async () => new Response(JSON.stringify({ error: 'queue full' }), {
+      status: 503,
+      headers: { 'Retry-After': '8' },
+    }))
+
+    await assert.rejects(
+      client.requestJsonResponse('/api/book/1/2', { method: 'DELETE' }),
+      (error: unknown) => {
+        assert.ok(error instanceof ApiError)
+        assert.equal(error.status, 503)
+        assert.equal(error.category, 'server')
+        assert.equal(error.retryAfterSeconds, 8)
+        return true
+      },
+    )
+  })
+
+  it('clamps integer Retry-After values and omits invalid values', async () => {
+    const client = new ApiClient({ apiUrl: 'http://localhost:5270' })
+    const responses = [
+      new Response('{}', { status: 202, headers: { 'Retry-After': '0' } }),
+      new Response('{}', { status: 202, headers: { 'Retry-After': '120' } }),
+      new Response('{}', { status: 202, headers: { 'Retry-After': '1.5' } }),
+      new Response('{}', { status: 202, headers: { 'Retry-After': 'Wed, 21 Oct 2015 07:28:00 GMT' } }),
+      new Response('{}', { status: 202, headers: { 'Retry-After': '  ' } }),
+    ]
+    let responseIndex = 0
+    setFetch(async () => responses[responseIndex++])
+
+    assert.equal((await client.requestJsonResponse('/job/0')).retryAfterSeconds, 1)
+    assert.equal((await client.requestJsonResponse('/job/60')).retryAfterSeconds, 60)
+    assert.equal((await client.requestJsonResponse('/job/fraction')).retryAfterSeconds, undefined)
+    assert.equal((await client.requestJsonResponse('/job/date')).retryAfterSeconds, undefined)
+    assert.equal((await client.requestJsonResponse('/job/blank')).retryAfterSeconds, undefined)
+  })
+
+  it('keeps requestJson returning only the parsed body and supports the wrapper', async () => {
+    const responses = [
+      new Response(JSON.stringify({ value: 1 }), {
+        status: 202,
+        headers: { Location: '/job/1', 'Retry-After': '4' },
+      }),
+      new Response(JSON.stringify({ value: 2 }), {
+        status: 202,
+        headers: { Location: '/job/2', 'Retry-After': '5' },
+      }),
+    ]
+    let responseIndex = 0
+    setFetch(async () => responses[responseIndex++])
+    const client = new ApiClient({ apiUrl: 'http://localhost:5270' })
+
+    assert.deepEqual(await client.requestJson<{ value: number }>('/body-only'), { value: 1 })
+    assert.deepEqual(await requestJsonResponse<{ value: number }>('/metadata', undefined, {
+      apiUrl: 'http://localhost:5270',
+    }), {
+      body: { value: 2 },
+      status: 202,
+      retryAfterSeconds: 5,
+      location: '/job/2',
+    })
   })
 })
 

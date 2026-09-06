@@ -10,12 +10,15 @@
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--layout-control-gap, var(--space-3));
-  min-height: 58px;
-  margin-bottom: var(--space-4);
+  min-height: 56px;
+  margin-bottom: var(--space-5);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-overview);
-  background: linear-gradient(135deg, #292633, #242430);
+  background:
+    radial-gradient(circle at 3% 0%, #8f2d8128 0, transparent 26%),
+    linear-gradient(135deg, #282431, #23232f);
+  box-shadow: inset 0 1px 0 #ffffff08;
 }
 
 .dashboard-detail__header h1 {
@@ -92,7 +95,7 @@
 .dashboard-detail__generated {
   justify-self: end;
   color: var(--color-text-dim);
-  font-size: .66rem;
+  font-size: var(--font-size-label-sm);
 }
 
 .dashboard-detail__meta-line {
@@ -133,6 +136,7 @@
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-surface);
   background: var(--color-surface);
+  box-shadow: inset 0 1px 0 #ffffff05;
 }
 
 .dashboard-detail__panel h2,
@@ -143,7 +147,7 @@
 .dashboard-detail__section h3 {
   margin: 0;
   color: var(--color-text);
-  font-size: .82rem;
+  font-size: var(--font-size-body-md);
 }
 
 .dashboard-detail__grid,
@@ -156,10 +160,26 @@
 
 .dashboard-detail__metric {
   min-width: 0;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-3);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-surface);
   background: #292933;
+}
+
+.dashboard-detail__metric-label {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dashboard-detail__metric-label > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-detail__metric-icon {
@@ -167,7 +187,7 @@
   height: 28px;
   display: inline-grid;
   place-items: center;
-  margin-bottom: var(--space-2);
+  flex: 0 0 auto;
   border: 1px solid var(--color-neutral-border);
   border-radius: var(--radius-control);
   background: var(--color-neutral-fill);
@@ -178,13 +198,13 @@
 .dashboard-detail__metric-icon--warning { border-color: var(--color-warning-border); background: var(--color-warning-soft); color: var(--color-warning-text); }
 .dashboard-detail__metric-icon--danger { border-color: var(--color-danger-border); background: var(--color-danger-soft); color: var(--color-danger-text); }
 .dashboard-detail__metric-icon--info { border-color: var(--color-info-border); background: var(--color-info-soft); color: var(--color-info-text); }
-.dashboard-detail__metric > strong { display: block; margin-top: var(--space-1); color: var(--color-text); font-size: .9rem; font-weight: 700; overflow-wrap: anywhere; }
+.dashboard-detail__metric > strong { display: block; margin-top: var(--space-3); color: var(--color-text); font-size: var(--font-size-body-md); font-weight: 700; overflow-wrap: anywhere; }
 
 .dashboard-detail__metric-label,
 .dashboard-detail__label,
 .dashboard-detail dt {
   color: var(--color-text-dim);
-  font-size: .65rem;
+  font-size: var(--font-size-label-sm);
   font-weight: 700;
   letter-spacing: .04em;
 }
@@ -193,7 +213,7 @@
 .dashboard-detail dd {
   margin: var(--space-1) 0 0;
   color: var(--color-text);
-  font-size: .9rem;
+  font-size: var(--font-size-body-md);
   font-weight: 700;
   overflow-wrap: anywhere;
 }
@@ -208,7 +228,7 @@
   border-radius: var(--radius-full);
   background: var(--color-neutral-fill);
   color: var(--color-neutral-on-fill);
-  font-size: .64rem;
+  font-size: var(--font-size-label-sm);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -315,7 +335,7 @@
 .dashboard-detail table {
   width: 100%;
   border-collapse: collapse;
-  font-size: .7rem;
+  font-size: var(--font-size-body-sm);
 }
 
 .dashboard-detail th,
@@ -328,7 +348,7 @@
 
 .dashboard-detail th {
   color: var(--color-text-dim);
-  font-size: .62rem;
+  font-size: var(--font-size-label-sm);
   letter-spacing: .05em;
   white-space: nowrap;
 }
@@ -436,6 +456,7 @@
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-surface);
   background: #292933;
+  box-shadow: inset 0 1px 0 #ffffff04;
 }
 
 .dashboard-detail__filter-label,

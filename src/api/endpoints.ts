@@ -14,7 +14,7 @@ import type {
   TagAdditionalNameUpsertRequest,
   TagAdditionalNameUpsertResponse,
 } from '../models'
-import { requestBlob, requestJson } from './client'
+import { requestBlob, requestJson, requestJsonResponse } from './client'
 import type {
   WebBookCacheBookDto,
   WebBookCacheSearchRequest,
@@ -61,6 +61,29 @@ export const deleteBookPhysical = (groupId: string, bookId: string, signal?: Abo
     signal,
   })
 )
+
+/**
+ * Permanently remove a library book and retain the HTTP response metadata.
+ *
+ * The body contract intentionally matches deleteBookPhysical.  The metadata
+ * is needed by the asynchronous deletion monitor for Retry-After scheduling,
+ * while the legacy endpoint above continues to expose only its response body.
+ */
+export const deleteBookPhysicalWithMetadata = (
+  groupId: string,
+  bookId: string,
+  signal?: AbortSignal,
+) => (
+  requestJsonResponse<BookDeletionJobResponse>(`/api/book/${segment(groupId)}/${segment(bookId)}`, {
+    method: 'DELETE',
+    query: { remove: true },
+    auth: 'edit',
+    signal,
+  })
+)
+
+/** Explicit name for the asynchronous physical-deletion enqueue operation. */
+export const enqueueBookPhysicalDeletion = deleteBookPhysicalWithMetadata
 
 /** @deprecated Use deleteBookPhysical to make the deletion disposition explicit. */
 export const deleteBook = deleteBookPhysical

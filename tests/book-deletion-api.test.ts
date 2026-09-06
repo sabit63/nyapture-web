@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 
 import { configureApi, getApiSettings } from '../src/api/client'
-import { deleteBook, deleteBookPhysical } from '../src/api/endpoints'
+import { deleteBook, deleteBookPhysical, enqueueBookPhysicalDeletion } from '../src/api/endpoints'
 
 type FetchInput = Parameters<typeof fetch>[1]
 
@@ -44,5 +44,25 @@ describe('physical book deletion endpoint', () => {
 
   it('keeps the legacy descriptor as an explicit physical-delete alias', () => {
     assert.equal(deleteBook, deleteBookPhysical)
+  })
+
+  it('preserves response metadata for the asynchronous deletion runner', async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      success: true,
+      data: { jobId: 'job-1', status: 'Pending', disposition: 'Physical' },
+    }), {
+      status: 202,
+      headers: {
+        Location: '/api/book/deletion-jobs/job-1',
+        'Retry-After': '3',
+      },
+    })) as typeof fetch
+
+    const result = await enqueueBookPhysicalDeletion('group', 'book')
+
+    assert.equal(result.body.data?.jobId, 'job-1')
+    assert.equal(result.status, 202)
+    assert.equal(result.retryAfterSeconds, 3)
+    assert.equal(result.location, '/api/book/deletion-jobs/job-1')
   })
 })

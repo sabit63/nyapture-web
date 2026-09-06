@@ -106,6 +106,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     displaySettings,
     selectMode,
     selected,
+    pendingDeletionKeys,
     sortType,
     sortDirection,
     hitomiSortPeriod,
@@ -135,6 +136,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     applyBookTagChange,
     applyBookTitleChange,
   } = controller
+  const selectableVisibleBooks = visibleBooks.filter((book) => !pendingDeletionKeys.has(getBookIdentityKey(book)))
 
   useEffect(() => {
     retryPendingScrollRestoration()
@@ -315,7 +317,7 @@ export function SearchPage({ controller }: SearchPageProps) {
               size="compact"
               type="button"
               aria-label="全選択"
-              disabled={isSearchLoading || visibleBooks.length === 0 || visibleBooks.every((book) => selected.includes(getBookIdentityKey(book)))}
+              disabled={isSearchLoading || selectableVisibleBooks.length === 0 || selectableVisibleBooks.every((book) => selected.includes(getBookIdentityKey(book)))}
               onClick={selectAllVisibleBooks}
             >
               <ListChecks size={17} aria-hidden="true" />
@@ -344,7 +346,7 @@ export function SearchPage({ controller }: SearchPageProps) {
               size="compact"
               type="button"
               aria-label="全選択"
-              disabled={isSearchLoading || visibleBooks.length === 0 || visibleBooks.every((book) => selected.includes(getBookIdentityKey(book)))}
+              disabled={isSearchLoading || selectableVisibleBooks.length === 0 || selectableVisibleBooks.every((book) => selected.includes(getBookIdentityKey(book)))}
               onClick={selectAllVisibleBooks}
             >
               <ListChecks size={17} aria-hidden="true" />
@@ -397,29 +399,34 @@ export function SearchPage({ controller }: SearchPageProps) {
               aria-busy={isSearchLoading}
               inert={isSearchLoading ? true : undefined}
             >
-              {visibleBooks.map((book) => (
-                <BookCard
-                  key={getBookIdentityKey(book)}
-                  book={book}
-                  selectMode={selectMode}
-                  selected={selected.includes(getBookIdentityKey(book))}
-                  onToggle={() => toggleSelection(getBookIdentityKey(book))}
-                  onTagSearch={searchByTag}
-                  onTagSearchDestinationRequest={openTagSearchDestination}
-                  onTagOverflowDetails={(trigger) => {
-                    detailsTriggerRef.current = trigger
-                    setDetailsBook(book)
-                    setDetailsOpen(true)
-                  }}
-                  isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
-                  onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
-                    ? (trigger) => openWebBookDetail(book, trigger)
-                    : undefined}
-                  onDelete={(trigger) => deleteLibraryBook(book, trigger)}
-                  onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
-                  onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
-                />
-              ))}
+              {visibleBooks.map((book) => {
+                const bookKey = getBookIdentityKey(book)
+                const deletionPending = pendingDeletionKeys.has(bookKey)
+                return (
+                  <BookCard
+                    key={bookKey}
+                    book={book}
+                    selectMode={selectMode}
+                    selected={selected.includes(bookKey)}
+                    onToggle={() => toggleSelection(bookKey)}
+                    actionsDisabled={deletionPending}
+                    onTagSearch={searchByTag}
+                    onTagSearchDestinationRequest={openTagSearchDestination}
+                    onTagOverflowDetails={(trigger) => {
+                      detailsTriggerRef.current = trigger
+                      setDetailsBook(book)
+                      setDetailsOpen(true)
+                    }}
+                    isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
+                    onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
+                      ? (trigger) => openWebBookDetail(book, trigger)
+                      : undefined}
+                    onDelete={(trigger) => deleteLibraryBook(book, trigger)}
+                    onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
+                    onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
+                  />
+                )
+              })}
             </div>
             {showSearchLoader && (
               <div className="results-loading-overlay" aria-hidden="true">

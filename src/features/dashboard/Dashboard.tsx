@@ -409,7 +409,6 @@ function DashboardHome({
             status={getServiceStatus(summary?.webPilot)}
             error={sectionError(errors, ['webPilot', 'webpilot'])}
           >
-            <strong>{summary?.webPilot?.isConfigured ? '設定済み' : '未設定'}</strong>
             <span>
               {summary?.webPilot?.lastTestStatus
                 ? `最終テスト: ${summary.webPilot.lastTestStatus}`
@@ -424,7 +423,6 @@ function DashboardHome({
             status={getServiceStatus(summary?.imageWorker)}
             error={sectionError(errors, ['imageWorker', 'image-worker'])}
           >
-            <strong>{summary?.imageWorker?.isConfigured ? '設定済み' : '未設定'}</strong>
             <span>
               {summary?.imageWorker?.lastTestStatus
                 ? `最終テスト: ${summary.imageWorker.lastTestStatus}`
@@ -462,7 +460,6 @@ function DashboardHome({
             icon={Server}
             status={{ label: '管理', tone: 'info', icon: Server }}
           >
-            <strong>同期と設定</strong>
             <span>サイト・自動ダウンロード管理</span>
           </SummaryCard>
           <SummaryCard
