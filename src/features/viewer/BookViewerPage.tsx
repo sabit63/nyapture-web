@@ -1,11 +1,12 @@
-import { ArrowUp, ImageOff, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { RefObject, SyntheticEvent } from 'react'
+import { ArrowUp, ImageOff, ZoomIn, ZoomOut } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import type { ApiBookCardModel } from '../../api'
 import { getBookPageBlob } from '../../api'
 import { useViewerGeometry } from './use-viewer-geometry'
 import { BookDetailsSheet } from './BookDetailsSheet'
-import { BookPageLoader, INITIAL_BOOK_PAGE_SNAPSHOT } from './book-page-loading'
+import { BookPageLoader } from './book-page-loading'
+import { BookPageImage } from './BookPageImage'
 import type { BookCardModel, BookTag } from '../../models'
 import { InternalLink } from '../../app/client-router'
 import { Button, buttonClassName } from '../../components/ui/Button'
@@ -28,8 +29,6 @@ export type BookViewerPageProps = {
   detailsTriggerRef: RefObject<HTMLButtonElement | null>
 }
 
-const PAGE_WIDTH = 1000
-const PAGE_HEIGHT = 1400
 const READER_BASE_WIDTH = 760
 const MAX_PAGE_COUNT = 10_000
 const VIEWER_ZOOM_LEVELS = [50, 75, 100, 125, 150] as const
@@ -245,7 +244,7 @@ function BookViewerReady({
   const renderedPages = useMemo(
     () =>
       Array.from({ length: totalPages }, (_, index) => (
-        <BookViewerPageImage
+        <BookPageImage
           key={`${bookIdentity}:${index + 1}`}
           bookTitle={book.title}
           pageLoader={pageLoader}
@@ -345,109 +344,5 @@ function BookViewerReady({
     </section>
   )
 }
-
-const BookViewerPageImage = memo(function BookViewerPageImage({
-  bookTitle,
-  pageLoader,
-  pageNumber,
-}: {
-  bookTitle: string
-  pageLoader: BookPageLoader
-  pageNumber: number
-}) {
-  const subscribe = useCallback(
-    (listener: () => void) => pageLoader.subscribe(pageNumber, listener),
-    [pageLoader, pageNumber],
-  )
-  const getSnapshot = useCallback(
-    () => pageLoader.getSnapshot(pageNumber),
-    [pageLoader, pageNumber],
-  )
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => INITIAL_BOOK_PAGE_SNAPSHOT)
-  const isBusy =
-    snapshot.phase === 'queued' ||
-    snapshot.phase === 'loading' ||
-    snapshot.phase === 'decoding' ||
-    snapshot.phase === 'retryWaiting'
-  const initialCandidateUrl = snapshot.displayedUrl ? undefined : snapshot.candidateUrl
-  const upgradeCandidateUrl = snapshot.displayedUrl ? snapshot.candidateUrl : undefined
-  const pageLabel = `${bookTitle}の${pageNumber}ページ目`
-
-  const candidateLoaded = (event: SyntheticEvent<HTMLImageElement>) => {
-    if (!snapshot.candidateUrl || snapshot.candidateGeneration === undefined) return
-    pageLoader.candidateLoaded(
-      pageNumber,
-      snapshot.candidateGeneration,
-      snapshot.candidateUrl,
-      event.currentTarget.naturalWidth,
-      event.currentTarget.naturalHeight,
-    )
-  }
-  const candidateFailed = () => {
-    if (!snapshot.candidateUrl || snapshot.candidateGeneration === undefined) return
-    pageLoader.candidateFailed(pageNumber, snapshot.candidateGeneration, snapshot.candidateUrl)
-  }
-
-  return (
-    <figure
-      className={`book-viewer__page book-viewer__page--${snapshot.phase} ${snapshot.isUpgrading ? 'is-upgrading' : ''}`}
-      data-page-number={pageNumber}
-      aria-busy={isBusy ? true : undefined}
-      style={{ aspectRatio: snapshot.aspectRatio }}
-    >
-      <div className="book-viewer__page-frame">
-        {!snapshot.displayedUrl && isBusy && (
-          <span className="book-viewer__page-skeleton" aria-hidden="true" />
-        )}
-        {snapshot.displayedUrl && (
-          <img
-            src={snapshot.displayedUrl}
-            alt={pageLabel}
-            width={PAGE_WIDTH}
-            height={PAGE_HEIGHT}
-            decoding="async"
-          />
-        )}
-        {initialCandidateUrl && (
-          <img
-            src={initialCandidateUrl}
-            alt={pageLabel}
-            width={PAGE_WIDTH}
-            height={PAGE_HEIGHT}
-            decoding="async"
-            onLoad={candidateLoaded}
-            onError={candidateFailed}
-          />
-        )}
-        {upgradeCandidateUrl && (
-          <img
-            className="book-viewer__page-image-probe"
-            src={upgradeCandidateUrl}
-            alt=""
-            width={PAGE_WIDTH}
-            height={PAGE_HEIGHT}
-            decoding="async"
-            aria-hidden="true"
-            onLoad={candidateLoaded}
-            onError={candidateFailed}
-          />
-        )}
-        {snapshot.phase === 'error' && (
-          <div
-            className="book-viewer__page-error"
-            aria-label={`${pageLabel}を読み込めませんでした`}
-          >
-            <ImageOff size={27} strokeWidth={1.5} aria-hidden="true" />
-            <span>このページを読み込めませんでした</span>
-            <button type="button" onClick={() => pageLoader.manualRetry(pageNumber)}>
-              <RotateCcw size={14} aria-hidden="true" />
-              再試行
-            </button>
-          </div>
-        )}
-      </div>
-    </figure>
-  )
-})
 
 export { BookViewerPage }

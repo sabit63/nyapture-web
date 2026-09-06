@@ -10,7 +10,12 @@ import { navigateBackOrFallback, RouterRuntime, useRouterLocation } from './app/
 import { RouteBoundary } from './app/RouteBoundary'
 import { useSnackbar } from './components/Snackbar'
 import { IconButton, StatePanel } from './components/ui'
-import { SearchHeader, SearchPage, useSearchController } from './features/search'
+import {
+  SEARCH_CONTINUOUS_DETAILS_ACTION_ID,
+  SearchHeader,
+  SearchPage,
+  useSearchController,
+} from './features/search'
 import { API_CONNECTION_STATE_LABELS, useApiSettings } from './features/settings'
 import { AppOverlays } from './features/shell/AppOverlays'
 import { useAppShellController } from './features/shell/useAppShellController'
@@ -131,6 +136,10 @@ function App() {
               <FileText size={18} aria-hidden="true" />
             </IconButton>
           )}
+          <span
+            id={SEARCH_CONTINUOUS_DETAILS_ACTION_ID}
+            className="topbar__action-slot"
+          />
           <IconButton
             ref={apiSettingsController.apiSettingsTriggerRef}
             className="api-settings-trigger"

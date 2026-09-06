@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   BOOK_PAGE_DECODE_TIMEOUT_MS,
+  BOOK_PAGE_MAX_CONCURRENCY,
   BOOK_PAGE_MAX_PIPELINE,
   BookPageLoader,
   compareBookPageQueueCandidates,
@@ -74,7 +75,7 @@ test('queue priority is deterministic across lanes and distance', () => {
   assert.deepEqual(candidates.map(getBookPageQueueLane), [5, 3, 2, 1, 0, 4, 3])
 })
 
-test('four-request cap includes an aborted request until its promise settles', async () => {
+test('default request cap includes an aborted request until its promise settles', async () => {
   const requests: Array<ReturnType<typeof deferred<Blob>> & { pageNumber: number; signal: AbortSignal }> = []
   const loader = new BookPageLoader({
     totalPages: 6,
@@ -93,18 +94,65 @@ test('four-request cap includes an aborted request until its promise settles', a
   }
   await flushPromises()
 
-  assert.equal(loader.getActiveCount(), 4)
-  assert.equal(requests.length, 4)
+  assert.equal(loader.getActiveCount(), BOOK_PAGE_MAX_CONCURRENCY)
+  assert.equal(requests.length, BOOK_PAGE_MAX_CONCURRENCY)
   loader.setLoadRange(1, false)
   loader.setRetentionRange(1, false)
   assert.equal(requests[0].signal.aborted, true)
-  assert.equal(loader.getActiveCount(), 4)
-  assert.equal(requests.length, 4)
+  assert.equal(loader.getActiveCount(), BOOK_PAGE_MAX_CONCURRENCY)
+  assert.equal(requests.length, BOOK_PAGE_MAX_CONCURRENCY)
 
   requests[0].reject(new DOMException('aborted', 'AbortError'))
   await flushPromises()
-  assert.equal(loader.getActiveCount(), 4)
-  assert.equal(requests.length, 5)
+  assert.equal(loader.getActiveCount(), BOOK_PAGE_MAX_CONCURRENCY)
+  assert.equal(requests.length, BOOK_PAGE_MAX_CONCURRENCY + 1)
+  loader.dispose()
+})
+
+test('custom concurrency and pipeline limits cap and drain queued requests', async () => {
+  const requests: Array<ReturnType<typeof deferred<Blob>>> = []
+  let nextUrl = 0
+  const loader = new BookPageLoader({
+    totalPages: 6,
+    maxConcurrency: 2,
+    maxPipeline: 3,
+    loadPage: () => {
+      const request = deferred<Blob>()
+      requests.push(request)
+      return request.promise
+    },
+    createObjectUrl: () => `blob:custom-limit-${++nextUrl}`,
+    revokeObjectUrl: () => undefined,
+  })
+  loader.setRequestWidth(640)
+  for (let pageNumber = 1; pageNumber <= 6; pageNumber += 1) {
+    loader.setRetentionRange(pageNumber, true)
+    loader.setLoadRange(pageNumber, true)
+  }
+  await flushPromises()
+
+  assert.equal(loader.getActiveCount(), 2)
+  assert.equal(loader.getPipelineCount(), 2)
+  assert.equal(requests.length, 2)
+
+  requests.slice(0, 2).forEach((request) => request.resolve(new Blob(['candidate'])))
+  await flushPromises()
+  assert.equal(loader.getActiveCount(), 1)
+  assert.equal(loader.getPipelineCount(), 3)
+  assert.equal(requests.length, 3)
+
+  const firstCandidate = loader.getSnapshot(1)
+  loader.candidateLoaded(
+    1,
+    firstCandidate.candidateGeneration!,
+    firstCandidate.candidateUrl!,
+    640,
+    896,
+  )
+  await flushPromises()
+  assert.equal(loader.getActiveCount(), 2)
+  assert.equal(loader.getPipelineCount(), 3)
+  assert.equal(requests.length, 4)
   loader.dispose()
 })
 

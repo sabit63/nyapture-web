@@ -1,5 +1,5 @@
 export { AdvancedSearchDialog } from './AdvancedSearchDialog'
 export { WebBookDetailDialog } from './WebBookDetailDialog'
-export { SearchHeader, SearchPage } from './SearchPage'
+export { SEARCH_CONTINUOUS_DETAILS_ACTION_ID, SearchHeader, SearchPage } from './SearchPage'
 export { useSearchController, type SearchController } from './useSearchController'
 export * from './search-utils'

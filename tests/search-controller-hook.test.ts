@@ -47,3 +47,60 @@ it('composed search controller synchronizes URL state, execution, selection and 
     dom.cleanup()
   }
 })
+
+it('continuous reader navigation preserves its mode and resets stale start identities', async () => {
+  const dom = installHookDom('http://localhost/search?q=sample&page=1&view=continuous&gid=fixture&id=book')
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    success: true,
+    books: [{
+      groupId: 'fixture',
+      bookId: 'book',
+      title: 'Fixture',
+      totalPage: 3,
+      status: 'Downloaded',
+    }],
+    totalPage: 5,
+  }), { headers: { 'Content-Type': 'application/json' } })
+  const hook = await renderHook(() => useSearchController({
+    isWebSearch: false,
+    isLibrarySearch: true,
+    isMissingTagSearch: false,
+    isBookViewer: false,
+    apiRevision: 0,
+    displaySettings: { thumbnailColumns: 5 },
+    hubConnectionState: 'idle',
+    notify: () => {},
+  }), undefined)
+
+  try {
+    assert.equal(hook.current.searchView, 'continuous')
+    assert.deepEqual(hook.current.continuousStart, { groupId: 'fixture', bookId: 'book' })
+
+    await act(async () => { hook.current.goToResultPage(2) })
+    let params = new URL(dom.window.location.href).searchParams
+    assert.equal(params.get('view'), 'continuous')
+    assert.equal(params.get('page'), '2')
+    assert.equal(params.has('gid'), false)
+    assert.equal(params.has('id'), false)
+
+    await act(async () => { hook.current.enterContinuousView(hook.current.searchResultBooks[0]) })
+    params = new URL(dom.window.location.href).searchParams
+    assert.equal(params.get('gid'), 'fixture')
+    assert.equal(params.get('id'), 'book')
+
+    await act(async () => { hook.current.searchByTag({ type: 'Artists', name: 'artist' }) })
+    params = new URL(dom.window.location.href).searchParams
+    assert.equal(params.get('view'), 'continuous')
+    assert.equal(params.has('gid'), false)
+    assert.equal(params.has('id'), false)
+
+    await act(async () => { hook.current.exitContinuousView() })
+    params = new URL(dom.window.location.href).searchParams
+    assert.equal(params.has('view'), false)
+    assert.equal(params.has('gid'), false)
+    assert.equal(params.has('id'), false)
+  } finally {
+    await hook.unmount()
+    dom.cleanup()
+  }
+})

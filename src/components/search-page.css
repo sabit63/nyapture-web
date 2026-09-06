@@ -96,6 +96,11 @@
 .hitomi-append-control select:focus-visible { border-color: var(--color-focus); }
 .hitomi-append-control svg { position: absolute; right: var(--space-2); pointer-events: none; }
 .toolbar-icon { width: var(--control-height-compact); height: var(--control-height-compact); border-color: var(--color-border); background: var(--color-surface); }
+.search-view-toggle { display: inline-flex; align-items: center; }
+.search-view-toggle .toolbar-icon { border-radius: 0; }
+.search-view-toggle .toolbar-icon:first-child { border-radius: var(--radius-control) 0 0 var(--radius-control); }
+.search-view-toggle .toolbar-icon:last-child { margin-left: -1px; border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+.search-view-toggle .toolbar-icon.is-active { position: relative; z-index: 1; border-color: var(--color-accent-border); background: var(--color-accent-soft); color: var(--color-accent-text); }
 .selection-toolbar__delete { border-color: var(--color-danger-border); background: var(--color-danger-soft); color: var(--color-danger-text); }
 .selection-toggle.is-active { border-color: var(--color-accent-border); background: var(--color-accent-soft); color: var(--color-accent-text); }
 .sort-direction-toggle { color: var(--color-text-muted); }
@@ -103,7 +108,8 @@
 .sort-direction-toggle[aria-pressed='true'] { border-color: var(--color-accent-border); background: var(--color-accent-soft); color: var(--color-accent-text); }
 
 .results-stage { position: relative; }
-.results-stage--loading-visible .book-grid { opacity: .48; }
+.results-stage--loading-visible .book-grid,
+.results-stage--loading-visible .continuous-reader { opacity: .48; }
 .results-loading-overlay { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .results-spinner { color: var(--color-accent-text); animation: ui-spin .85s linear infinite; }
 

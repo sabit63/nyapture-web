@@ -117,3 +117,6 @@ body.drawer-open { overflow: hidden; }
 
   .topbar .brand { display: inline-flex; }
 }
+.topbar__action-slot {
+  display: contents;
+}

@@ -75,6 +75,10 @@ export type BookPageLoaderOptions = {
   random?: () => number
   setTimer?: (callback: () => void, delayMs: number) => unknown
   clearTimer?: (timer: unknown) => void
+  /** Maximum in-flight fetches. Defaults to the existing viewer limit of 4. */
+  maxConcurrency?: number
+  /** Maximum fetch/decode pipeline slots. Defaults to the existing viewer limit of 6. */
+  maxPipeline?: number
 }
 
 const DEFAULT_ASPECT_RATIO = 5 / 7
@@ -86,6 +90,10 @@ export const INITIAL_BOOK_PAGE_SNAPSHOT: BookPageSnapshot = Object.freeze({
 })
 
 const asFinitePositive = (value: number) => Number.isFinite(value) && value > 0 ? value : undefined
+
+const normalizeBookPageLimit = (value: number | undefined, fallback: number) => (
+  typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : fallback
+)
 
 export const getBookPageRequestWidth = (
   readerWidth: number,
@@ -176,6 +184,8 @@ export class BookPageLoader {
   private readonly random: () => number
   private readonly setTimer: NonNullable<BookPageLoaderOptions['setTimer']>
   private readonly clearTimer: NonNullable<BookPageLoaderOptions['clearTimer']>
+  private readonly maxConcurrency: number
+  private readonly maxPipeline: number
   private currentPage = 1
   private requestWidth?: BookPageRequestWidth
   private activeCount = 0
@@ -196,6 +206,8 @@ export class BookPageLoader {
     this.random = options.random ?? Math.random
     this.setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs))
     this.clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer as ReturnType<typeof setTimeout>))
+    this.maxConcurrency = normalizeBookPageLimit(options.maxConcurrency, BOOK_PAGE_MAX_CONCURRENCY)
+    this.maxPipeline = normalizeBookPageLimit(options.maxPipeline, BOOK_PAGE_MAX_PIPELINE)
   }
 
   subscribe(pageNumber: number, listener: () => void) {
@@ -526,8 +538,8 @@ export class BookPageLoader {
   private drainQueue() {
     if (this.disposed) return
     while (
-      this.activeCount < BOOK_PAGE_MAX_CONCURRENCY
-      && this.activePipelineCount < BOOK_PAGE_MAX_PIPELINE
+      this.activeCount < this.maxConcurrency
+      && this.activePipelineCount < this.maxPipeline
     ) {
       const candidates = [...this.queuedPages].flatMap((pageNumber) => {
         const record = this.records.get(pageNumber)

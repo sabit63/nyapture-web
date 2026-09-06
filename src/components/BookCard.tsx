@@ -35,7 +35,11 @@ export type BookCardProps = {
   onDelete?: (trigger: HTMLButtonElement) => void
   onRefresh?: () => void
   onDownload?: () => void
+  /** Opens both cover and title unless `onCoverOpen` overrides the cover. */
   onOpen?: (trigger?: HTMLElement) => void
+  /** Opens only the cover; the title keeps its normal `onOpen` or viewer-link behavior. */
+  onCoverOpen?: (trigger?: HTMLElement) => void
+  coverOpenAriaLabel?: string
   onTagOverflowDetails?: (trigger: HTMLButtonElement) => void
   openDisabled?: boolean
   actionsDisabled?: boolean
@@ -58,6 +62,8 @@ export function BookCard({
   onRefresh,
   onDownload,
   onOpen,
+  onCoverOpen,
+  coverOpenAriaLabel,
   onTagOverflowDetails,
   openDisabled = false,
   actionsDisabled = false,
@@ -96,6 +102,7 @@ export function BookCard({
   const canDownload = !isDownloading && !isDownloaded && typeof onDownload === 'function'
   const canDelete = (allowWebDelete || !isWebBook) && typeof onDelete === 'function'
   const hasActions = canRefresh || canDownload || canDelete || (extraActions !== undefined && extraActions !== null)
+  const coverOpen = onCoverOpen ?? onOpen
   const tagsDialogTitleId = `tags-dialog-title-${tagsId}`
 
   const handleThumbnailClick = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -136,6 +143,8 @@ export function BookCard({
     <article
       className={`book-card ${selected ? 'book-card--selected' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`}
       data-book-status={book.status}
+      data-book-group-id={apiGroupId}
+      data-book-id={apiBookId}
       aria-busy={actionsDisabled || undefined}
     >
       <Thumbnail
@@ -144,21 +153,21 @@ export function BookCard({
         reloadKey={thumbnailReloadKey}
         loadingPolicy={{ mode: 'page', viewports: 3 }}
         alt={`${book.title}の表紙`}
-        linkHref={onOpen ? undefined : viewerUrl}
-        linkAriaLabel={onOpen ? undefined : `${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
-        linkTabIndex={onOpen ? undefined : (selectMode ? -1 : undefined)}
-        linkOnClick={onOpen ? undefined : handleThumbnailClick}
+        linkHref={coverOpen ? undefined : viewerUrl}
+        linkAriaLabel={coverOpen ? undefined : `${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
+        linkTabIndex={coverOpen ? undefined : (selectMode ? -1 : undefined)}
+        linkOnClick={coverOpen ? undefined : handleThumbnailClick}
         fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
         fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
         variant={book.cover}
       >
-        {onOpen && (
+        {coverOpen && (
           <button
             type="button"
             className="book-cover__open-button"
-            aria-label={`${book.title}を表示`}
+            aria-label={coverOpenAriaLabel ?? `${book.title}を表示`}
             disabled={openDisabled}
-            onClick={(event) => onOpen(event.currentTarget)}
+            onClick={(event) => coverOpen(event.currentTarget)}
           />
         )}
         {book.totalPage > 0 && <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>}

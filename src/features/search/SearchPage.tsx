@@ -3,7 +3,10 @@ import {
   ArrowUp,
   Check,
   ChevronDown,
+  FileText,
   ListChecks,
+  Images,
+  LayoutGrid,
   LoaderCircle,
   RefreshCw,
   Search,
@@ -11,7 +14,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { ApiBookCardModel } from '../../api'
 import { retryPendingScrollRestoration } from '../../app/client-router'
@@ -28,6 +32,10 @@ import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
 import { BookDetailsSheet } from '../viewer/BookDetailsSheet'
+import { SearchContinuousReader } from './SearchContinuousReader'
+import { isReadableBook, resolveContinuousStart } from './search-continuous-utils'
+
+export const SEARCH_CONTINUOUS_DETAILS_ACTION_ID = 'search-continuous-details-action'
 
 export type SearchHeaderProps = {
   controller: SearchController
@@ -90,7 +98,11 @@ export type SearchPageProps = {
 export function SearchPage({ controller }: SearchPageProps) {
   const [detailsBook, setDetailsBook] = useState<ApiBookCardModel>()
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [activeContinuousBook, setActiveContinuousBook] = useState<ApiBookCardModel>()
+  const [continuousHeaderActionHost, setContinuousHeaderActionHost] = useState<HTMLElement | null>(null)
+  const [returnRestoreRevision, setReturnRestoreRevision] = useState(0)
   const detailsTriggerRef = useRef<HTMLButtonElement>(null)
+  const returnToBookRef = useRef<ApiBookCardModel | undefined>(undefined)
   const {
     isWebSearch,
     criteria,
@@ -112,8 +124,9 @@ export function SearchPage({ controller }: SearchPageProps) {
     hitomiSortPeriod,
     totalResultPages,
     resultPage,
+    searchView,
+    continuousStart,
     paginationPageCount,
-    setResultPage,
     changeHitomiAppend,
     setHitomiSortPeriod,
     setSortType,
@@ -135,6 +148,8 @@ export function SearchPage({ controller }: SearchPageProps) {
     goToResultPage,
     applyBookTagChange,
     applyBookTitleChange,
+    enterContinuousView,
+    exitContinuousView,
   } = controller
   const selectableVisibleBooks = visibleBooks.filter((book) => !pendingDeletionKeys.has(getBookIdentityKey(book)))
 
@@ -143,10 +158,63 @@ export function SearchPage({ controller }: SearchPageProps) {
     setDetailsOpen(false)
   }, [searchResultGeneration])
 
+  useEffect(() => {
+    setContinuousHeaderActionHost(document.getElementById(SEARCH_CONTINUOUS_DETAILS_ACTION_ID))
+  }, [])
+
   const isSearchLoading = searchState === 'loading'
   const showSearchLoader = isSearchLoading && searchLoaderVisible
   const showNoResults = searchState === 'success' && visibleBooks.length === 0
   const displayedCriteriaTags = applyTagEntityMetadata(criteria.tags, searchResponseTags)
+  const isContinuousView = !isWebSearch && searchView === 'continuous'
+  const continuousResolution = useMemo(
+    () => resolveContinuousStart(visibleBooks, continuousStart),
+    [continuousStart, visibleBooks],
+  )
+  const readableBooks = continuousResolution.sequence
+  const continuousDetailsBook = (activeContinuousBook
+    ? readableBooks.find((book) => (
+        book.apiGroupId === activeContinuousBook.apiGroupId
+        && book.apiBookId === activeContinuousBook.apiBookId
+      ))
+    : undefined) ?? readableBooks[continuousResolution.startIndex]
+
+  useEffect(() => {
+    const returnToBook = returnToBookRef.current
+    if (isContinuousView || isSearchLoading || !returnToBook) return
+    let restoreFrame: number | undefined
+    let settleTimer: number | undefined
+    const navigationFrame = window.requestAnimationFrame(() => {
+      // RouterRuntime resets the viewport and focuses the destination heading
+      // in its own navigation frame. Restore the originating card afterwards.
+      restoreFrame = window.requestAnimationFrame(() => {
+        const card = Array.from(document.querySelectorAll<HTMLElement>('.book-card')).find((element) => (
+          element.dataset.bookGroupId === returnToBook.apiGroupId
+          && element.dataset.bookId === returnToBook.apiBookId
+        ))
+        if (!card) return
+        card.scrollIntoView({ block: 'center' })
+        card.querySelector<HTMLButtonElement>('.book-cover__open-button')?.focus({ preventScroll: true })
+        // Keep the target through any result refresh triggered by the URL
+        // change, then discard it once the grid has remained stable.
+        settleTimer = window.setTimeout(() => {
+          const pending = returnToBookRef.current
+          if (
+            pending
+            && pending.apiGroupId === returnToBook.apiGroupId
+            && pending.apiBookId === returnToBook.apiBookId
+          ) {
+            returnToBookRef.current = undefined
+          }
+        }, 1_000)
+      })
+    })
+    return () => {
+      window.cancelAnimationFrame(navigationFrame)
+      if (restoreFrame !== undefined) window.cancelAnimationFrame(restoreFrame)
+      if (settleTimer !== undefined) window.clearTimeout(settleTimer)
+    }
+  }, [isContinuousView, isSearchLoading, returnRestoreRevision, searchResultGeneration, visibleBooks])
   useDocumentTitle(formatSearchPageTitle({
     isWebSearch,
     isLibrarySearch: controller.isLibrarySearch,
@@ -266,7 +334,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                   {HITOMI_SORT_PERIODS.map((period) => <option key={period.value} value={period.value}>{period.label}</option>)}
                 </select>
               ) : (
-                <select value={sortType} aria-label="並び順の種類" disabled={isSearchLoading} onChange={(event) => { setSortType(event.target.value as typeof sortType); setResultPage(1) }}>
+                <select value={sortType} aria-label="並び順の種類" disabled={isSearchLoading} onChange={(event) => setSortType(event.target.value as typeof sortType)}>
                   <option value="uploaded">アップロード日時</option>
                   <option value="title">タイトル順</option>
                   <option value="pages">ページ数順</option>
@@ -284,24 +352,63 @@ export function SearchPage({ controller }: SearchPageProps) {
                 aria-label={sortDirection === 'desc' ? '現在は降順。昇順に切り替える' : '現在は昇順。降順に切り替える'}
                 aria-pressed={sortDirection === 'asc'}
                 disabled={isSearchLoading}
-                onClick={() => { setSortDirection((current) => current === 'desc' ? 'asc' : 'desc'); setResultPage(1) }}
+                onClick={() => setSortDirection(sortDirection === 'desc' ? 'asc' : 'desc')}
               >
                 {sortDirection === 'desc' ? <ArrowDown size={17} aria-hidden="true" /> : <ArrowUp size={17} aria-hidden="true" />}
               </IconButton>
             )}
-            <IconButton
-              className={`toolbar-icon selection-toggle ${selectMode ? 'is-active' : ''}`}
-              variant="ghost"
-              tone="neutral"
-              size="compact"
-              type="button"
-              aria-label={selectMode ? '選択を終了' : '選択'}
-              aria-pressed={selectMode}
-              disabled={isSearchLoading}
-              onClick={toggleSelectMode}
-            >
-              <Check size={16} aria-hidden="true" />
-            </IconButton>
+            {!isWebSearch && (
+              <div className="search-view-toggle" role="group" aria-label="検索結果の表示形式">
+                <IconButton
+                  className={`toolbar-icon ${!isContinuousView ? 'is-active' : ''}`}
+                  variant="ghost"
+                  tone="neutral"
+                  size="compact"
+                  type="button"
+                  aria-label="カード一覧"
+                  aria-pressed={!isContinuousView}
+                  disabled={isSearchLoading}
+                  onClick={() => {
+                    if (!isContinuousView) return
+                    returnToBookRef.current = activeContinuousBook ?? readableBooks[continuousResolution.startIndex]
+                    setReturnRestoreRevision((current) => current + 1)
+                    exitContinuousView()
+                  }}
+                >
+                  <LayoutGrid size={16} aria-hidden="true" />
+                </IconButton>
+                <IconButton
+                  className={`toolbar-icon ${isContinuousView ? 'is-active' : ''}`}
+                  variant="ghost"
+                  tone="neutral"
+                  size="compact"
+                  type="button"
+                  aria-label="連続閲覧"
+                  aria-pressed={isContinuousView}
+                  disabled={isSearchLoading || readableBooks.length === 0}
+                  onClick={() => {
+                    if (!isContinuousView) enterContinuousView()
+                  }}
+                >
+                  <Images size={16} aria-hidden="true" />
+                </IconButton>
+              </div>
+            )}
+            {!isContinuousView && (
+              <IconButton
+                className={`toolbar-icon selection-toggle ${selectMode ? 'is-active' : ''}`}
+                variant="ghost"
+                tone="neutral"
+                size="compact"
+                type="button"
+                aria-label={selectMode ? '選択を終了' : '選択'}
+                aria-pressed={selectMode}
+                disabled={isSearchLoading}
+                onClick={toggleSelectMode}
+              >
+                <Check size={16} aria-hidden="true" />
+              </IconButton>
+            )}
             <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button" aria-label="結果を更新" disabled={isSearchLoading} onClick={refresh}>
               <RefreshCw size={17} aria-hidden="true" />
             </IconButton>
@@ -392,42 +499,67 @@ export function SearchPage({ controller }: SearchPageProps) {
           />
         ) : showNoResults ? null : (
           <div className={`results-stage ${showSearchLoader ? 'results-stage--loading-visible' : ''}`}>
-            <div
-              key={searchResultGeneration}
-              className="book-grid"
-              style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}
-              aria-busy={isSearchLoading}
-              inert={isSearchLoading ? true : undefined}
-            >
-              {visibleBooks.map((book) => {
-                const bookKey = getBookIdentityKey(book)
-                const deletionPending = pendingDeletionKeys.has(bookKey)
-                return (
-                  <BookCard
-                    key={bookKey}
-                    book={book}
-                    selectMode={selectMode}
-                    selected={selected.includes(bookKey)}
-                    onToggle={() => toggleSelection(bookKey)}
-                    actionsDisabled={deletionPending}
-                    onTagSearch={searchByTag}
-                    onTagSearchDestinationRequest={openTagSearchDestination}
-                    onTagOverflowDetails={(trigger) => {
-                      detailsTriggerRef.current = trigger
-                      setDetailsBook(book)
-                      setDetailsOpen(true)
-                    }}
-                    isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
-                    onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
-                      ? (trigger) => openWebBookDetail(book, trigger)
-                      : undefined}
-                    onDelete={(trigger) => deleteLibraryBook(book, trigger)}
-                    onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
-                    onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
-                  />
-                )
-              })}
-            </div>
+            {isContinuousView ? (
+              readableBooks.length > 0 ? (
+                <SearchContinuousReader
+                  books={readableBooks}
+                  startIndex={continuousResolution.startIndex}
+                  resultPage={resultPage}
+                  totalResultPages={totalResultPages}
+                  isLoading={isSearchLoading}
+                  onActiveBookChange={setActiveContinuousBook}
+                  onBookJump={enterContinuousView}
+                  onResultPageChange={goToResultPage}
+                />
+              ) : (
+                <StatePanel
+                  title="連続閲覧できるBookがありません"
+                  description={`閲覧可能 0件／対象外 ${visibleBooks.length}件。ダウンロード済みでページ画像を取得できるBookがありません。`}
+                  role="status"
+                  action={<Button onClick={exitContinuousView}>カード一覧へ戻る</Button>}
+                />
+              )
+            ) : (
+              <div
+                key={searchResultGeneration}
+                className="book-grid"
+                style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}
+                aria-busy={isSearchLoading}
+                inert={isSearchLoading ? true : undefined}
+              >
+                {visibleBooks.map((book) => {
+                  const bookKey = getBookIdentityKey(book)
+                  const deletionPending = pendingDeletionKeys.has(bookKey)
+                  const canStartContinuous = !isWebSearch && !selectMode && isReadableBook(book)
+                  return (
+                    <BookCard
+                      key={bookKey}
+                      book={book}
+                      selectMode={selectMode}
+                      selected={selected.includes(bookKey)}
+                      onToggle={() => toggleSelection(bookKey)}
+                      actionsDisabled={deletionPending}
+                      onTagSearch={searchByTag}
+                      onTagSearchDestinationRequest={openTagSearchDestination}
+                      onTagOverflowDetails={(trigger) => {
+                        detailsTriggerRef.current = trigger
+                        setDetailsBook(book)
+                        setDetailsOpen(true)
+                      }}
+                      isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
+                      onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
+                        ? (trigger) => openWebBookDetail(book, trigger)
+                        : undefined}
+                      onCoverOpen={canStartContinuous ? () => enterContinuousView(book) : undefined}
+                      coverOpenAriaLabel={canStartContinuous ? `${book.title}から連続閲覧` : undefined}
+                      onDelete={(trigger) => deleteLibraryBook(book, trigger)}
+                      onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
+                      onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
+                    />
+                  )
+                })}
+              </div>
+            )}
             {showSearchLoader && (
               <div className="results-loading-overlay" aria-hidden="true">
                 <LoaderCircle className="results-spinner" size={30} strokeWidth={2.1} />
@@ -436,7 +568,7 @@ export function SearchPage({ controller }: SearchPageProps) {
           </div>
         )}
 
-        {visibleBooks.length > 0 && totalResultPages > 1 && (
+        {!isContinuousView && visibleBooks.length > 0 && totalResultPages > 1 && (
           <nav className="pagination" aria-label="検索結果のページ">
             {getPaginationItems(resultPage, totalResultPages, paginationPageCount).map((item, index) => item === 'ellipsis'
               ? <span key={`ellipsis-${index}`} className="pagination__ellipsis" aria-hidden="true">…</span>
@@ -446,6 +578,25 @@ export function SearchPage({ controller }: SearchPageProps) {
           </nav>
         )}
       </section>
+      {isContinuousView && continuousDetailsBook && continuousHeaderActionHost && createPortal(
+        <IconButton
+          ref={detailsTriggerRef}
+          size="default"
+          type="button"
+          aria-label="Book情報を表示"
+          aria-haspopup="dialog"
+          aria-expanded={detailsOpen}
+          aria-controls="book-viewer-details"
+          disabled={isSearchLoading}
+          onClick={() => {
+            setDetailsBook(continuousDetailsBook)
+            setDetailsOpen(true)
+          }}
+        >
+          <FileText size={18} aria-hidden="true" />
+        </IconButton>,
+        continuousHeaderActionHost,
+      )}
       {detailsBook && (
         <BookDetailsSheet
           book={detailsBook}
