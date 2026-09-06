@@ -24,7 +24,7 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'オンライン',
     items: [
       { label: 'Hitomi', icon: Globe2, href: '/hitomila/search' },
-      { label: 'キャッシュ候補', icon: ListFilter, href: '/web-cache' },
+      { label: 'Web Cache', icon: ListFilter, href: '/web-cache' },
       { label: 'ダウンロード', icon: Download, href: '/download/book' },
     ],
   },

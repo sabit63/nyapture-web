@@ -163,6 +163,7 @@ function App() {
       ) : isBookViewer && viewerRoute ? (
         <BookViewerRoute
           route={viewerRoute}
+          onBookChange={searchController.applyBookTagChange}
           apiRevision={apiSettingsController.apiRevision}
           onTagSearch={searchController.searchByTag}
           onTagSearchDestinationRequest={searchController.openTagSearchDestination}

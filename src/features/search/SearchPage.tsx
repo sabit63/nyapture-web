@@ -11,8 +11,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
+import type { ApiBookCardModel } from '../../api'
 import { retryPendingScrollRestoration } from '../../app/client-router'
 import { BookCard } from '../../components/BookCard'
 import { TagChip } from '../../components/TagChip'
@@ -26,6 +27,7 @@ import { applyTagEntityMetadata } from './tag-display-name'
 import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
+import { BookDetailsSheet } from '../viewer/BookDetailsSheet'
 
 export type SearchHeaderProps = {
   controller: SearchController
@@ -86,6 +88,9 @@ export type SearchPageProps = {
 }
 
 export function SearchPage({ controller }: SearchPageProps) {
+  const [detailsBook, setDetailsBook] = useState<ApiBookCardModel>()
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const detailsTriggerRef = useRef<HTMLButtonElement>(null)
   const {
     isWebSearch,
     criteria,
@@ -127,10 +132,13 @@ export function SearchPage({ controller }: SearchPageProps) {
     openWebBookDetail,
     deleteLibraryBook,
     goToResultPage,
+    applyBookTagChange,
+    applyBookTitleChange,
   } = controller
 
   useEffect(() => {
     retryPendingScrollRestoration()
+    setDetailsOpen(false)
   }, [searchResultGeneration])
 
   const isSearchLoading = searchState === 'loading'
@@ -149,7 +157,12 @@ export function SearchPage({ controller }: SearchPageProps) {
 
   return (
     <>
-      <h1 id="page-title" className={controller.isMissingTagSearch ? 'missing-search-title' : 'sr-only'}>{isWebSearch ? 'Web検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</h1>
+      <h1
+        id="page-title"
+        className={isWebSearch ? 'hitomi-search-title' : controller.isMissingTagSearch ? 'missing-search-title' : 'sr-only'}
+      >
+        {isWebSearch ? 'Hitomi' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}
+      </h1>
 
       {controller.isMissingTagSearch && (
         <form className="missing-search-panel" onSubmit={controller.submitSearch}>
@@ -179,7 +192,6 @@ export function SearchPage({ controller }: SearchPageProps) {
           )}
           {criteria.tags.length > 0 && (
             <span className="filter-value filter-value--tags">
-              <span className="filter-value__operator">{criteria.tagMode === 'and' ? 'すべてのタグ' : 'いずれかのタグ'}:</span>
               {displayedCriteriaTags.map((tag) => (
                 <TagChip
                   key={`${tag.type}:${tag.name}`}
@@ -394,6 +406,11 @@ export function SearchPage({ controller }: SearchPageProps) {
                   onToggle={() => toggleSelection(getBookIdentityKey(book))}
                   onTagSearch={searchByTag}
                   onTagSearchDestinationRequest={openTagSearchDestination}
+                  onTagOverflowDetails={(trigger) => {
+                    detailsTriggerRef.current = trigger
+                    setDetailsBook(book)
+                    setDetailsOpen(true)
+                  }}
                   isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
                   onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
                     ? (trigger) => openWebBookDetail(book, trigger)
@@ -422,6 +439,27 @@ export function SearchPage({ controller }: SearchPageProps) {
           </nav>
         )}
       </section>
+      {detailsBook && (
+        <BookDetailsSheet
+          book={detailsBook}
+          totalPages={detailsBook.totalPage}
+          detailsOpen={detailsOpen}
+          onDetailsOpenChange={setDetailsOpen}
+          detailsTriggerRef={detailsTriggerRef}
+          onBookChange={(updated) => {
+            setDetailsBook(updated)
+            applyBookTagChange(updated)
+          }}
+          onTitleChange={(groupId, bookId, title) => {
+            setDetailsBook((current) => current?.groupId === groupId && current.bookId === bookId
+              ? { ...current, title }
+              : current)
+            applyBookTitleChange(groupId, bookId, title)
+          }}
+          onTagSearch={searchByTag}
+          onTagSearchDestinationRequest={openTagSearchDestination}
+        />
+      )}
     </>
   )
 }

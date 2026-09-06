@@ -61,27 +61,26 @@
 .tag-overflow.tag-overflow--control { min-width: 34px; max-width: none; height: 25px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; margin-left: auto; padding: var(--space-1) var(--space-2); border: 1px solid #6e4c68; border-radius: 6px; background: #2a2a36; color: #dc8fc8; font-size: .61rem; cursor: pointer; }
 .tag-overflow.tag-overflow--control:hover:not(:disabled) { border-color: #8a557c; background: #c1339e1a; color: #f0c5e3; }
 .tags-dialog {
-  width: min(540px, calc(100vw - 32px));
-  max-height: 86vh;
+  width: min(760px, calc(100vw - var(--space-8)));
+  max-height: min(90vh, 760px);
 }
 
-.tags-dialog__panel { display: flex; flex-direction: column; max-height: 86vh; }
+.tags-dialog__panel { display: flex; flex-direction: column; max-height: min(90vh, 760px); }
 .tags-dialog__header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-subtle); background: var(--color-background-deep); }
 .tags-dialog__header > div { min-width: 0; }
-.tags-dialog__header span { display: block; margin-bottom: var(--layout-tight-gap); color: #d986c1; font-size: .65rem; font-weight: 700; letter-spacing: .07em; }
 .tags-dialog__header h2 { margin: 0; overflow: hidden; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
-.tags-dialog__body { padding: var(--space-2) var(--space-4) var(--space-6); overflow-y: auto; overscroll-behavior: contain; }
-.tags-dialog__group { padding-top: var(--space-4); }
+.tags-dialog__body { padding: var(--space-5) var(--space-4) var(--space-6); overflow-y: auto; overscroll-behavior: contain; }
+.tags-dialog__group { min-width: 0; padding-top: var(--space-4); }
+.tags-dialog__group:first-child { padding-top: 0; }
 .tags-dialog__group + .tags-dialog__group { margin-top: var(--layout-tight-gap); border-top: 1px solid #ffffff08; }
-.tags-dialog__group-heading { display: flex; align-items: center; gap: var(--layout-control-gap); margin-bottom: var(--space-2); }
-.tags-dialog__group-heading h3 { margin: 0; color: #c7c7d2; font-size: .72rem; }
+.tags-dialog__group-heading { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.tags-dialog__group-heading h3 { margin: 0; color: #c9c9d7; font-size: .88rem; font-weight: 700; }
 .tags-dialog__group-heading span { min-width: 22px; height: 20px; display: inline-grid; place-items: center; padding: 0 var(--space-2); border: 1px solid #56566a; border-radius: 999px; background: #3b3b4a; color: #eeeef5; font-size: .7rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; text-align: center; }
-.tags-dialog__chips { display: flex; flex-wrap: wrap; gap: var(--layout-control-gap); }
+.tags-dialog__chips { min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2); }
 
 @media (min-width: 640px) {
   .book-card__body { padding: var(--space-3) var(--space-4); }
-  .tags-dialog { max-height: min(78vh, 700px); }
-  .tags-dialog__panel { max-height: min(78vh, 700px); }
   .tags-dialog__header { padding-inline: var(--space-5) var(--space-4); }
-  .tags-dialog__body { padding-inline: var(--space-5); }
+  .tags-dialog__body { padding: var(--space-6) var(--layout-page-gutter) var(--space-8); }
+  .tags-dialog__group-heading h3 { font-size: .9rem; }
 }

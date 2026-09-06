@@ -36,6 +36,8 @@ it('composed search controller synchronizes URL state, execution, selection and 
     assert.deepEqual(hook.current.selected, [])
     assert.equal(hook.current.searchState, 'success')
     assert.equal(requests.at(-1)?.page, 3)
+    await act(async () => { hook.current.applyBookTitleChange('fixture', 'book', 'edited title') })
+    assert.equal(hook.current.searchResultBooks[0]?.title, 'edited title')
     const count = requests.length
     await act(async () => { hook.current.refresh() })
     assert.equal(requests.length, count + 1)

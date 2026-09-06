@@ -150,7 +150,7 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
             <div className="tag-search-destination-dialog__actions">
               <InternalLink
                 ref={primaryActionRef}
-                className={buttonClassName({ variant: 'outline', tone: 'neutral' }, 'tag-search-destination-dialog__action')}
+                className={buttonClassName({ variant: 'outline', tone: 'neutral', size: 'compact' }, 'tag-search-destination-dialog__action')}
                 href={selection.libraryUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -164,7 +164,7 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
                 <ExternalLink aria-hidden="true" />
               </InternalLink>
               <InternalLink
-                className={buttonClassName({ variant: 'outline', tone: 'accent' }, 'tag-search-destination-dialog__action')}
+                className={buttonClassName({ variant: 'outline', tone: 'accent', size: 'compact' }, 'tag-search-destination-dialog__action')}
                 href={selection.hitomiUrl}
                 target="_blank"
                 rel="noopener noreferrer"

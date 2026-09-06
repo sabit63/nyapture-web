@@ -40,6 +40,30 @@ export function DashboardDetails({ route, apiRevision }: DashboardDetailsProps) 
           <Icon size={22} />
         </span>
         <h1 id="dashboard-detail-title">{meta.title}</h1>
+        {route === 'web-cache' && (
+          <div className="dashboard-detail__header-actions">
+            <InternalLink
+              className={buttonClassName(
+                { variant: 'outline', tone: 'neutral', size: 'compact' },
+                'dashboard-detail__web-cache-link',
+              )}
+              href="/web-cache"
+            >
+              Web Cache
+            </InternalLink>
+            <IconButton
+              variant="ghost"
+              tone="neutral"
+              size="compact"
+              className="dashboard-detail__icon-button"
+              type="button"
+              aria-label="再読み込み"
+              onClick={() => setRefreshRevision((revision) => revision + 1)}
+            >
+              <RefreshCw size={17} aria-hidden="true" />
+            </IconButton>
+          </div>
+        )}
         {route !== 'web-cache' && (
           <IconButton
             variant="ghost"
@@ -81,7 +105,7 @@ export function DashboardDetails({ route, apiRevision }: DashboardDetailsProps) 
         {route === 'cache' && (
           <CacheDetails apiRevision={apiRevision} refreshRevision={refreshRevision} />
         )}
-        {route === 'web-cache' && <WebCacheManagement apiRevision={apiRevision} />}
+        {route === 'web-cache' && <WebCacheManagement apiRevision={apiRevision} refreshRevision={refreshRevision} />}
         {route === 'logs' && (
           <LogsDetails apiRevision={apiRevision} refreshRevision={refreshRevision} />
         )}

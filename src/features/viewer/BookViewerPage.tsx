@@ -1,6 +1,7 @@
 import { ArrowUp, ImageOff, RotateCcw } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { RefObject, SyntheticEvent } from 'react'
+import type { ApiBookCardModel } from '../../api'
 import { getBookPageBlob } from '../../api'
 import { useViewerGeometry } from './use-viewer-geometry'
 import { BookDetailsSheet } from './BookDetailsSheet'
@@ -9,7 +10,6 @@ import type { BookCardModel, BookTag } from '../../models'
 import { InternalLink } from '../../app/client-router'
 import { Button, buttonClassName } from '../../components/ui/Button'
 import { IconButton } from '../../components/ui/IconButton'
-import './book-viewer.css'
 
 type BookViewerRouteState = 'missing' | 'loading' | 'notFound' | 'error' | 'ready'
 
@@ -19,6 +19,7 @@ export type BookViewerPageProps = {
   book?: BookCardModel
   errorMessage?: string
   onRetry?: () => void
+  onBookChange: (book: ApiBookCardModel) => void
   onTitleChange: (groupId: string, bookId: string, title: string) => void
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
@@ -43,6 +44,7 @@ function BookViewerPage({
   book,
   errorMessage,
   onRetry,
+  onBookChange,
   onTitleChange,
   onTagSearch,
   onTagSearchDestinationRequest,
@@ -69,6 +71,7 @@ function BookViewerPage({
       <BookViewerReady
         book={book}
         headingRef={headingRef}
+        onBookChange={onBookChange}
         onTitleChange={onTitleChange}
         onTagSearch={onTagSearch}
         onTagSearchDestinationRequest={onTagSearchDestinationRequest}
@@ -149,6 +152,7 @@ function BookViewerPage({
 function BookViewerReady({
   book,
   headingRef,
+  onBookChange,
   onTitleChange,
   onTagSearch,
   onTagSearchDestinationRequest,
@@ -158,6 +162,7 @@ function BookViewerReady({
 }: {
   book: BookCardModel
   headingRef: RefObject<HTMLHeadingElement | null>
+  onBookChange: (book: ApiBookCardModel) => void
   onTitleChange: (groupId: string, bookId: string, title: string) => void
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
@@ -257,8 +262,10 @@ function BookViewerReady({
       )}
 
       <BookDetailsSheet
+        key={bookIdentity}
         book={book}
         totalPages={totalPages}
+        onBookChange={onBookChange}
         onTitleChange={onTitleChange}
         onTagSearch={onTagSearch}
         onTagSearchDestinationRequest={onTagSearchDestinationRequest}

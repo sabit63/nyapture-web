@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import {
   autocompleteTags,
 } from '../../api'
-import type { DisplaySettings } from '../../api'
+import type { ApiBookCardModel, DisplaySettings } from '../../api'
 import type { BookDownloadHubConnectionState } from '../../realtime/book-download-hub'
 import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
 import { getTagLabel, TAG_TYPE_ORDER } from '../../models'
@@ -186,6 +186,24 @@ export function useSearchController({
     })
     navigateSearchUrl(url)
   }, [criteria, currentSearchDestination, hitomiAppend, isWebSearch, navigateSearchUrl])
+
+  const applyBookTagChange = useCallback((updated: ApiBookCardModel) => {
+    const updateTags = <T extends { groupId: string; bookId: string }>(book: T): T => (
+      book.groupId === updated.groupId && book.bookId === updated.bookId
+        ? { ...book, tags: applyTagDisplayNameOverrides(updated.tags, tagDisplayNameOverrides), tagSet: updated.tagSet }
+        : book
+    )
+    setLibrarySearchBooks((current) => current.map(updateTags))
+    updateWebSearchResultBooks((current) => current.map(updateTags))
+  }, [setLibrarySearchBooks, updateWebSearchResultBooks, tagDisplayNameOverrides])
+
+  const applyBookTitleChange = useCallback((groupId: string, bookId: string, title: string) => {
+    const updateTitle = (book: ApiBookCardModel) => (
+      book.groupId === groupId && book.bookId === bookId ? { ...book, title } : book
+    )
+    setLibrarySearchBooks((current) => current.map(updateTitle))
+    updateWebSearchResultBooks((current) => current.map(updateTitle))
+  }, [setLibrarySearchBooks, updateWebSearchResultBooks])
 
   const applyTagDisplayName = useCallback((tag: BookTag, displayName?: string) => {
     setTagDisplayNameOverrides((current) => {
@@ -505,6 +523,8 @@ export function useSearchController({
   }, [setSelected, visibleBooks])
 
   return {
+    applyBookTagChange,
+    applyBookTitleChange,
     isWebSearch,
     isLibrarySearch,
     isMissingTagSearch,

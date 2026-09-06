@@ -2,11 +2,12 @@ import { useCacheManagement } from './use-cache-management'
 import {
   Activity,
   Check,
+  ChevronRight,
   CircleAlert,
-  CircleHelp,
   Database,
   Gauge,
   HardDrive,
+  PencilLine,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -17,7 +18,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { isValidElement, useCallback, useState, type ChangeEvent } from 'react'
+import { isValidElement, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 
 import {
   Button,
@@ -31,6 +32,7 @@ import './web-cache-management.css'
 
 export type WebCacheManagementProps = {
   apiRevision: number
+  refreshRevision: number
 }
 
 type ConfirmAction =
@@ -100,7 +102,7 @@ function Toggle({ label, checked, onChange, disabled = false }: {
   )
 }
 
-export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
+export function WebCacheManagement({ apiRevision, refreshRevision }: WebCacheManagementProps) {
   const {
     serverConfig,
     draft,
@@ -116,7 +118,6 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     statusLoading,
     statusError,
     loadStatus,
-    hasRuntimeOverride,
     configLoading,
     configError,
     feedback,
@@ -145,6 +146,14 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     saveDisabled,
   } = useCacheManagement(apiRevision)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
+  const previousRefreshRevisionRef = useRef(refreshRevision)
+
+  useEffect(() => {
+    if (previousRefreshRevisionRef.current === refreshRevision) return
+    previousRefreshRevisionRef.current = refreshRevision
+    void loadConfig(true)
+    void loadStatus()
+  }, [loadConfig, loadStatus, refreshRevision])
 
   const addSite = useCallback(() => {
     updateDraft((current) => ({
@@ -180,50 +189,16 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     else removeSite(action.index)
   }, [confirmAction, removeSite, reset])
 
-  const runtimeNotice = hasRuntimeOverride
-    ? '現在のDashboardで変更したRAM overrideを表示しています。ApiService再起動後は構成ファイルの初期値へ戻ります。'
-    : 'Dashboardでの変更はRAM overrideです。ApiService再起動後は構成ファイルの初期値へ戻ります。'
-
   const statusTone = status?.isRunning ? 'info' : statusError ? 'danger' : 'success'
 
   return (
-    <section className="web-cache-management" aria-labelledby="web-cache-management-title" aria-busy={configLoading || statusLoading}>
-      <header className="web-cache-management__header">
-        <div className="web-cache-management__heading">
-          <span className="web-cache-management__heading-icon" aria-hidden="true"><Database size={21} /></span>
-          <div>
-            <h2 id="web-cache-management-title" className="web-cache-management__title">同期と設定</h2>
-            <p>キャッシュ候補の同期と自動ダウンロードを管理します。</p>
-          </div>
-        </div>
-        <div className="web-cache-management__header-actions">
-          <Button variant="outline" tone="neutral" size="compact" type="button" onClick={() => void loadConfig(true)} disabled={configLoading || saving || validating || resetting}>
-            <RefreshCw size={15} aria-hidden="true" /> 設定を再取得
-          </Button>
-          <IconButton variant="ghost" tone="neutral" size="compact" type="button" aria-label="状態を更新" onClick={() => void loadStatus()} disabled={statusLoading}>
-            <RefreshCw size={16} aria-hidden="true" />
-          </IconButton>
-        </div>
-      </header>
-
-      <div className="web-cache-management__notices">
-        <div className="web-cache-management__notice web-cache-management__notice--warning" role="note"><CircleHelp size={16} aria-hidden="true" /><span>{runtimeNotice}</span></div>
-        <div className="web-cache-management__notice web-cache-management__notice--info" role="note"><TestTube2 size={16} aria-hidden="true" /><span>サイト疎通テストは保存済みで有効なサイト設定を対象に実行します。</span></div>
-      </div>
-
+    <section className="web-cache-management" aria-label="Web Cache管理" aria-busy={configLoading || statusLoading}>
       {configError && <div className="web-cache-management__alert web-cache-management__alert--danger" role="alert"><CircleAlert size={16} aria-hidden="true" /><span>{configError}</span><Button variant="ghost" tone="danger" size="compact" type="button" onClick={() => void loadConfig(true)} disabled={configLoading}>再試行</Button></div>}
       {statusError && <div className="web-cache-management__alert web-cache-management__alert--danger" role="alert"><CircleAlert size={16} aria-hidden="true" /><span>{statusError}</span><Button variant="ghost" tone="danger" size="compact" type="button" onClick={() => void loadStatus()} disabled={statusLoading}>再試行</Button></div>}
       {feedback && <div className={`web-cache-management__alert web-cache-management__alert--${feedback.tone}`} role={feedback.tone === 'danger' ? 'alert' : 'status'}><span>{feedback.message}</span></div>}
 
-      {allValidationMessages.length > 0 && (
-        <div className="web-cache-management__validation" role="alert">
-          <strong>設定を保存できません。</strong>
-          <ul>{allValidationMessages.map((message, index) => <li key={`${message}-${index}`}>{message}</li>)}</ul>
-        </div>
-      )}
-
       <section className="web-cache-management__section" aria-labelledby="web-cache-sync-status-title">
-        <div className="web-cache-management__section-heading"><div><h2 id="web-cache-sync-status-title">同期状態</h2><p>Web Cache同期の現在値と前回実行結果。</p></div><span className={`web-cache-management__status web-cache-management__status--${statusTone}`}>{status?.isRunning ? <Activity size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}{status?.isRunning ? '実行中' : '待機'}</span></div>
+        <div className="web-cache-management__section-heading"><div><h2 id="web-cache-sync-status-title">同期状態</h2></div><span className={`web-cache-management__status web-cache-management__status--${statusTone}`}>{status?.isRunning ? <Activity size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}{status?.isRunning ? '実行中' : '待機'}</span></div>
         <div className="web-cache-management__metrics">
           <Metric icon={Server} label="実行中サイト" value={status?.currentSite || '—'} tone={status?.isRunning ? 'info' : 'muted'} />
           <Metric icon={Gauge} label="取得ページ" value={formatNumber(status?.pagesLoaded)} tone="info" />
@@ -240,7 +215,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
       </section>
 
       <section className="web-cache-management__section" aria-labelledby="web-cache-manual-sync-title">
-        <div className="web-cache-management__section-heading"><div><h2 id="web-cache-manual-sync-title">手動同期</h2><p>全サイトまたは特定GroupIdを指定して同期を開始します。</p></div></div>
+        <div className="web-cache-management__section-heading"><div><h2 id="web-cache-manual-sync-title">手動同期</h2></div></div>
         <div className="web-cache-management__form-grid web-cache-management__form-grid--sync">
           <Field label="対象GroupId"><input className="web-cache-management__input" value={syncGroupId} onChange={(event) => setSyncGroupId(event.target.value)} placeholder="全サイト" disabled={syncing || status?.isRunning} /></Field>
           <Toggle label="Force（既存の次回実行を待たずに実行）" checked={syncForce} onChange={setSyncForce} disabled={syncing || status?.isRunning} />
@@ -249,10 +224,21 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
       </section>
 
       {draft && (
-        <>
+        <details className="web-cache-management__settings">
+          <summary className="web-cache-management__settings-summary">
+            <span className="web-cache-management__settings-title"><ChevronRight size={18} className="web-cache-management__settings-chevron" aria-hidden="true" />設定</span>
+            {draftDirty && <span className="web-cache-management__dirty-indicator" role="img" aria-label="未保存の変更あり"><PencilLine size={16} aria-hidden="true" /></span>}
+          </summary>
+          <div className="web-cache-management__settings-content">
+          {allValidationMessages.length > 0 && (
+            <div className="web-cache-management__validation" role="alert">
+              <strong>設定を保存できません。</strong>
+              <ul>{allValidationMessages.map((message, index) => <li key={`${message}-${index}`}>{message}</li>)}</ul>
+            </div>
+          )}
           <fieldset className="web-cache-management__fieldset" disabled={saving || validating || resetting}>
           <section className="web-cache-management__section" aria-labelledby="web-cache-global-title">
-            <div className="web-cache-management__section-heading"><div><h2 id="web-cache-global-title">全体設定</h2><p>同期スケジュールと1回あたりの取得上限。</p></div><span className="web-cache-management__draft-badge">編集用コピー</span></div>
+            <div className="web-cache-management__section-heading"><div><h2 id="web-cache-global-title">全体設定</h2></div><span className="web-cache-management__draft-badge">編集用コピー</span></div>
             <div className="web-cache-management__form-grid">
               <Field label="有効"><Toggle label="Web Cache同期を有効にする" checked={draft.enabled} onChange={(value) => updateDraft((current) => ({ ...current, enabled: value }))} /></Field>
               <Field label="同期間隔（分）" error={issueFor('intervalMinutes')}><input className="web-cache-management__input" type="number" min="1" step="1" value={Number.isNaN(draft.intervalMinutes) ? '' : draft.intervalMinutes} onChange={(event) => updateGlobalNumber('intervalMinutes', updateNumber(event))} /></Field>
@@ -263,7 +249,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
           </section>
 
           <section className="web-cache-management__section" aria-labelledby="web-cache-sites-title">
-            <div className="web-cache-management__section-heading"><div><h2 id="web-cache-sites-title">サイト別設定</h2><p>GroupIdごとの開始URL、取得上限、ドメイン間隔。</p></div><Button variant="outline" tone="accent" size="compact" type="button" onClick={addSite} disabled={saving || validating}><Plus size={15} aria-hidden="true" /> サイトを追加</Button></div>
+            <div className="web-cache-management__section-heading"><div><h2 id="web-cache-sites-title">サイト別設定</h2></div><Button variant="outline" tone="accent" size="compact" type="button" onClick={addSite} disabled={saving || validating}><Plus size={15} aria-hidden="true" /> サイトを追加</Button></div>
             {draft.sites.length === 0 ? <div className="web-cache-management__empty">サイト設定がありません。「サイトを追加」から登録してください。</div> : <div className="web-cache-management__site-list">{draft.sites.map((site, index) => {
               const groupId = site.groupId?.trim() ?? ''
               const siteResult = siteTests[groupId]
@@ -284,7 +270,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
           </section>
 
           <section className="web-cache-management__section" aria-labelledby="web-cache-auto-download-title">
-            <div className="web-cache-management__section-heading"><div><h2 id="web-cache-auto-download-title">自動ダウンロード設定</h2><p>同期した候補をダウンロードキューへ自動投入する条件。</p></div></div>
+            <div className="web-cache-management__section-heading"><div><h2 id="web-cache-auto-download-title">自動ダウンロード設定</h2></div></div>
             <div className="web-cache-management__form-grid">
               <Field label="自動投入"><Toggle label="条件に一致した候補を自動投入する" checked={draft.autoDownload.enabled === true} onChange={(value) => updateAutoDownload('enabled', value)} /></Field>
               <Field label="条件の組み合わせ" error={issueFor('autoDownload.conditionMode')}><select className="web-cache-management__input" value={draft.autoDownload.conditionMode ?? 'All'} onChange={(event) => updateAutoDownload('conditionMode', event.target.value)}><option value="All">All（すべて）</option><option value="Any">Any（いずれか）</option></select></Field>
@@ -299,10 +285,11 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
           </fieldset>
 
           <footer className="web-cache-management__form-footer">
-            <span className="web-cache-management__footer-meta">{draftDirty ? '未保存の編集があります。' : serverConfig?.updatedAt ? `最終保存: ${formatDateTime(serverConfig.updatedAt)}` : '保存済み設定を編集中です。'}</span>
+            <span className="web-cache-management__footer-meta">{serverConfig?.updatedAt ? `最終保存: ${formatDateTime(serverConfig.updatedAt)}` : '保存済み設定を編集中です。'}</span>
             <div className="web-cache-management__inline-actions"><Button variant="outline" tone="warning" type="button" onClick={() => setConfirmAction({ kind: 'reset' })} disabled={resetDisabled}><RotateCcw size={15} aria-hidden="true" /> 初期値へリセット</Button><Button variant="solid" tone="accent" type="button" onClick={() => void save()} disabled={saveDisabled}>{saving || validating ? <><RefreshCw size={15} className="is-spinning" aria-hidden="true" /> {validating ? '検証中…' : '保存中…'}</> : <><Save size={15} aria-hidden="true" /> 設定を保存</>}</Button></div>
           </footer>
-        </>
+          </div>
+        </details>
       )}
 
       <Dialog

@@ -36,6 +36,7 @@ export type BookCardProps = {
   onRefresh?: () => void
   onDownload?: () => void
   onOpen?: (trigger?: HTMLElement) => void
+  onTagOverflowDetails?: (trigger: HTMLButtonElement) => void
   openDisabled?: boolean
   actionsDisabled?: boolean
   downloadDisabled?: boolean
@@ -57,6 +58,7 @@ export function BookCard({
   onRefresh,
   onDownload,
   onOpen,
+  onTagOverflowDetails,
   openDisabled = false,
   actionsDisabled = false,
   downloadDisabled = false,
@@ -122,7 +124,13 @@ export function BookCard({
     navigate(event.currentTarget.href)
   }
 
-  const openTagsDialog = () => setTagsOpen(true)
+  const handleTagOverflowClick = (trigger: HTMLButtonElement) => {
+    if (isDownloaded && onTagOverflowDetails) {
+      onTagOverflowDetails(trigger)
+      return
+    }
+    setTagsOpen(true)
+  }
 
   return (
     <article
@@ -249,8 +257,10 @@ export function BookCard({
               variant="ghost"
               tone="accent"
               size="compact"
-              aria-label={`${book.title}の残り${hiddenTagCount}件のタグを表示`}
-              onClick={openTagsDialog}
+              aria-label={isDownloaded && onTagOverflowDetails
+                ? `${book.title}の詳細情報を表示`
+                : `${book.title}の残り${hiddenTagCount}件のタグを表示`}
+              onClick={(event) => handleTagOverflowClick(event.currentTarget)}
             >
               +{hiddenTagCount}
             </Button>
@@ -274,7 +284,6 @@ export function BookCard({
           <div className="tags-dialog__panel">
             <DialogHeader className="tags-dialog__header">
               <div>
-                <span>タグ一覧</span>
                 <h2 id={tagsDialogTitleId}>{book.title}</h2>
               </div>
               <IconButton ref={tagsCloseButtonRef} aria-label="タグ一覧を閉じる" onClick={() => requestClose('close-button')}>

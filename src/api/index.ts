@@ -64,6 +64,7 @@ export type {
 } from './display-settings-storage'
 
 export * from './books'
+export * from './book-tags'
 export * from './dashboard'
 export * from './endpoints'
 export * from './hitomi'

@@ -14,6 +14,7 @@ import type { BookViewerRouteData, BookViewerRouteState } from './viewer-route'
 export type BookViewerRouteProps = {
   route: BookViewerRouteData
   apiRevision: number
+  onBookChange: (book: ApiBookCardModel) => void
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   tagDisplayNameOverrides: TagDisplayNameOverrides
@@ -26,6 +27,7 @@ export type BookViewerRouteProps = {
 export function BookViewerRoute({
   route,
   apiRevision,
+  onBookChange,
   onTagSearch,
   onTagSearchDestinationRequest,
   tagDisplayNameOverrides,
@@ -45,6 +47,11 @@ export function BookViewerRoute({
       return { ...current, title }
     })
   }, [])
+
+  const updateViewerBook = useCallback((updated: ApiBookCardModel) => {
+    setViewerBook((current) => current?.groupId === updated.groupId && current.bookId === updated.bookId ? updated : current)
+    onBookChange(updated)
+  }, [onBookChange])
 
   const readyBook = viewerState === 'ready' && viewerBookIdentity === route.identity ? viewerBook : undefined
   useRouteContentCommitted(readyBook)
@@ -104,6 +111,7 @@ export function BookViewerRoute({
       routeIdentity={route.identity}
       errorMessage={viewerError}
       onRetry={() => setViewerRevision((current) => current + 1)}
+      onBookChange={updateViewerBook}
       onTitleChange={updateViewerBookTitle}
       onTagSearch={onTagSearch}
       onTagSearchDestinationRequest={onTagSearchDestinationRequest}

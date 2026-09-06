@@ -50,7 +50,6 @@
 .filter-values { min-height: var(--space-5); display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
 .filter-value { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); font-size: .72rem; }
 .filter-value--tags { gap: var(--space-2); }
-.filter-value__operator { color: var(--color-text-muted); }
 
 .results {
   width: calc(100% + var(--layout-page-gutter) + var(--layout-page-gutter));
@@ -158,6 +157,12 @@
 .missing-search-title {
   width: min(100%, var(--container-wide));
   margin: 0 auto var(--space-4);
+  font-size: var(--font-size-heading-md);
+}
+
+.hitomi-search-title {
+  width: min(100%, var(--container-wide));
+  margin: 0 auto var(--space-6);
   font-size: var(--font-size-heading-md);
 }
 

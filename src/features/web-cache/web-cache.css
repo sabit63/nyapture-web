@@ -5,6 +5,7 @@
 .web-cache__heading p, .web-cache__toolbar p { color: var(--color-text-muted); margin: 0; font-size: var(--font-size-body-sm); }
 .web-cache__heading a, .web-cache__toolbar a { color: var(--color-text-muted); }
 .web-cache__heading a:hover, .web-cache__toolbar a:hover { color: var(--color-text); }
+.web-cache__management-link { text-decoration: none; }
 .cache-search { padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); }
 .cache-search__basic, .cache-search__advanced { display: grid; grid-template-columns: 1fr; align-items: end; gap: var(--space-3); }
 .cache-search label { display: grid; gap: var(--space-2); font-size: var(--font-size-label-md); color: var(--color-text-muted); min-width: 0; }

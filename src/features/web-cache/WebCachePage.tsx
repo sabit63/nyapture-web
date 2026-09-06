@@ -17,7 +17,7 @@ import {
   getDownloadStatusIdentityKey,
   normalizeSearchBookDownloadStatus,
 } from '../../realtime/search-book-status'
-import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton, StatePanel, iconButtonClassName } from '../../components/ui'
+import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton, StatePanel, buttonClassName, iconButtonClassName } from '../../components/ui'
 import type { SnackbarTone } from '../../components/Snackbar'
 import type { WebBookCacheBookDto } from '../../models/web-cache'
 import { getPaginationItems } from '../search/search-utils'
@@ -129,7 +129,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
   const statusVersionsRef = useRef(new Map<string, number>())
   const realtimeFrameRef = useRef<number | null>(null)
   const statusSnapshotControllerRef = useRef<AbortController | null>(null)
-  useDocumentTitle(formatPageTitle(`キャッシュ候補 · ${applied.page}ページ`))
+  useDocumentTitle(formatPageTitle(`Web Cache · ${applied.page}ページ`))
 
   const applyStatuses = useCallback((statuses: BookDownloadStatus[]) => {
     if (statuses.length === 0) return
@@ -327,7 +327,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
         setDeleteTarget(null)
         setSelected((current) => current && identity(current) === key ? null : current)
         setRevision((value) => value + 1)
-        notify('キャッシュ候補を削除しました。')
+        notify('Web Cacheを削除しました。')
       }
     } catch (failure) {
       if (!controller.signal.aborted) {
@@ -349,7 +349,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
   const activeBook = detail ?? selected
   return (
     <section className="web-cache" aria-labelledby="web-cache-title">
-      <header className="web-cache__heading"><div><h1 id="web-cache-title">キャッシュ候補</h1><p>収集済みのWeb書籍から、ダウンロードする候補を探す</p></div><InternalLink href="/dashboard/web-cache">Web Cache管理</InternalLink></header>
+      <header className="web-cache__heading"><div><h1 id="web-cache-title">Web Cache</h1></div><InternalLink className={buttonClassName({ variant: 'outline', tone: 'neutral' }, 'web-cache__management-link')} href="/dashboard/web-cache">管理</InternalLink></header>
       <form className="cache-search" role="search" onSubmit={submit}>
         <div className="cache-search__basic">
           <label>キーワード<input type="search" value={draft.q} onChange={(event) => setDraft({ ...draft, q: event.target.value })} placeholder="タイトル・キーワード" /></label>
@@ -366,14 +366,14 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
         </div></details>
         {formError && <p className="cache-error" role="alert">{formError}</p>}
       </form>
-      <div className="web-cache__toolbar"><p role="status">{loading ? '検索中…' : error ? '検索に失敗しました' : `${totalCount.toLocaleString()}件 · ${applied.page} / ${totalPages}ページ`}</p><div><InternalLink href="/download/book">ダウンロード</InternalLink><IconButton aria-label="検索結果を更新" disabled={loading} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={17} /></IconButton></div></div>
+      <div className="web-cache__toolbar"><p role="status">{loading ? '検索中…' : error ? '検索に失敗しました' : `${totalCount.toLocaleString()}件 · ${applied.page} / ${totalPages}ページ`}</p><div><IconButton aria-label="検索結果を更新" disabled={loading} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={17} /></IconButton></div></div>
       {error && <StatePanel title="検索できませんでした" description={error} action={<Button onClick={() => setRevision((value) => value + 1)}>再試行</Button>} />}
       {loading ? <StatePanel title="候補を検索しています…" /> : !error && books.length === 0 ? <StatePanel title="該当する候補がありません" description="検索条件を変更するか、管理画面で同期状態を確認してください。" /> : !error && (
         <div className="book-grid" style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}>
           {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} card={bookCards[index] ?? mapCacheResultBook(book)} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
         </div>
       )}
-      {!loading && !error && totalPages > 1 && <nav className="pagination" aria-label="キャッシュ候補のページ">{getPaginationItems(applied.page, totalPages, 5).map((page, index) => page === 'ellipsis' ? <span key={`gap-${index}`}>…</span> : page === applied.page ? <span key={page} className="pagination__current" aria-current="page">{page}</span> : <Button key={page} onClick={() => navigate(`/web-cache${serializeCacheSearch({ ...applied, page })}`)} aria-label={`${page}ページへ`}>{page}</Button>)}</nav>}
+      {!loading && !error && totalPages > 1 && <nav className="pagination" aria-label="Web Cacheのページ">{getPaginationItems(applied.page, totalPages, 5).map((page, index) => page === 'ellipsis' ? <span key={`gap-${index}`}>…</span> : page === applied.page ? <span key={page} className="pagination__current" aria-current="page">{page}</span> : <Button key={page} onClick={() => navigate(`/web-cache${serializeCacheSearch({ ...applied, page })}`)} aria-label={`${page}ページへ`}>{page}</Button>)}</nav>}
       <Dialog open={selected !== null} onRequestClose={() => { setSelected(null); return true }} aria-labelledby="cache-detail-title" className="cache-detail">
         <DialogHeader><h2 id="cache-detail-title">候補の詳細</h2><IconButton aria-label="詳細を閉じる" onClick={() => setSelected(null)}><X size={18} /></IconButton></DialogHeader>
         <DialogBody>
@@ -389,7 +389,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
         <DialogFooter>{activeBook && <><Button disabled={detailLoading || !detail || pending.has(identity(activeBook)) || enqueued.has(identity(activeBook))} onClick={() => { void mutate(activeBook, 'enqueue') }}>{pending.has(identity(activeBook)) ? '投入中…' : enqueued.has(identity(activeBook)) ? '投入済み' : 'ダウンロード投入'}</Button>{sourceUrl(activeBook) && <a href={sourceUrl(activeBook)} target="_blank" rel="noopener noreferrer">配信元を開く</a>}</>}</DialogFooter>
       </Dialog>
       <Dialog open={deleteTarget !== null} dismissible={!deleteTarget || !pending.has(identity(deleteTarget))} onRequestClose={() => { if (deleteTarget && pending.has(identity(deleteTarget))) return false; setDeleteTarget(null); return true }} aria-labelledby="cache-delete-title">
-        <DialogHeader><h2 id="cache-delete-title">キャッシュ候補を削除</h2></DialogHeader><DialogBody><p>「{deleteTarget?.title || deleteTarget?.bookId}」をキャッシュから削除しますか？</p>{deleteError && <p className="cache-error" role="alert">{deleteError}</p>}</DialogBody><DialogFooter><Button disabled={Boolean(deleteTarget && pending.has(identity(deleteTarget)))} onClick={() => setDeleteTarget(null)}>キャンセル</Button><Button variant="solid" tone="danger" disabled={!deleteTarget || pending.has(identity(deleteTarget))} onClick={() => { if (deleteTarget) void mutate(deleteTarget, 'delete') }}>{deleteTarget && pending.has(identity(deleteTarget)) ? '削除中…' : '削除'}</Button></DialogFooter>
+        <DialogHeader><h2 id="cache-delete-title">Web Cacheを削除</h2></DialogHeader><DialogBody><p>「{deleteTarget?.title || deleteTarget?.bookId}」をキャッシュから削除しますか？</p>{deleteError && <p className="cache-error" role="alert">{deleteError}</p>}</DialogBody><DialogFooter><Button disabled={Boolean(deleteTarget && pending.has(identity(deleteTarget)))} onClick={() => setDeleteTarget(null)}>キャンセル</Button><Button variant="solid" tone="danger" disabled={!deleteTarget || pending.has(identity(deleteTarget))} onClick={() => { if (deleteTarget) void mutate(deleteTarget, 'delete') }}>{deleteTarget && pending.has(identity(deleteTarget)) ? '削除中…' : '削除'}</Button></DialogFooter>
       </Dialog>
     </section>
   )

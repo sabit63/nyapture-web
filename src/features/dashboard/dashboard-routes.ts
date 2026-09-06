@@ -32,7 +32,7 @@ export const DASHBOARD_ROUTE_META: Record<DashboardDetailRoute, RouteMeta> = {
   'image-worker': { title: 'ImageWorker', icon: Image },
   maintenance: { title: 'Maintenance', icon: Wrench },
   cache: { title: 'Cache', icon: Zap },
-  'web-cache': { title: 'Web Cache', icon: Server },
+  'web-cache': { title: 'Web Cache 管理', icon: Server },
   logs: { title: 'Logs', icon: ListChecks },
 }
 
@@ -56,4 +56,3 @@ export const resolveDashboardRoute = (path?: string): DashboardRoute => {
   const pathname = (source.split(/[?#]/)[0] || '/').replace(/\/+$/, '') || '/'
   return DASHBOARD_PATHS[pathname] ?? 'home'
 }
-
