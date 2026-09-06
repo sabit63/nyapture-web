@@ -105,6 +105,7 @@
 .tag-display-name-editor__spinner { animation: ui-spin .85s linear infinite; }
 
 .api-settings-dialog__footer { grid-template-columns: 1fr 1fr; }
+.display-settings-dialog__footer { display: flex; justify-content: flex-end; }
 .api-settings-dialog__footer .api-settings-dialog__action { width: var(--control-height-default); }
 .api-settings-dialog__footer .api-settings-dialog__action:last-child { justify-self: end; }
 .api-settings-dialog__section { display: flex; flex-direction: column; gap: var(--space-4); }

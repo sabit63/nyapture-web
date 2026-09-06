@@ -1,7 +1,7 @@
-import { ChevronDown, Eye, EyeOff, Save, Trash2, X } from 'lucide-react'
+import { Eye, EyeOff, Save, Trash2, X } from 'lucide-react'
 
 import { API_PROXY_PROTOCOLS } from '../../api'
-import type { ApiProxyProtocol, DisplaySettings } from '../../api'
+import type { ApiProxyProtocol } from '../../api'
 import {
   Button,
   Dialog,
@@ -20,7 +20,6 @@ export function ApiSettingsDialog({ controller }: ApiSettingsDialogProps) {
   const {
     apiSettingsDraft,
     apiSettingsOpen,
-    apiSettingsExpanded,
     apiSettingsErrors,
     apiSettingsSaveError,
     apiKeyVisible,
@@ -34,14 +33,11 @@ export function ApiSettingsDialog({ controller }: ApiSettingsDialogProps) {
     testApiConnection,
     saveApiSettings,
     resetApiSettings,
-    setApiSettingsExpanded,
     setApiKeyVisible,
     setEditKeyVisible,
     setApiSettingsDraft,
     setApiSettingsErrors,
     setApiSettingsSaveError,
-    displaySettingsDraft,
-    setDisplaySettingsDraft,
   } = controller
   const draftConnectionStatusLabel = controller.draftConnectionState === 'pending'
     ? '確認中'
@@ -65,7 +61,7 @@ export function ApiSettingsDialog({ controller }: ApiSettingsDialogProps) {
         <form className="advanced-dialog__panel api-settings-dialog__panel" noValidate onSubmit={(event) => saveApiSettings(event, requestClose)}>
           <DialogHeader className="advanced-dialog__header">
             <div>
-              <h2 id="api-settings-title">設定</h2>
+              <h2 id="api-settings-title">API設定</h2>
             </div>
             <div className="api-settings-dialog__header-actions">
               <Button
@@ -84,23 +80,18 @@ export function ApiSettingsDialog({ controller }: ApiSettingsDialogProps) {
                 <span className="api-settings__connection-indicator-dot" aria-hidden="true" />
                 <span>{draftConnectionStatusLabel}</span>
               </Button>
-              <IconButton size="default" type="button" aria-label="設定を閉じる" onClick={() => requestClose('close-button')}>
+              <IconButton size="default" type="button" aria-label="API設定を閉じる" onClick={() => requestClose('close-button')}>
                 <X size={19} aria-hidden="true" />
               </IconButton>
             </div>
           </DialogHeader>
 
           <DialogBody className="advanced-dialog__body">
-            <details
-              className="api-settings-dialog__section api-settings-dialog__section--expandable"
+            <section
+              className="api-settings-dialog__section"
               aria-labelledby="api-settings-section-title"
-              open={apiSettingsExpanded}
-              onToggle={(event) => setApiSettingsExpanded(event.currentTarget.open)}
             >
-              <summary id="api-settings-section-title" className="api-settings-dialog__section-heading">
-                <span>API</span>
-                <ChevronDown size={15} aria-hidden="true" />
-              </summary>
+              <h3 id="api-settings-section-title">接続先</h3>
               <div className="api-settings-dialog__content">
                 <section className="advanced-dialog__field">
                   <label htmlFor="api-settings-url">URL</label>
@@ -207,7 +198,7 @@ export function ApiSettingsDialog({ controller }: ApiSettingsDialogProps) {
                   </section>
                 </fieldset>
               </div>
-            </details>
+            </section>
 
             <section className="api-settings-dialog__section" aria-labelledby="proxy-settings-section-title" hidden>
               <div className="api-settings-dialog__section-heading">
@@ -310,30 +301,6 @@ export function ApiSettingsDialog({ controller }: ApiSettingsDialogProps) {
                   {apiSettingsErrors.proxyPort && <p id="api-settings-proxy-port-error" className="advanced-field-error" role="alert">{apiSettingsErrors.proxyPort}</p>}
                 </section>
               </div>
-            </section>
-
-            <section className="api-settings-dialog__section" aria-labelledby="display-settings-section-title">
-              <h3 id="display-settings-section-title">表示設定</h3>
-              <section className="advanced-dialog__field">
-                <select
-                  id="display-settings-thumbnail-columns"
-                  value={displaySettingsDraft.thumbnailColumns}
-                  aria-label="サムネイル列数"
-                  onChange={(event) => {
-                    setApiSettingsSaveError('')
-                    setDisplaySettingsDraft((current) => ({
-                      ...current,
-                      thumbnailColumns: Number(event.target.value) as DisplaySettings['thumbnailColumns'],
-                    }))
-                  }}
-                >
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                </select>
-              </section>
             </section>
 
             {draftConnectionState === 'error' && (

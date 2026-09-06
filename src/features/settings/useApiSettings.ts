@@ -28,9 +28,10 @@ export type ApiSettingsController = {
   displaySettings: DisplaySettings
   displaySettingsDraft: DisplaySettings
   apiSettingsOpen: boolean
-  apiSettingsExpanded: boolean
+  displaySettingsOpen: boolean
   apiSettingsErrors: ApiSettingsErrors
   apiSettingsSaveError: string
+  displaySettingsSaveError: string
   apiKeyVisible: boolean
   editKeyVisible: boolean
   draftConnectionState: ApiConnectionState
@@ -38,20 +39,26 @@ export type ApiSettingsController = {
   activeConnectionState: ApiConnectionState
   apiRevision: number
   apiSettingsDialogRef: RefObject<HTMLDialogElement | null>
+  displaySettingsDialogRef: RefObject<HTMLDialogElement | null>
   apiSettingsTriggerRef: RefObject<HTMLButtonElement | null>
+  displaySettingsTriggerRef: RefObject<HTMLButtonElement | null>
   openApiSettings: () => void
+  openDisplaySettings: () => void
   requestApiSettingsClose: (reason: Parameters<NativeDialogControls['requestClose']>[0]) => boolean
+  requestDisplaySettingsClose: (reason: Parameters<NativeDialogControls['requestClose']>[0]) => boolean
   afterApiSettingsClose: () => void
+  afterDisplaySettingsClose: () => void
   clearDraftConnectionCheck: () => void
   testApiConnection: (settings?: ApiSettings) => Promise<void>
   saveApiSettings: (event: FormEvent<HTMLFormElement>, requestClose: NativeDialogControls['requestClose']) => void
+  saveDisplaySettings: (event: FormEvent<HTMLFormElement>, requestClose: NativeDialogControls['requestClose']) => void
   resetApiSettings: (requestClose: NativeDialogControls['requestClose']) => void
-  setApiSettingsExpanded: (expanded: boolean) => void
   setApiKeyVisible: (visible: boolean | ((current: boolean) => boolean)) => void
   setEditKeyVisible: (visible: boolean | ((current: boolean) => boolean)) => void
   setApiSettingsDraft: Dispatch<SetStateAction<ApiSettings>>
   setApiSettingsErrors: Dispatch<SetStateAction<ApiSettingsErrors>>
   setApiSettingsSaveError: Dispatch<SetStateAction<string>>
+  setDisplaySettingsSaveError: Dispatch<SetStateAction<string>>
   setDisplaySettingsDraft: Dispatch<SetStateAction<DisplaySettings>>
 }
 
@@ -62,9 +69,10 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(initialSettings.display)
   const [displaySettingsDraft, setDisplaySettingsDraft] = useState<DisplaySettings>(() => ({ ...displaySettings }))
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false)
-  const [apiSettingsExpanded, setApiSettingsExpanded] = useState(true)
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [apiSettingsErrors, setApiSettingsErrors] = useState<ApiSettingsErrors>({})
   const [apiSettingsSaveError, setApiSettingsSaveError] = useState('')
+  const [displaySettingsSaveError, setDisplaySettingsSaveError] = useState('')
   const [apiKeyVisible, setApiKeyVisible] = useState(false)
   const [editKeyVisible, setEditKeyVisible] = useState(false)
   const [draftConnectionState, setDraftConnectionState] = useState<ApiConnectionState>('idle')
@@ -72,7 +80,9 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
   const [activeConnectionState, setActiveConnectionState] = useState<ApiConnectionState>('idle')
   const [apiRevision, setApiRevision] = useState(0)
   const apiSettingsDialogRef = useRef<HTMLDialogElement>(null)
+  const displaySettingsDialogRef = useRef<HTMLDialogElement>(null)
   const apiSettingsTriggerRef = useRef<HTMLButtonElement>(null)
+  const displaySettingsTriggerRef = useRef<HTMLButtonElement>(null)
   const draftConnectionAbortRef = useRef<AbortController | null>(null)
   const activeConnectionAbortRef = useRef<AbortController | null>(null)
   const announceActiveConnectionRef = useRef<'save' | 'reset' | null>(null)
@@ -113,14 +123,18 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     clearDraftConnectionCheck()
     setApiKeyVisible(false)
     setEditKeyVisible(false)
-    setApiSettingsExpanded(true)
     setApiSettingsDraft(nextDraft)
-    setDisplaySettingsDraft({ ...displaySettings })
     setApiSettingsErrors({})
     setApiSettingsSaveError('')
     setApiSettingsOpen(true)
     void testApiConnection(nextDraft)
-  }, [apiSettings, clearDraftConnectionCheck, displaySettings, testApiConnection])
+  }, [apiSettings, clearDraftConnectionCheck, testApiConnection])
+
+  const openDisplaySettings = useCallback(() => {
+    setDisplaySettingsDraft({ ...displaySettings })
+    setDisplaySettingsSaveError('')
+    setDisplaySettingsOpen(true)
+  }, [displaySettings])
 
   const prepareApiSettingsClose = useCallback(() => {
     clearDraftConnectionCheck()
@@ -139,15 +153,23 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     setApiSettingsOpen(false)
   }, [prepareApiSettingsClose])
 
+  const requestDisplaySettingsClose = useCallback((_reason: Parameters<NativeDialogControls['requestClose']>[0]) => {
+    setDisplaySettingsOpen(false)
+    return true
+  }, [])
+
+  const afterDisplaySettingsClose = useCallback(() => {
+    setDisplaySettingsOpen(false)
+  }, [])
+
   const saveApiSettings = useCallback((event: FormEvent<HTMLFormElement>, requestClose: NativeDialogControls['requestClose']) => {
     event.preventDefault()
     const { normalized, errors } = validateApiSettings(apiSettingsDraft)
     setApiSettingsErrors(errors)
     if (!normalized) return
-    const normalizedDisplaySettings = normalizeDisplaySettings(displaySettingsDraft)
 
     try {
-      saveAppSettings({ api: normalized, display: normalizedDisplaySettings })
+      saveAppSettings({ api: normalized, display: displaySettings })
     } catch {
       setApiSettingsSaveError('設定を端末へ保存できませんでした。ブラウザのストレージ設定を確認してください。')
       return
@@ -155,14 +177,30 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
 
     clearDraftConnectionCheck()
     configureApi(normalized)
-    setDisplaySettings(normalizedDisplaySettings)
     setApiSettings(normalized)
     setApiSettingsDraft(normalized)
-    setDisplaySettingsDraft(normalizedDisplaySettings)
     announceActiveConnectionRef.current = 'save'
     setApiRevision((current) => current + 1)
     requestClose('submit')
-  }, [apiSettingsDraft, clearDraftConnectionCheck, displaySettingsDraft])
+  }, [apiSettingsDraft, clearDraftConnectionCheck, displaySettings])
+
+  const saveDisplaySettings = useCallback((event: FormEvent<HTMLFormElement>, requestClose: NativeDialogControls['requestClose']) => {
+    event.preventDefault()
+    const normalizedDisplaySettings = normalizeDisplaySettings(displaySettingsDraft)
+
+    try {
+      saveAppSettings({ api: apiSettings, display: normalizedDisplaySettings })
+    } catch {
+      setDisplaySettingsSaveError('表示設定を端末へ保存できませんでした。ブラウザのストレージ設定を確認してください。')
+      return
+    }
+
+    setDisplaySettings(normalizedDisplaySettings)
+    setDisplaySettingsDraft(normalizedDisplaySettings)
+    setDisplaySettingsSaveError('')
+    requestClose('submit')
+    notify('表示設定を保存しました')
+  }, [apiSettings, displaySettingsDraft, notify])
 
   const resetApiSettings = useCallback((requestClose: NativeDialogControls['requestClose']) => {
     if (!window.confirm('端末に保存したAPI設定を削除し、既定値へ戻しますか？')) return
@@ -220,9 +258,10 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     displaySettings,
     displaySettingsDraft,
     apiSettingsOpen,
-    apiSettingsExpanded,
+    displaySettingsOpen,
     apiSettingsErrors,
     apiSettingsSaveError,
+    displaySettingsSaveError,
     apiKeyVisible,
     editKeyVisible,
     draftConnectionState,
@@ -230,20 +269,26 @@ export function useApiSettings(notify: (message: string, tone?: 'success' | 'war
     activeConnectionState,
     apiRevision,
     apiSettingsDialogRef,
+    displaySettingsDialogRef,
     apiSettingsTriggerRef,
+    displaySettingsTriggerRef,
     openApiSettings,
+    openDisplaySettings,
     requestApiSettingsClose,
+    requestDisplaySettingsClose,
     afterApiSettingsClose,
+    afterDisplaySettingsClose,
     clearDraftConnectionCheck,
     testApiConnection,
     saveApiSettings,
+    saveDisplaySettings,
     resetApiSettings,
-    setApiSettingsExpanded,
     setApiKeyVisible,
     setEditKeyVisible,
     setApiSettingsDraft,
     setApiSettingsErrors,
     setApiSettingsSaveError,
+    setDisplaySettingsSaveError,
     setDisplaySettingsDraft,
   }
 }

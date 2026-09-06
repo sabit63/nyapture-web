@@ -36,7 +36,19 @@
 .topbar .brand { display: none; }
 .menu-button { width: var(--space-12); display: inline-grid; margin-inline-start: calc(var(--space-1) - var(--layout-page-gutter)); }
 
-.topbar__actions { min-width: 0; justify-self: end; display: flex; align-items: center; gap: var(--layout-control-gap); }
+.topbar__actions {
+  width: calc(var(--space-8) + var(--control-height-default) + var(--control-height-default) + var(--layout-control-gap) + var(--layout-control-gap));
+  min-width: 0;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--layout-control-gap);
+}
+
+.topbar__actions:has(.topbar__view-mode-slot) {
+  width: calc(var(--space-8) + var(--control-height-default) + var(--control-height-compact) + var(--control-height-compact) + var(--control-height-default) + var(--layout-control-gap) + var(--layout-control-gap) + var(--layout-control-gap));
+}
 
 .drawer {
   position: fixed;
@@ -117,6 +129,36 @@ body.drawer-open { overflow: hidden; }
 
   .topbar .brand { display: inline-flex; }
 }
+
+@media (max-width: 639px) {
+  .topbar__actions:has(.topbar__view-mode-slot) {
+    width: calc(var(--space-8) + var(--control-height-default) + var(--control-height-compact) + var(--control-height-default) + var(--layout-control-gap) + var(--layout-control-gap) + var(--layout-control-gap));
+  }
+
+  .topbar__actions:has(.topbar__view-mode-slot) .search-view-toggle .toolbar-icon {
+    margin-left: 0;
+    border-radius: var(--radius-control);
+  }
+
+  .topbar__actions:has(.topbar__view-mode-slot) .search-view-toggle .toolbar-icon[aria-pressed='true'] {
+    display: none;
+  }
+}
+
 .topbar__action-slot {
   display: contents;
+}
+
+.topbar__view-mode-slot {
+  width: calc(var(--control-height-compact) + var(--control-height-compact) - 1px);
+  height: var(--control-height-compact);
+  display: inline-flex;
+  flex: 0 0 calc(var(--control-height-compact) + var(--control-height-compact) - 1px);
+}
+
+@media (max-width: 639px) {
+  .topbar__view-mode-slot {
+    width: var(--control-height-compact);
+    flex-basis: var(--control-height-compact);
+  }
 }

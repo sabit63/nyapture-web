@@ -1,7 +1,9 @@
 import {
   FileText,
-  Radio,
-  Settings,
+  Settings2,
+  Wifi,
+  WifiLow,
+  WifiOff,
 } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
@@ -12,6 +14,7 @@ import { useSnackbar } from './components/Snackbar'
 import { IconButton, StatePanel } from './components/ui'
 import {
   SEARCH_CONTINUOUS_DETAILS_ACTION_ID,
+  SEARCH_VIEW_MODE_ACTION_ID,
   SearchHeader,
   SearchPage,
   useSearchController,
@@ -57,6 +60,7 @@ function App() {
     lastRouterRevisionRef.current = routerLocation.revision
     shellController.onNavigate()
     if (apiSettingsController.apiSettingsOpen) apiSettingsController.requestApiSettingsClose('programmatic')
+    if (apiSettingsController.displaySettingsOpen) apiSettingsController.requestDisplaySettingsClose('programmatic')
   }, [apiSettingsController, routerLocation.revision, shellController])
   const realtimeEnabled = isLibrarySearch || isWebSearch || isWebCache || isDownloadManager
   const hubConnectionState = useBookDownloadHubConnection(realtimeEnabled, apiSettingsController.apiRevision)
@@ -92,6 +96,11 @@ function App() {
     ? !realtimeEnabled || hubConnectionState === 'connected' ? 'connected' : 'warning'
     : 'error'
   const connectionLabel = `API: ${API_CONNECTION_STATE_LABELS[apiConnectionState]}、リアルタイム: ${realtimeConnectionLabel}`
+  const ConnectionIcon = connectionStatus === 'connected'
+    ? Wifi
+    : connectionStatus === 'warning'
+      ? WifiLow
+      : WifiOff
 
   return (
     <AppShell
@@ -109,18 +118,6 @@ function App() {
       )}
       headerActions={(
         <>
-          <span
-            className={`connection connection--${connectionStatus}`}
-            role="status"
-            aria-label={connectionLabel}
-            aria-live="polite"
-            data-api-state={apiConnectionState}
-            data-realtime-state={hubConnectionState}
-            data-realtime-enabled={realtimeEnabled}
-            data-sync-freshness={searchController.searchSyncFreshness}
-          >
-            <Radio className="connection__icon" aria-hidden="true" />
-          </span>
           {isBookViewer && (
             <IconButton
               ref={bookViewerDetailsTriggerRef}
@@ -140,18 +137,45 @@ function App() {
             id={SEARCH_CONTINUOUS_DETAILS_ACTION_ID}
             className="topbar__action-slot"
           />
+          {isLibrarySearch && (
+            <span
+              id={SEARCH_VIEW_MODE_ACTION_ID}
+              className="topbar__action-slot topbar__view-mode-slot"
+            />
+          )}
+          <span className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {connectionLabel}
+          </span>
           <IconButton
-            ref={apiSettingsController.apiSettingsTriggerRef}
+            ref={apiSettingsController.displaySettingsTriggerRef}
             className="api-settings-trigger"
             size="default"
             type="button"
-            aria-label="設定を開く"
+            aria-label="表示設定を開く"
+            aria-haspopup="dialog"
+            aria-expanded={apiSettingsController.displaySettingsOpen}
+            aria-controls="display-settings-dialog"
+            onClick={apiSettingsController.openDisplaySettings}
+          >
+            <Settings2 size={18} aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            ref={apiSettingsController.apiSettingsTriggerRef}
+            className={`connection connection--${connectionStatus}`}
+            size="compact"
+            type="button"
+            aria-label={`API設定を開く。${connectionLabel}`}
             aria-haspopup="dialog"
             aria-expanded={apiSettingsController.apiSettingsOpen}
             aria-controls="api-settings-dialog"
+            title="API設定"
+            data-api-state={apiConnectionState}
+            data-realtime-state={hubConnectionState}
+            data-realtime-enabled={realtimeEnabled}
+            data-sync-freshness={searchController.searchSyncFreshness}
             onClick={apiSettingsController.openApiSettings}
           >
-            <Settings size={18} aria-hidden="true" />
+            <ConnectionIcon className="connection__icon" aria-hidden="true" />
           </IconButton>
         </>
       )}

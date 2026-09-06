@@ -1,6 +1,7 @@
 import {
   ArrowDown,
   ArrowUp,
+  BookSearch,
   Check,
   ChevronDown,
   FileText,
@@ -10,7 +11,6 @@ import {
   LoaderCircle,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react'
@@ -36,6 +36,7 @@ import { SearchContinuousReader } from './SearchContinuousReader'
 import { isReadableBook, resolveContinuousStart } from './search-continuous-utils'
 
 export const SEARCH_CONTINUOUS_DETAILS_ACTION_ID = 'search-continuous-details-action'
+export const SEARCH_VIEW_MODE_ACTION_ID = 'search-view-mode-action'
 
 export type SearchHeaderProps = {
   controller: SearchController
@@ -85,7 +86,7 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
         aria-controls="advanced-search-dialog"
         onClick={openAdvancedSearch}
       >
-        <SlidersHorizontal size={17} aria-hidden="true" />
+        <BookSearch size={17} aria-hidden="true" />
       </IconButton>
     </form>
   )
@@ -100,6 +101,7 @@ export function SearchPage({ controller }: SearchPageProps) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [activeContinuousBook, setActiveContinuousBook] = useState<ApiBookCardModel>()
   const [continuousHeaderActionHost, setContinuousHeaderActionHost] = useState<HTMLElement | null>(null)
+  const [viewModeHeaderActionHost, setViewModeHeaderActionHost] = useState<HTMLElement | null>(null)
   const [returnRestoreRevision, setReturnRestoreRevision] = useState(0)
   const detailsTriggerRef = useRef<HTMLButtonElement>(null)
   const returnToBookRef = useRef<ApiBookCardModel | undefined>(undefined)
@@ -160,6 +162,7 @@ export function SearchPage({ controller }: SearchPageProps) {
 
   useEffect(() => {
     setContinuousHeaderActionHost(document.getElementById(SEARCH_CONTINUOUS_DETAILS_ACTION_ID))
+    setViewModeHeaderActionHost(document.getElementById(SEARCH_VIEW_MODE_ACTION_ID))
   }, [])
 
   const isSearchLoading = searchState === 'loading'
@@ -357,43 +360,6 @@ export function SearchPage({ controller }: SearchPageProps) {
                 {sortDirection === 'desc' ? <ArrowDown size={17} aria-hidden="true" /> : <ArrowUp size={17} aria-hidden="true" />}
               </IconButton>
             )}
-            {!isWebSearch && (
-              <div className="search-view-toggle" role="group" aria-label="検索結果の表示形式">
-                <IconButton
-                  className={`toolbar-icon ${!isContinuousView ? 'is-active' : ''}`}
-                  variant="ghost"
-                  tone="neutral"
-                  size="compact"
-                  type="button"
-                  aria-label="カード一覧"
-                  aria-pressed={!isContinuousView}
-                  disabled={isSearchLoading}
-                  onClick={() => {
-                    if (!isContinuousView) return
-                    returnToBookRef.current = activeContinuousBook ?? readableBooks[continuousResolution.startIndex]
-                    setReturnRestoreRevision((current) => current + 1)
-                    exitContinuousView()
-                  }}
-                >
-                  <LayoutGrid size={16} aria-hidden="true" />
-                </IconButton>
-                <IconButton
-                  className={`toolbar-icon ${isContinuousView ? 'is-active' : ''}`}
-                  variant="ghost"
-                  tone="neutral"
-                  size="compact"
-                  type="button"
-                  aria-label="連続閲覧"
-                  aria-pressed={isContinuousView}
-                  disabled={isSearchLoading || readableBooks.length === 0}
-                  onClick={() => {
-                    if (!isContinuousView) enterContinuousView()
-                  }}
-                >
-                  <Images size={16} aria-hidden="true" />
-                </IconButton>
-              </div>
-            )}
             {!isContinuousView && (
               <IconButton
                 className={`toolbar-icon selection-toggle ${selectMode ? 'is-active' : ''}`}
@@ -578,6 +544,44 @@ export function SearchPage({ controller }: SearchPageProps) {
           </nav>
         )}
       </section>
+      {controller.isLibrarySearch && viewModeHeaderActionHost && createPortal(
+        <div className="search-view-toggle" role="group" aria-label="検索結果の表示形式">
+          <IconButton
+            className={`toolbar-icon ${!isContinuousView ? 'is-active' : ''}`}
+            variant="ghost"
+            tone="neutral"
+            size="compact"
+            type="button"
+            aria-label="カード一覧"
+            aria-pressed={!isContinuousView}
+            disabled={isSearchLoading}
+            onClick={() => {
+              if (!isContinuousView) return
+              returnToBookRef.current = activeContinuousBook ?? readableBooks[continuousResolution.startIndex]
+              setReturnRestoreRevision((current) => current + 1)
+              exitContinuousView()
+            }}
+          >
+            <LayoutGrid size={16} aria-hidden="true" />
+          </IconButton>
+          <IconButton
+            className={`toolbar-icon ${isContinuousView ? 'is-active' : ''}`}
+            variant="ghost"
+            tone="neutral"
+            size="compact"
+            type="button"
+            aria-label="連続閲覧"
+            aria-pressed={isContinuousView}
+            disabled={isSearchLoading || readableBooks.length === 0}
+            onClick={() => {
+              if (!isContinuousView) enterContinuousView()
+            }}
+          >
+            <Images size={16} aria-hidden="true" />
+          </IconButton>
+        </div>,
+        viewModeHeaderActionHost,
+      )}
       {isContinuousView && continuousDetailsBook && continuousHeaderActionHost && createPortal(
         <IconButton
           ref={detailsTriggerRef}

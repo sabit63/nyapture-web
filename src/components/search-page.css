@@ -23,6 +23,35 @@
 .quick-search .search-submit:hover,
 .quick-search .search-detail:hover { background: var(--color-neutral-soft); color: var(--color-text); }
 
+@media (max-width: 639px) {
+  .quick-search {
+    width: var(--control-height-compact);
+    height: var(--control-height-compact);
+    justify-self: start;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .quick-search:focus-within {
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .quick-search input,
+  .quick-search .search-clear,
+  .quick-search .search-submit,
+  .quick-search__divider {
+    display: none;
+  }
+
+  .quick-search .search-detail {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+}
+
 .connection {
   width: var(--space-8);
   height: var(--space-8);
@@ -35,11 +64,11 @@
 }
 
 .connection__icon { width: 17px; height: 17px; }
-.connection--connected { color: var(--color-success-fill); }
-.connection--warning { color: var(--color-warning-fill); }
-.connection--loading { color: var(--color-warning-fill); }
-.connection--error { color: var(--color-danger-fill); }
-.connection--stale { color: var(--color-danger-fill); background: color-mix(in srgb, var(--color-danger-fill) 9%, transparent); }
+.icon-button.connection--connected { color: var(--color-success-fill); }
+.icon-button.connection--warning { color: var(--color-warning-fill); }
+.icon-button.connection--loading { color: var(--color-warning-fill); }
+.icon-button.connection--error { color: var(--color-danger-fill); }
+.icon-button.connection--stale { color: var(--color-danger-fill); background: color-mix(in srgb, var(--color-danger-fill) 9%, transparent); }
 .connection--loading .connection__icon { animation: ui-spin .85s linear infinite; }
 
 .filter-panel {

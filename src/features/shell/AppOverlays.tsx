@@ -5,6 +5,7 @@ import { TagSearchDestinationDialog } from '../search/TagSearchDestinationDialog
 import type { SearchController } from '../search/useSearchController'
 import { LibraryDeleteDialog } from '../library/LibraryDeleteDialog'
 import { ApiSettingsDialog } from '../settings/ApiSettingsDialog'
+import { DisplaySettingsDialog } from '../settings/DisplaySettingsDialog'
 import type { ApiSettingsController } from '../settings/useApiSettings'
 
 export type AppOverlaysProps = {
@@ -26,6 +27,7 @@ export function AppOverlays({
       <WebBookDetailDialog controller={searchController} />
       <TagSearchDestinationDialog controller={searchController} />
       <ApiSettingsDialog controller={apiSettingsController} />
+      <DisplaySettingsDialog controller={apiSettingsController} />
       <LibraryDeleteDialog
         dialogRef={searchController.deleteDialogRef}
         open={searchController.deleteDialogOpen}
