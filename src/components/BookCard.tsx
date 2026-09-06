@@ -12,6 +12,7 @@ import type { MouseEvent, ReactNode } from 'react'
 import { requestBlob } from '../api'
 import type { ApiBookCardModel } from '../api'
 import { InternalLink, navigate, shouldInterceptNavigationClick } from '../app/client-router'
+import { toPublicPath } from '../app/app-base-path'
 import { BookStatusBadge } from './BookStatusBadge'
 import { TagChip } from './TagChip'
 import { Thumbnail } from './Thumbnail'
@@ -93,7 +94,7 @@ export function BookCard({
   const apiGroupId = book.apiGroupId?.trim()
   const apiBookId = book.apiBookId?.trim()
   const viewerUrl = apiGroupId && apiBookId
-    ? `/book/viewer?id=${encodeURIComponent(apiBookId)}&gid=${encodeURIComponent(apiGroupId)}`
+    ? toPublicPath(`/book/viewer?id=${encodeURIComponent(apiBookId)}&gid=${encodeURIComponent(apiGroupId)}`)
     : undefined
   const isDownloading = book.status === 'Downloading'
   const isDownloaded = book.status === 'Downloaded'

@@ -54,6 +54,18 @@ is the port exposed on the Docker host and defaults to `8080`.
 It is not sent to the browser; Nginx forwards same-origin `/alive` and `/api/*`
 requests to this address.
 
+To expose the same container through a path-based reverse proxy, forward the
+request prefix in `X-Forwarded-Prefix`. The serving Nginx accepts only a
+`/nyapture/viewer` prefix (with an optional trailing slash) and rewrites the
+document base for that request; direct requests and unrecognized header values
+continue to use `/`. Publish the web container on the LAN-facing Viewer port
+with `NYA_WEB_BIND=0.0.0.0` and `NYA_WEB_PORT=5370`, then have the gateway strip
+the public prefix and send `X-Forwarded-Prefix: /nyapture/viewer`.
+
+The reverse proxy must also forward WebSocket upgrade headers when the saved
+API URL points through that proxy. API URLs and credentials are not derived
+from the UI path prefix; the configured API settings are used unchanged.
+
 `VITE_NYA_API_URL` is optional. Leave it empty for same-origin access through
 Nginx. Set it only when browsers should connect directly to an external API;
 because Vite embeds it during the image build, rebuild after changing it.

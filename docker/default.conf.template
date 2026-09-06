@@ -1,3 +1,9 @@
+map $http_x_forwarded_prefix $nyapture_base_href {
+  default "/";
+  "/nyapture/viewer" "/nyapture/viewer/";
+  "/nyapture/viewer/" "/nyapture/viewer/";
+}
+
 server {
   listen 80;
   listen [::]:80;
@@ -39,5 +45,7 @@ server {
 
   location / {
     try_files $uri $uri/ /index.html;
+    sub_filter '<base href="/" />' '<base href="$nyapture_base_href" />';
+    sub_filter_once on;
   }
 }

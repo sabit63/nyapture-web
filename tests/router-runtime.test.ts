@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
+import * as React from 'react'
+import { createRoot } from 'react-dom/client'
 import { it } from 'node:test'
-import { RouterRuntime } from '../src/app/router-components'
-import { navigate, createRouterHistoryState } from '../src/app/client-router'
+import { InternalLink, RouterRuntime } from '../src/app/router-components'
+import { navigate, createRouterHistoryState, useRouterLocation } from '../src/app/client-router'
 import { act, installHookDom, renderHook } from './helpers/react-hook'
+
+Object.defineProperty(globalThis, 'React', { configurable: true, value: React })
 
 it('resets scroll only on navigation and preserves it across unrelated renders', async () => {
   const dom = installHookDom('http://localhost/search')
@@ -58,6 +62,43 @@ it('resets scroll only on navigation and preserves it across unrelated renders',
     assert.deepEqual(scrollCalls, [], 'render after history navigation must not restore again')
   } finally {
     await hook.unmount()
+    dom.cleanup()
+  }
+})
+
+it('exposes logical routes while history retains the public app prefix', async () => {
+  const dom = installHookDom('http://localhost/nyapture/viewer/search')
+  const base = document.createElement('base')
+  base.href = '/nyapture/viewer/'
+  document.head.append(base)
+  const hook = await renderHook(() => useRouterLocation(), undefined)
+  try {
+    assert.equal(hook.current.pathname, '/search')
+    await act(async () => { navigate('/dashboard/web-cache') })
+    assert.equal(dom.window.location.pathname, '/nyapture/viewer/dashboard/web-cache')
+    assert.equal(hook.current.pathname, '/dashboard/web-cache')
+  } finally {
+    await hook.unmount()
+    dom.cleanup()
+  }
+})
+
+it('renders logical internal links with the public app prefix', async () => {
+  const dom = installHookDom('http://localhost/nyapture/viewer/search')
+  const base = document.createElement('base')
+  base.href = '/nyapture/viewer/'
+  document.head.append(base)
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => {
+      root.render(React.createElement(InternalLink, { href: '/dashboard' }, 'Dashboard'))
+    })
+    assert.equal(container.querySelector('a')?.getAttribute('href'), '/nyapture/viewer/dashboard')
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
     dom.cleanup()
   }
 })

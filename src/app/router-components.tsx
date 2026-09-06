@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useEffectEvent, useRef, type AnchorHTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
 import { navigate, shouldInterceptNavigationClick, useRouterLocation, locationStore, readRouterHistoryMetadata, runScheduledScrollSave, persistScrollPosition, beginPendingScrollRestoration } from './client-router'
+import { toPublicPath } from './app-base-path'
 
 const getAnchorTarget = (anchor: HTMLAnchorElement) => (
   anchor.hasAttribute('target') ? anchor.getAttribute('target') : null
@@ -35,7 +36,8 @@ export const InternalLink = forwardRef<HTMLAnchorElement, Omit<InternalLinkProps
     navigate(anchor.href)
   }, [onClick])
 
-  return <a ref={ref} href={href} onClick={handleClick} {...props} />
+  const publicHref = typeof href === 'string' ? toPublicPath(href) : href
+  return <a ref={ref} href={publicHref} onClick={handleClick} {...props} />
 })
 InternalLink.displayName = 'InternalLink'
 

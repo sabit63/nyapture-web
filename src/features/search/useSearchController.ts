@@ -7,6 +7,7 @@ import type { ApiBookCardModel, DisplaySettings } from '../../api'
 import type { BookDownloadHubConnectionState } from '../../realtime/book-download-hub'
 import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
 import { getTagLabel, TAG_TYPE_ORDER } from '../../models'
+import { toLogicalPath } from '../../app/app-base-path'
 import {
   cloneCriteria,
   createSearchUrlForDestination,
@@ -191,7 +192,8 @@ export function useSearchController({
   }, [navigateSearchUrlFromRoute, resultPage, routerLocation.href, searchView, setResultPageFromRoute])
 
   const navigateSearchUrl = useCallback((url: URL) => {
-    const isLibraryDestination = url.pathname === '/search' || url.pathname === '/search/missing-tags'
+    const logicalPath = toLogicalPath(url.pathname)
+    const isLibraryDestination = logicalPath === '/search' || logicalPath === '/search/missing-tags'
     const destination = searchView === 'continuous' && isLibraryDestination
       ? applyContinuousSearchParams(url)
       : url

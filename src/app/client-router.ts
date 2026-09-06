@@ -1,6 +1,12 @@
 import {
   useSyncExternalStore,
 } from 'react'
+import {
+  getAppBasePath,
+  isAppPath,
+  removeAppBasePath,
+  toPublicUrl,
+} from './app-base-path'
 
 const ROUTER_NAMESPACE = 'nyapture-router'
 const ROUTER_STATE_KEY = '__nyapture_router__'
@@ -60,6 +66,7 @@ export type NavigationClickDetails = {
   href?: string | null
   currentHref?: string
   currentOrigin?: string
+  appBasePath?: string
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -159,6 +166,7 @@ export const shouldInterceptNavigationClick = ({
   href,
   currentHref,
   currentOrigin,
+  appBasePath,
 }: NavigationClickDetails): boolean => {
   if (defaultPrevented || button !== 0 || metaKey || ctrlKey || shiftKey || altKey) return false
   if (target !== null && target !== '') return false
@@ -175,6 +183,10 @@ export const shouldInterceptNavigationClick = ({
 
   const origin = currentOrigin ?? current?.origin
   if (!origin || destination.origin !== origin) return false
+  const basePath = appBasePath ?? getAppBasePath()
+  if (basePath !== '/' && (!isAppPath(destination.pathname, basePath) || (current && !isAppPath(current.pathname, basePath)))) {
+    return false
+  }
   if (current && destination.pathname === current.pathname && destination.search === current.search) {
     // Hash changes are deliberately left to the browser so native anchor
     // scrolling and URL semantics remain intact.
@@ -215,7 +227,7 @@ const readBrowserLocation = (): RouterLocation => {
   return {
     href: url.href,
     origin: url.origin,
-    pathname: url.pathname,
+    pathname: removeAppBasePath(url.pathname),
     search: url.search,
     hash: url.hash,
     historyState: window.history.state,
@@ -342,7 +354,7 @@ const createLocationStore = () => {
 
   const navigate = (to: string | URL, options: NavigateOptions = {}) => {
     if (typeof window === 'undefined') return
-    const destination = new URL(to.toString(), window.location.href)
+    const destination = toPublicUrl(to)
     if (destination.origin !== window.location.origin) {
       window.location.assign(destination.toString())
       return

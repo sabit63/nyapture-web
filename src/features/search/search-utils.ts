@@ -1,5 +1,6 @@
 import { HITOMI_APPENDS, isValidLocalDate, TAG_TYPE_ORDER } from '../../models'
 import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria } from '../../models'
+import { toPublicPath } from '../../app/app-base-path'
 
 export { isValidLocalDate }
 
@@ -113,7 +114,7 @@ export const createSearchUrlForDestination = (
   const isHitomiSearch = options.destination === 'hitomi'
   const isMissingTagSearch = options.destination === 'missing-tags'
   const pathname = isHitomiSearch ? '/hitomila/search' : isMissingTagSearch ? '/search/missing-tags' : '/search'
-  const url = new URL(pathname, options.origin ?? window.location.origin)
+  const url = new URL(toPublicPath(pathname), options.origin ?? window.location.origin)
   const text = criteria.text.trim()
   const tags = isHitomiSearch
     ? criteria.tags.filter((tag, index, all) => !isJapaneseLanguageTag(tag) || all.findIndex(isJapaneseLanguageTag) === index)
