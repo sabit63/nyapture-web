@@ -15,40 +15,11 @@ import type {
   WebBookCacheSyncRequest,
   WebBookCacheSyncStartResponse,
   WebBookCacheValidationResponse,
-} from '../models/web-cache'
-
-type ApiResponse = {
-  success?: boolean
-  message?: string | null
-}
-
-type ApiEnvelope<T> = ApiResponse & {
-  data?: T | null
-}
+} from './dto/web-cache'
+import { createEnvelopePolicy, type ApiResponse, type ApiEnvelope } from './response'
 
 const segment = (value: string) => encodeURIComponent(value)
-
-const failureMessage = (response?: ApiResponse | null) => (
-  response?.message?.trim() || 'Web Book Cache APIの応答に失敗しました。'
-)
-
-const assertSuccess = (response: (ApiResponse & { data?: unknown }) | null | undefined): void => {
-  if (response?.success === false) {
-    const data = response.data
-    const errors = data && typeof data === 'object' && 'errors' in data && Array.isArray(data.errors)
-      ? data.errors.filter((value): value is string => typeof value === 'string')
-      : undefined
-    throw new ApiError(failureMessage(response), { validationErrors: errors })
-  }
-}
-
-const unwrapData = <T>(response: ApiEnvelope<T>): T => {
-  assertSuccess(response)
-  if (response.data === undefined || response.data === null) {
-    throw new ApiError(failureMessage(response))
-  }
-  return response.data
-}
+const { assertSuccess, unwrapData } = createEnvelopePolicy('Web Book Cache APIの応答に失敗しました。')
 
 /** Search responses are returned directly by the Web Book Cache endpoint. */
 export const searchCache = async (

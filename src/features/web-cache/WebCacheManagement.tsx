@@ -1,5 +1,4 @@
-import { useCacheSyncStatus } from './use-cache-sync-status'
-import { useCacheDraft } from './use-cache-draft'
+import { useCacheManagement } from './use-cache-management'
 import {
   Activity,
   Check,
@@ -18,21 +17,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { isValidElement, useCallback, useState, type ChangeEvent } from 'react'
 
-import {
-  ApiError,
-  getErrorMessage,
-} from '../../api'
-import {
-  cancelCacheSync,
-  getCacheConfig,
-  resetCacheConfig,
-  runCacheSync,
-  saveCacheConfig,
-  testCacheSite,
-  validateCacheConfig,
-} from '../../api/web-cache'
 import {
   Button,
   Dialog,
@@ -41,42 +27,15 @@ import {
   DialogHeader,
   IconButton,
 } from '../../components/ui'
-import type {
-  WebBookCacheConfigDto,
-  WebBookCacheConfigResponse,
-  WebBookCacheSyncStartResponse,
-  WebBookCacheValidationResponse,
-  WebBookCacheSiteTestResponse,
-} from '../../models/web-cache'
-import {
-  canSaveWebCacheConfig,
-  cloneWebCacheConfig,
-  createCacheSyncRequest,
-  getValidationMessagesFromError,
-  isCurrentCacheRequest,
-  validateWebCacheDraft,
-  validationMessages,
-  type WebCacheConfigDraft,
-} from './management-state'
 import './web-cache-management.css'
 
 export type WebCacheManagementProps = {
   apiRevision: number
 }
 
-type Feedback = {
-  tone: 'success' | 'warning' | 'danger' | 'info'
-  message: string
-}
-
 type ConfirmAction =
   | { kind: 'reset' }
   | { kind: 'remove-site'; index: number; groupId: string }
-
-type SiteTestResult = {
-  tone: 'success' | 'warning' | 'danger'
-  message: string
-}
 
 const formatNumber = (value?: number | null) => (
   typeof value === 'number' && Number.isFinite(value)
@@ -90,36 +49,6 @@ const formatDateTime = (value?: string | null) => {
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
-
-const responseMessage = (value: unknown): string | null => {
-  if (!value || typeof value !== 'object') return null
-  const message = (value as { message?: unknown }).message
-  return typeof message === 'string' && message.trim() ? message.trim() : null
-}
-
-const responseIsFailure = (value: unknown) => (
-  !!value
-  && typeof value === 'object'
-  && (value as { success?: unknown }).success === false
-)
-
-const errorMessage = (error: unknown) => {
-  const validationErrors = getValidationMessagesFromError(error)
-  if (validationErrors.length > 0) return validationErrors.join('\n')
-  if (error instanceof ApiError && error.message.trim()) return error.message
-  return getErrorMessage(error)
-}
-
-const responseConfig = (value: WebBookCacheConfigResponse | WebBookCacheConfigDto): WebCacheConfigDraft => {
-  if (value && typeof value === 'object' && 'config' in value && value.config) {
-    return cloneWebCacheConfig(value.config)
-  }
-  return cloneWebCacheConfig(value as WebBookCacheConfigDto)
-}
-
-const responseRuntimeOverride = (value: WebBookCacheConfigResponse | WebBookCacheConfigDto) => (
-  !!(value && typeof value === 'object' && 'hasRuntimeOverride' in value && value.hasRuntimeOverride)
-)
 
 const updateNumber = (event: ChangeEvent<HTMLInputElement>) => (
   event.target.value === '' ? Number.NaN : Number(event.target.value)
@@ -172,117 +101,50 @@ function Toggle({ label, checked, onChange, disabled = false }: {
 }
 
 export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
-  const { serverConfig, setServerConfig, draft, setDraft, draftRef, allowedGroupIdsText, setAllowedGroupIdsText, excludedTagsText, setExcludedTagsText, applyEditableConfig, updateDraft, updateGlobalNumber, updateAutoDownload, updateSite } = useCacheDraft()
-  const [hasRuntimeOverride, setHasRuntimeOverride] = useState(false)
-  const { status, setStatus, statusLoading, statusError, loadStatus } = useCacheSyncStatus(apiRevision)
-  const [configLoading, setConfigLoading] = useState(true)
-  const [configError, setConfigError] = useState<string | null>(null)
-  const [configUncertain, setConfigUncertain] = useState(false)
-  const configUncertainRef = useRef(false)
-  const [validationIssues, setValidationIssues] = useState<Array<{ path?: string; message: string }>>([])
-  const [feedback, setFeedback] = useState<Feedback | null>(null)
-  const [validating, setValidating] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [resetting, setResetting] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [cancelPending, setCancelPending] = useState(false)
-  const [syncGroupId, setSyncGroupId] = useState('')
-  const [syncForce, setSyncForce] = useState(false)
-  const [testingGroupId, setTestingGroupId] = useState<string | null>(null)
-  const [siteTests, setSiteTests] = useState<Record<string, SiteTestResult>>({})
+  const {
+    serverConfig,
+    draft,
+    allowedGroupIdsText,
+    setAllowedGroupIdsText,
+    excludedTagsText,
+    setExcludedTagsText,
+    updateDraft,
+    updateGlobalNumber,
+    updateAutoDownload,
+    updateSite,
+    status,
+    statusLoading,
+    statusError,
+    loadStatus,
+    hasRuntimeOverride,
+    configLoading,
+    configError,
+    feedback,
+    setFeedback,
+    validating,
+    saving,
+    resetting,
+    syncing,
+    cancelPending,
+    syncGroupId,
+    setSyncGroupId,
+    syncForce,
+    setSyncForce,
+    testingGroupId,
+    siteTests,
+    allValidationMessages,
+    issueFor,
+    loadConfig,
+    save,
+    reset,
+    runSync,
+    cancel,
+    testSite,
+    draftDirty,
+    resetDisabled,
+    saveDisabled,
+  } = useCacheManagement(apiRevision)
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
-
-  const mountedRef = useRef(true)
-  const revisionRef = useRef(apiRevision)
-  const generationRef = useRef(0)
-  const configControllerRef = useRef<AbortController | null>(null)
-  const mutationControllerRef = useRef<AbortController | null>(null)
-  const configRequestIdRef = useRef(0)
-  const mutationBusyRef = useRef(false)
-
-  const isActive = useCallback((generation: number, revision = apiRevision) => (
-    mountedRef.current
-    && generationRef.current === generation
-    && revisionRef.current === revision
-  ), [apiRevision])
-
-  const abortRequests = useCallback(() => {
-    configControllerRef.current?.abort()
-    mutationControllerRef.current?.abort()
-  }, [])
-
-  const loadConfig = useCallback(async (preserveDraft: boolean, generation = generationRef.current) => {
-    const requestId = ++configRequestIdRef.current
-    configControllerRef.current?.abort()
-    const controller = new AbortController()
-    configControllerRef.current = controller
-    if (!preserveDraft) setConfigLoading(true)
-    setConfigError(null)
-    try {
-      const result = await getCacheConfig(controller.signal)
-      if (!isActive(generation) || !isCurrentCacheRequest(apiRevision, revisionRef.current, requestId, configRequestIdRef.current)) return 'stale' as const
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? 'Web Cache設定を取得できませんでした。')
-      const nextConfig = responseConfig(result)
-      setServerConfig(nextConfig)
-      setHasRuntimeOverride(responseRuntimeOverride(result))
-      if (!preserveDraft || configUncertainRef.current || draftRef.current === null) applyEditableConfig(nextConfig)
-      if (configUncertainRef.current) setFeedback(null)
-      configUncertainRef.current = false
-      setConfigUncertain(false)
-      return 'success' as const
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return 'stale' as const
-      setConfigError(configUncertainRef.current ? 'リセット済み・設定の再取得に失敗しました' : errorMessage(error))
-      return 'error' as const
-    } finally {
-      if (isActive(generation) && requestId === configRequestIdRef.current) setConfigLoading(false)
-    }
-  }, [apiRevision, applyEditableConfig, draftRef, isActive, setServerConfig])
-
-  useEffect(() => {
-    mountedRef.current = true
-    revisionRef.current = apiRevision
-    const generation = ++generationRef.current
-    abortRequests()
-    setServerConfig(null)
-    setDraft(null)
-    setConfigError(null)
-    setFeedback(null)
-    setValidationIssues([])
-    setValidating(false)
-    setSaving(false)
-    setResetting(false)
-    setSyncing(false)
-    setCancelPending(false)
-    setTestingGroupId(null)
-    setSiteTests({})
-    setAllowedGroupIdsText('')
-    setExcludedTagsText('')
-    mutationBusyRef.current = false
-    setConfigLoading(true)
-    void loadConfig(false, generation)
-    return () => {
-      mountedRef.current = false
-      abortRequests()
-    }
-  }, [abortRequests, apiRevision, loadConfig, setDraft, setServerConfig, setAllowedGroupIdsText, setExcludedTagsText])
-
-  useEffect(() => {
-    if (!status?.isRunning && cancelPending) setCancelPending(false)
-  }, [cancelPending, status?.isRunning])
-
-  useEffect(() => () => {
-    mountedRef.current = false
-    abortRequests()
-  }, [abortRequests])
-
-  const localIssues = useMemo(() => (draft ? validateWebCacheDraft(draft) : []), [draft])
-  const allValidationMessages = useMemo(() => (
-    [...validationMessages(localIssues), ...validationIssues.map(({ message }) => message)]
-  ), [localIssues, validationIssues])
-  const issueFor = useCallback((path: string) => (
-    localIssues.find((item) => item.path === path)?.message
-  ), [localIssues])
 
   const addSite = useCallback(() => {
     updateDraft((current) => ({
@@ -298,7 +160,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
       }],
     }))
     setFeedback(null)
-  }, [updateDraft])
+  }, [setFeedback, updateDraft])
 
   const confirmRemoveSite = useCallback((index: number) => {
     const groupId = draft?.sites[index]?.groupId?.trim() ?? ''
@@ -308,189 +170,7 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
   const removeSite = useCallback((index: number) => {
     updateDraft((current) => ({ ...current, sites: current.sites.filter((_, siteIndex) => siteIndex !== index) }))
     setFeedback({ tone: 'info', message: 'サイトを編集用コピーから削除しました。保存すると反映されます。' })
-  }, [updateDraft])
-
-  const beginMutation = useCallback(() => {
-    if (mutationBusyRef.current) return null
-    const controller = new AbortController()
-    mutationBusyRef.current = true
-    mutationControllerRef.current = controller
-    return controller
-  }, [])
-
-  const endMutation = useCallback((controller: AbortController) => {
-    if (mutationControllerRef.current !== controller) return
-    mutationControllerRef.current = null
-    mutationBusyRef.current = false
-  }, [])
-
-  const save = useCallback(async () => {
-    if (configUncertain || !draft || !canSaveWebCacheConfig(draft, saving, validating)) return
-    const issues = validateWebCacheDraft(draft)
-    if (issues.length > 0) {
-      setValidationIssues(issues)
-      setFeedback({ tone: 'warning', message: '入力内容を確認してください。' })
-      return
-    }
-    const generation = generationRef.current
-    const controller = beginMutation()
-    if (!controller) return
-    setValidating(true)
-    setSaving(false)
-    setValidationIssues([])
-    setFeedback(null)
-    try {
-      const validation = await validateCacheConfig(cloneWebCacheConfig(draft), controller.signal)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (responseIsFailure(validation) || validation?.isValid !== true) {
-        const messages = (validation as WebBookCacheValidationResponse | null | undefined)?.errors ?? []
-        setValidationIssues(messages.filter((message): message is string => typeof message === 'string').map((message) => ({ message })))
-        setFeedback({ tone: 'warning', message: responseMessage(validation) ?? '設定を保存できる状態ではありません。' })
-        return
-      }
-      setValidating(false)
-      setSaving(true)
-      const result = await saveCacheConfig(cloneWebCacheConfig(draft), controller.signal)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? 'Web Cache設定を保存できませんでした。')
-      const configRequestId = ++configRequestIdRef.current
-      const refreshed = await getCacheConfig(controller.signal)
-      if (!isActive(generation)
-        || controller.signal.aborted
-        || !isCurrentCacheRequest(apiRevision, revisionRef.current, configRequestId, configRequestIdRef.current)) return
-      if (responseIsFailure(refreshed)) throw new ApiError(responseMessage(refreshed) ?? '保存後のWeb Cache設定を取得できませんでした。')
-      const nextConfig = responseConfig(refreshed)
-      setServerConfig(nextConfig)
-      applyEditableConfig(nextConfig)
-      setHasRuntimeOverride(responseRuntimeOverride(refreshed))
-      setValidationIssues([])
-      setFeedback({ tone: 'success', message: 'Web Cache設定を保存しました。現在のDashboard上で有効です。' })
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      const messages = getValidationMessagesFromError(error)
-      if (messages.length > 0) setValidationIssues(messages.map((message) => ({ message })))
-      setFeedback({ tone: 'danger', message: errorMessage(error) })
-    } finally {
-      endMutation(controller)
-      if (isActive(generation) && !controller.signal.aborted) {
-        setValidating(false)
-        setSaving(false)
-      }
-    }
-  }, [apiRevision, applyEditableConfig, beginMutation, configUncertain, draft, endMutation, isActive, saving, setServerConfig, validating])
-
-  const reset = useCallback(async () => {
-    if (resetting) return
-    const generation = generationRef.current
-    const controller = beginMutation()
-    if (!controller) return
-    setResetting(true)
-    setFeedback(null)
-    try {
-      const result = await resetCacheConfig(controller.signal)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? 'Web Cache設定をリセットできませんでした。')
-      configUncertainRef.current = true
-      setConfigUncertain(true)
-      const refreshed = await loadConfig(false, generation)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (refreshed !== 'success') return
-      setFeedback({ tone: 'success', message: 'Web Cache設定を初期値へリセットしました。' })
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      setFeedback({ tone: 'danger', message: errorMessage(error) })
-    } finally {
-      endMutation(controller)
-      if (isActive(generation) && !controller.signal.aborted) setResetting(false)
-    }
-  }, [beginMutation, endMutation, isActive, loadConfig, resetting])
-
-  const runSync = useCallback(async () => {
-    if (syncing || cancelPending || status?.isRunning) return
-    const generation = generationRef.current
-    const controller = beginMutation()
-    if (!controller) return
-    setSyncing(true)
-    setFeedback(null)
-    try {
-      const result = await runCacheSync(createCacheSyncRequest(syncGroupId, syncForce), controller.signal)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? '同期を開始できませんでした。')
-      const start = result as WebBookCacheSyncStartResponse
-      if (start.started === false) {
-        setFeedback({ tone: 'warning', message: start.message ?? '同期は開始されませんでした。' })
-        if (start.status) setStatus(start.status)
-      } else {
-        if (start.status) setStatus(start.status)
-        else await loadStatus(generation, true)
-        setFeedback({ tone: 'success', message: start.message ?? 'Web Cache同期を開始しました。' })
-      }
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      setFeedback({ tone: 'danger', message: errorMessage(error) })
-    } finally {
-      endMutation(controller)
-      if (isActive(generation) && !controller.signal.aborted) setSyncing(false)
-    }
-  }, [beginMutation, cancelPending, endMutation, isActive, loadStatus, status?.isRunning, syncForce, syncGroupId, syncing, setStatus])
-
-  const cancel = useCallback(async () => {
-    if (cancelPending || !status?.isRunning) return
-    const generation = generationRef.current
-    const controller = beginMutation()
-    if (!controller) return
-    setCancelPending(true)
-    setFeedback(null)
-    try {
-      const result = await cancelCacheSync(controller.signal)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? '同期キャンセルを要求できませんでした。')
-      setFeedback({ tone: 'info', message: responseMessage(result) ?? 'キャンセルを要求しました。同期の終了を確認しています。' })
-      await loadStatus(generation, true)
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      setCancelPending(false)
-      setFeedback({ tone: 'danger', message: errorMessage(error) })
-    } finally {
-      endMutation(controller)
-    }
-  }, [beginMutation, cancelPending, endMutation, isActive, loadStatus, status?.isRunning])
-
-  const testSite = useCallback(async (groupId: string) => {
-    const normalized = groupId.trim()
-    if (!normalized || testingGroupId) return
-    const savedSite = serverConfig?.sites.find((site) => site.groupId?.trim() === normalized)
-    if (!savedSite) {
-      setSiteTests((current) => ({ ...current, [normalized]: { tone: 'warning', message: '保存済みサイトのみ疎通テストできます。先に設定を保存してください。' } }))
-      return
-    }
-    const generation = generationRef.current
-    const controller = beginMutation()
-    if (!controller) return
-    setTestingGroupId(normalized)
-    try {
-      const result = await testCacheSite(normalized, controller.signal)
-      if (!isActive(generation) || controller.signal.aborted) return
-      if (responseIsFailure(result)) throw new ApiError(responseMessage(result) ?? 'サイト疎通テストに失敗しました。')
-      const testResult = result as WebBookCacheSiteTestResponse
-      const detail = typeof testResult.bookCount === 'number'
-        ? `取得件数 ${formatNumber(testResult.bookCount)}、ページ ${formatNumber(testResult.currentPage)} / ${formatNumber(testResult.totalPage)}`
-        : ''
-      setSiteTests((current) => ({
-        ...current,
-        [normalized]: {
-          tone: testResult.success === false ? 'warning' : 'success',
-          message: testResult.message ?? (testResult.success === false ? 'サイト疎通テストに失敗しました。' : `疎通テストに成功しました。${detail ? ` ${detail}` : ''}`),
-        },
-      }))
-    } catch (error) {
-      if (!isActive(generation) || controller.signal.aborted) return
-      setSiteTests((current) => ({ ...current, [normalized]: { tone: 'danger', message: errorMessage(error) } }))
-    } finally {
-      endMutation(controller)
-      if (isActive(generation) && !controller.signal.aborted) setTestingGroupId(null)
-    }
-  }, [beginMutation, endMutation, isActive, serverConfig?.sites, testingGroupId])
+  }, [setFeedback, updateDraft])
 
   const resolveConfirmation = useCallback(() => {
     const action = confirmAction
@@ -504,11 +184,6 @@ export function WebCacheManagement({ apiRevision }: WebCacheManagementProps) {
     ? '現在のDashboardで変更したRAM overrideを表示しています。ApiService再起動後は構成ファイルの初期値へ戻ります。'
     : 'Dashboardでの変更はRAM overrideです。ApiService再起動後は構成ファイルの初期値へ戻ります。'
 
-  const draftDirty = useMemo(() => (
-    draft !== null && serverConfig !== null && JSON.stringify(draft) !== JSON.stringify(serverConfig)
-  ), [draft, serverConfig])
-  const resetDisabled = resetting || saving || validating || syncing || cancelPending
-  const saveDisabled = configUncertain || !canSaveWebCacheConfig(draft, saving, validating) || localIssues.length > 0 || resetting
   const statusTone = status?.isRunning ? 'info' : statusError ? 'danger' : 'success'
 
   return (

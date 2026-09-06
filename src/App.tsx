@@ -19,8 +19,8 @@ import { useBookDownloadHubConnection } from './realtime/use-book-download-hub'
 import './components/search-dialogs.css'
 import './components/search-page.css'
 
-const Dashboard = lazy(() => import('./components/Dashboard').then((module) => ({ default: module.Dashboard })))
-const DownloadManager = lazy(() => import('./components/DownloadManager').then((module) => ({ default: module.DownloadManager })))
+const Dashboard = lazy(() => import('./features/dashboard/Dashboard').then((module) => ({ default: module.Dashboard })))
+const DownloadManager = lazy(() => import('./features/downloads/DownloadManager').then((module) => ({ default: module.DownloadManager })))
 const WebCachePage = lazy(() => import('./features/web-cache/WebCachePage').then((module) => ({ default: module.WebCachePage })))
 const BookViewerRoute = lazy(() => import('./features/viewer/BookViewerRoute').then((module) => ({ default: module.BookViewerRoute })))
 

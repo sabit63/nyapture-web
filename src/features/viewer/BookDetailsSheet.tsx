@@ -1,7 +1,7 @@
 import { Pencil, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import type { BookViewerPageProps } from '../../components/BookViewerPage'
+import type { BookViewerPageProps } from './BookViewerPage'
 import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../../models'
 import type { BookTag, NyaTagType } from '../../models'
 import { BookStatusBadge } from '../../components/BookStatusBadge'

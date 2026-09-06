@@ -5,7 +5,7 @@ import { ApiError, getBook, getErrorMessage, mapEBookToCard } from '../../api'
 import type { ApiBookCardModel } from '../../api'
 import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
 import { useRouteContentCommitted } from '../../app/use-route-content-committed'
-import { BookViewerPage } from '../../components/BookViewerPage'
+import { BookViewerPage } from './BookViewerPage'
 import type { BookTag } from '../../models'
 import { applyTagDisplayNameOverrides, type TagDisplayNameOverrides } from '../search/tag-display-name'
 

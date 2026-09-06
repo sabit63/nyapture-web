@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useRef, type AnchorHTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
+import { forwardRef, useCallback, useEffect, useEffectEvent, useRef, type AnchorHTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from 'react'
 import { navigate, shouldInterceptNavigationClick, useRouterLocation, locationStore, readRouterHistoryMetadata, runScheduledScrollSave, persistScrollPosition, beginPendingScrollRestoration } from './client-router'
 
 const getAnchorTarget = (anchor: HTMLAnchorElement) => (
@@ -84,35 +84,26 @@ export function RouterRuntime({ children }: { children?: ReactNode }) {
     }
   }, [])
 
+  const applyNavigationScroll = useEffectEvent(() => {
+    if (location.navigationType === 'pop' && location.history?.entryId) {
+      beginPendingScrollRestoration(location.history.entryId, location.history.scrollY)
+    } else {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+    focusDestinationHeading()
+  })
+
   useEffect(() => {
     if (typeof window === 'undefined' || location.revision === 0) return
-    const frame = typeof window.requestAnimationFrame === 'function'
-      ? window.requestAnimationFrame(() => {
-        if (location.navigationType === 'pop') {
-          if (location.history?.entryId) {
-            beginPendingScrollRestoration(location.history.entryId, location.history.scrollY)
-          } else {
-            window.scrollTo({ top: 0, behavior: 'auto' })
-          }
-          focusDestinationHeading()
-        } else {
-          window.scrollTo({ top: 0, behavior: 'auto' })
-          focusDestinationHeading()
-        }
-      })
-      : undefined
-    if (frame === undefined) {
-      if (location.navigationType === 'pop' && location.history?.entryId) {
-        beginPendingScrollRestoration(location.history.entryId, location.history.scrollY)
-      } else {
-        window.scrollTo({ top: 0, behavior: 'auto' })
-      }
-      focusDestinationHeading()
+    // Scroll saves update history metadata without navigating. Only a new
+    // navigation revision should reset or restore the viewport.
+    if (typeof window.requestAnimationFrame !== 'function') {
+      applyNavigationScroll()
+      return
     }
-    return () => {
-      if (frame !== undefined) window.cancelAnimationFrame(frame)
-    }
-  }, [location.history?.entryId, location.history?.scrollY, location.navigationType, location.revision])
+    const frame = window.requestAnimationFrame(() => applyNavigationScroll())
+    return () => window.cancelAnimationFrame(frame)
+  }, [location.revision])
 
   return children ?? null
 }

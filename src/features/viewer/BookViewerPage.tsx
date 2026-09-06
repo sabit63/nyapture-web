@@ -1,21 +1,14 @@
-import {
-  ArrowUp,
-  ImageOff,
-  RotateCcw,
-} from 'lucide-react'
+import { ArrowUp, ImageOff, RotateCcw } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { RefObject, SyntheticEvent } from 'react'
-import { getBookPageBlob } from '../api'
-import { useViewerGeometry } from '../features/viewer/use-viewer-geometry'
-import { BookDetailsSheet } from '../features/viewer/BookDetailsSheet'
-import {
-  BookPageLoader,
-  INITIAL_BOOK_PAGE_SNAPSHOT,
-} from '../features/viewer/book-page-loading'
-import type { BookCardModel, BookTag } from '../models'
-import { InternalLink } from '../app/client-router'
-import { Button, buttonClassName } from './ui/Button'
-import { IconButton } from './ui/IconButton'
+import { getBookPageBlob } from '../../api'
+import { useViewerGeometry } from './use-viewer-geometry'
+import { BookDetailsSheet } from './BookDetailsSheet'
+import { BookPageLoader, INITIAL_BOOK_PAGE_SNAPSHOT } from './book-page-loading'
+import type { BookCardModel, BookTag } from '../../models'
+import { InternalLink } from '../../app/client-router'
+import { Button, buttonClassName } from '../../components/ui/Button'
+import { IconButton } from '../../components/ui/IconButton'
 import './book-viewer.css'
 
 type BookViewerRouteState = 'missing' | 'loading' | 'notFound' | 'error' | 'ready'
@@ -38,9 +31,11 @@ const PAGE_WIDTH = 1000
 const PAGE_HEIGHT = 1400
 const MAX_PAGE_COUNT = 10_000
 
-const isValidTotalPage = (value: number) => Number.isInteger(value) && value > 0 && value <= MAX_PAGE_COUNT
+const isValidTotalPage = (value: number) =>
+  Number.isInteger(value) && value > 0 && value <= MAX_PAGE_COUNT
 
-const getBookIdentity = (book: Pick<BookCardModel, 'groupId' | 'bookId'>) => `${book.groupId}\u0000${book.bookId}`
+const getBookIdentity = (book: Pick<BookCardModel, 'groupId' | 'bookId'>) =>
+  `${book.groupId}\u0000${book.bookId}`
 
 function BookViewerPage({
   routeState,
@@ -86,13 +81,24 @@ function BookViewerPage({
 
   if (routeState === 'loading') {
     return (
-      <section className="book-viewer book-viewer--route-loading" aria-busy="true" aria-labelledby="book-viewer-route-title">
-        <h1 id="book-viewer-route-title" ref={headingRef} className="sr-only" tabIndex={-1}>Bookビューア</h1>
-        <p className="sr-only" role="status" aria-live="polite">Bookビューアのページを準備しています</p>
+      <section
+        className="book-viewer book-viewer--route-loading"
+        aria-busy="true"
+        aria-labelledby="book-viewer-route-title"
+      >
+        <h1 id="book-viewer-route-title" ref={headingRef} className="sr-only" tabIndex={-1}>
+          Bookビューア
+        </h1>
+        <p className="sr-only" role="status" aria-live="polite">
+          Bookビューアのページを準備しています
+        </p>
         <div className="book-viewer__reader" aria-hidden="true">
           <div className="book-viewer__pages">
             {Array.from({ length: 3 }, (_, index) => (
-              <div className="book-viewer__page book-viewer__page--loading" key={`book-viewer-loading-page-${index + 1}`}>
+              <div
+                className="book-viewer__page book-viewer__page--loading"
+                key={`book-viewer-loading-page-${index + 1}`}
+              >
                 <div className="book-viewer__page-frame">
                   <span className="book-viewer__page-skeleton" aria-hidden="true" />
                 </div>
@@ -107,19 +113,35 @@ function BookViewerPage({
   const isMissing = routeState === 'missing'
   const isError = routeState === 'error'
   return (
-    <section className="book-viewer book-viewer--route-error" aria-labelledby="book-viewer-route-title">
+    <section
+      className="book-viewer book-viewer--route-error"
+      aria-labelledby="book-viewer-route-title"
+    >
       <h1 id="book-viewer-route-title" ref={headingRef} tabIndex={-1}>
-        {isMissing ? 'Bookの指定が必要です' : isError ? 'Bookを読み込めません' : 'Bookが見つかりません'}
+        {isMissing
+          ? 'Bookの指定が必要です'
+          : isError
+            ? 'Bookを読み込めません'
+            : 'Bookが見つかりません'}
       </h1>
       <p>
         {isMissing
           ? 'id と gid を指定すると、Bookの画像一覧を表示できます。'
           : isError
-            ? errorMessage ?? 'APIへの接続を確認して、もう一度お試しください。'
+            ? (errorMessage ?? 'APIへの接続を確認して、もう一度お試しください。')
             : '指定されたBookはライブラリまたは検索結果にありません。'}
       </p>
-      {isError && onRetry && <Button variant="solid" tone="accent" onClick={onRetry}>再試行</Button>}
-      <InternalLink className={buttonClassName({ variant: 'outline', tone: 'neutral' })} href="/search">検索へ戻る</InternalLink>
+      {isError && onRetry && (
+        <Button variant="solid" tone="accent" onClick={onRetry}>
+          再試行
+        </Button>
+      )}
+      <InternalLink
+        className={buttonClassName({ variant: 'outline', tone: 'neutral' })}
+        href="/search"
+      >
+        検索へ戻る
+      </InternalLink>
     </section>
   )
 }
@@ -145,21 +167,33 @@ function BookViewerReady({
 }) {
   const bookIdentity = useMemo(() => getBookIdentity(book), [book])
   const totalPages = isValidTotalPage(book.totalPage) ? book.totalPage : 0
-  const pageLoader = useMemo(() => new BookPageLoader({
-    totalPages,
-    loadPage: (pageNumber, width, signal) => getBookPageBlob({
-      groupId: book.groupId,
-      bookId: book.bookId,
-      page: pageNumber,
-      width,
-      format: 'webp',
-      fallbackToOriginal: false,
-    }, signal),
-  }), [book.bookId, book.groupId, totalPages])
+  const pageLoader = useMemo(
+    () =>
+      new BookPageLoader({
+        totalPages,
+        loadPage: (pageNumber, width, signal) =>
+          getBookPageBlob(
+            {
+              groupId: book.groupId,
+              bookId: book.bookId,
+              page: pageNumber,
+              width,
+              format: 'webp',
+              fallbackToOriginal: false,
+            },
+            signal,
+          ),
+      }),
+    [book.bookId, book.groupId, totalPages],
+  )
 
   useEffect(() => pageLoader.attach(), [pageLoader])
 
-  const { readerRef, currentPage, showScrollTop } = useViewerGeometry(bookIdentity, totalPages, pageLoader)
+  const { readerRef, currentPage, showScrollTop } = useViewerGeometry(
+    bookIdentity,
+    totalPages,
+    pageLoader,
+  )
 
   const scrollToTop = () => {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -167,18 +201,24 @@ function BookViewerReady({
   }
 
   const titleId = 'book-viewer-heading'
-  const renderedPages = useMemo(() => Array.from({ length: totalPages }, (_, index) => (
-    <BookViewerPageImage
-      key={`${bookIdentity}:${index + 1}`}
-      bookTitle={book.title}
-      pageLoader={pageLoader}
-      pageNumber={index + 1}
-    />
-  )), [book.title, bookIdentity, pageLoader, totalPages])
+  const renderedPages = useMemo(
+    () =>
+      Array.from({ length: totalPages }, (_, index) => (
+        <BookViewerPageImage
+          key={`${bookIdentity}:${index + 1}`}
+          bookTitle={book.title}
+          pageLoader={pageLoader}
+          pageNumber={index + 1}
+        />
+      )),
+    [book.title, bookIdentity, pageLoader, totalPages],
+  )
 
   return (
     <section className="book-viewer" aria-labelledby={titleId}>
-      <h1 id={titleId} ref={headingRef} className="sr-only" tabIndex={-1}>{book.title}の画像一覧</h1>
+      <h1 id={titleId} ref={headingRef} className="sr-only" tabIndex={-1}>
+        {book.title}の画像一覧
+      </h1>
 
       <section ref={readerRef} className="book-viewer__reader" aria-labelledby={titleId}>
         {totalPages > 0 ? (
@@ -216,9 +256,16 @@ function BookViewerReady({
         </IconButton>
       )}
 
-      <BookDetailsSheet book={book} totalPages={totalPages} onTitleChange={onTitleChange}
-        onTagSearch={onTagSearch} onTagSearchDestinationRequest={onTagSearchDestinationRequest}
-        detailsOpen={detailsOpen} onDetailsOpenChange={onDetailsOpenChange} detailsTriggerRef={detailsTriggerRef} />
+      <BookDetailsSheet
+        book={book}
+        totalPages={totalPages}
+        onTitleChange={onTitleChange}
+        onTagSearch={onTagSearch}
+        onTagSearchDestinationRequest={onTagSearchDestinationRequest}
+        detailsOpen={detailsOpen}
+        onDetailsOpenChange={onDetailsOpenChange}
+        detailsTriggerRef={detailsTriggerRef}
+      />
     </section>
   )
 }
@@ -241,10 +288,11 @@ const BookViewerPageImage = memo(function BookViewerPageImage({
     [pageLoader, pageNumber],
   )
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => INITIAL_BOOK_PAGE_SNAPSHOT)
-  const isBusy = snapshot.phase === 'queued'
-    || snapshot.phase === 'loading'
-    || snapshot.phase === 'decoding'
-    || snapshot.phase === 'retryWaiting'
+  const isBusy =
+    snapshot.phase === 'queued' ||
+    snapshot.phase === 'loading' ||
+    snapshot.phase === 'decoding' ||
+    snapshot.phase === 'retryWaiting'
   const initialCandidateUrl = snapshot.displayedUrl ? undefined : snapshot.candidateUrl
   const upgradeCandidateUrl = snapshot.displayedUrl ? snapshot.candidateUrl : undefined
   const pageLabel = `${bookTitle}の${pageNumber}ページ目`
@@ -272,7 +320,9 @@ const BookViewerPageImage = memo(function BookViewerPageImage({
       style={{ aspectRatio: snapshot.aspectRatio }}
     >
       <div className="book-viewer__page-frame">
-        {!snapshot.displayedUrl && isBusy && <span className="book-viewer__page-skeleton" aria-hidden="true" />}
+        {!snapshot.displayedUrl && isBusy && (
+          <span className="book-viewer__page-skeleton" aria-hidden="true" />
+        )}
         {snapshot.displayedUrl && (
           <img
             src={snapshot.displayedUrl}
@@ -307,7 +357,10 @@ const BookViewerPageImage = memo(function BookViewerPageImage({
           />
         )}
         {snapshot.phase === 'error' && (
-          <div className="book-viewer__page-error" aria-label={`${pageLabel}を読み込めませんでした`}>
+          <div
+            className="book-viewer__page-error"
+            aria-label={`${pageLabel}を読み込めませんでした`}
+          >
             <ImageOff size={27} strokeWidth={1.5} aria-hidden="true" />
             <span>このページを読み込めませんでした</span>
             <button type="button" onClick={() => pageLoader.manualRetry(pageNumber)}>

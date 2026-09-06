@@ -82,7 +82,7 @@ describe('ApiClient body lifecycle', () => {
     let internalSignal: AbortSignal | undefined
     let readerStarted = false
     setFetch(async (_input, init) => {
-      internalSignal = init?.signal
+      internalSignal = init?.signal ?? undefined
       return {
         ok: true,
         status: 200,
@@ -116,7 +116,7 @@ describe('ApiClient body lifecycle', () => {
     const client = new ApiClient({ apiUrl: 'http://localhost:5270' })
     let internalSignal: AbortSignal | undefined
     setFetch(async (_input, init) => {
-      internalSignal = init?.signal
+      internalSignal = init?.signal ?? undefined
       return {
         ok: true,
         status: 200,
@@ -168,7 +168,7 @@ describe('ApiClient body lifecycle', () => {
     const caller = new AbortController()
     let internalSignal: AbortSignal | undefined
     setFetch(async (_input, init) => {
-      internalSignal = init?.signal
+      internalSignal = init?.signal ?? undefined
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     })
 

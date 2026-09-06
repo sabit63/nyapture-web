@@ -212,7 +212,6 @@ export function useNativeDialog({
 
     if (open && !dialog.open) {
       const activeElement = document.activeElement
-      const scrollPosition = { left: window.scrollX, top: window.scrollY }
       restoreFocusTargetRef.current = activeElement instanceof HTMLElement && activeElement !== document.body
         ? activeElement
         : null
@@ -220,9 +219,6 @@ export function useNativeDialog({
       showNativeDialog(dialog)
       scheduleFrame(() => {
         focusIfAvailable(initialFocusRefRef.current?.current ?? null)
-        // Focusing a newly modal dialog can move the document to the dialog's
-        // DOM position even though the dialog itself is fixed in the top layer.
-        window.scrollTo({ ...scrollPosition, behavior: 'auto' })
       })
     } else if (!open && dialog.open) {
       if (!pendingReasonRef.current) controlledCloseRef.current = true

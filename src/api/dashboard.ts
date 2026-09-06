@@ -24,7 +24,7 @@ import type {
   MongoDbDiagnosticsResponse,
   WebPilotConfigResponse,
   WebPilotConfigUpdateRequest,
-} from '../models/dashboard'
+} from './dto/dashboard'
 
 /** Envelope returned by the Nya Dashboard API. */
 export type ApiEnvelope<T> = DashboardApiResponse<T>

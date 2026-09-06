@@ -9,11 +9,11 @@ import {
   X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Snackbar, useSnackbar } from './Snackbar'
-import { Button, IconButton, StatePanel } from './ui'
-import { DownloadCard, DownloadCardSkeleton } from '../features/downloads/download-card'
-import { useDownloadManager } from '../features/downloads/use-download-manager'
-import type { DownloadSort } from '../features/downloads/download-state'
+import { Snackbar, useSnackbar } from '../../components/Snackbar'
+import { Button, IconButton, StatePanel } from '../../components/ui'
+import { DownloadCard, DownloadCardSkeleton } from './download-card'
+import { useDownloadManager } from './use-download-manager'
+import type { DownloadSort } from './download-state'
 import './download-manager.css'
 
 export interface DownloadManagerProps {
@@ -45,11 +45,12 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
 
   const filteredDownloads = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase('ja-JP')
-    const matches = downloads.filter((download) => (
-      !normalizedQuery
-      || download.title.toLocaleLowerCase('ja-JP').includes(normalizedQuery)
-      || download.artist?.toLocaleLowerCase('ja-JP').includes(normalizedQuery) === true
-    ))
+    const matches = downloads.filter(
+      (download) =>
+        !normalizedQuery ||
+        download.title.toLocaleLowerCase('ja-JP').includes(normalizedQuery) ||
+        download.artist?.toLocaleLowerCase('ja-JP').includes(normalizedQuery) === true,
+    )
 
     return [...matches].sort((first, second) => {
       if (sort === 'progress') return second.progress - first.progress
@@ -61,11 +62,12 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
 
   const hasSearchQuery = searchQuery.trim().length > 0
   const activeDownloads = counts.running + counts.queued
-  const systemActivityLabel = systemStatus === null
-    ? 'システム状態未取得'
-    : systemStatus.isSystemRunning
-      ? 'システム処理中'
-      : null
+  const systemActivityLabel =
+    systemStatus === null
+      ? 'システム状態未取得'
+      : systemStatus.isSystemRunning
+        ? 'システム処理中'
+        : null
 
   return (
     <section
@@ -123,7 +125,11 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
             disabled={isRefreshing}
             onClick={refreshDownloads}
           >
-            <RefreshCw className={isRefreshing ? 'is-spinning' : undefined} size={18} aria-hidden="true" />
+            <RefreshCw
+              className={isRefreshing ? 'is-spinning' : undefined}
+              size={18}
+              aria-hidden="true"
+            />
           </IconButton>
         </div>
       </header>
@@ -131,7 +137,9 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
       <section className="download-manager__filters" aria-label="ダウンロードの検索と並び順">
         <div className="download-manager__search-field">
           <Search size={17} aria-hidden="true" />
-          <label className="sr-only" htmlFor="download-manager-search">タイトルまたは作者で検索</label>
+          <label className="sr-only" htmlFor="download-manager-search">
+            タイトルまたは作者で検索
+          </label>
           <input
             id="download-manager-search"
             type="search"
@@ -169,7 +177,11 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
       <div className="download-manager__list-header">
         <p>
           <span aria-live="polite">{filteredDownloads.length}件</span>
-          {isRefreshing && <span className="sr-only" role="status">更新中…</span>}
+          {isRefreshing && (
+            <span className="sr-only" role="status">
+              更新中…
+            </span>
+          )}
         </p>
       </div>
 
@@ -177,15 +189,35 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
         <div className="download-manager__error" role="alert">
           <TriangleAlert size={16} aria-hidden="true" />
           <span>{loadError}</span>
-          <Button variant="outline" tone="danger" size="compact" className="download-manager__error-retry" type="button" onClick={refreshDownloads} disabled={isRefreshing}>再試行</Button>
+          <Button
+            variant="outline"
+            tone="danger"
+            size="compact"
+            className="download-manager__error-retry"
+            type="button"
+            onClick={refreshDownloads}
+            disabled={isRefreshing}
+          >
+            再試行
+          </Button>
         </div>
       )}
 
       {isInitialLoading ? (
-        <div className="download-manager__loading" role="status" aria-live="polite" aria-busy="true">
+        <div
+          className="download-manager__loading"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
           <span className="sr-only">ダウンロード一覧を読み込み中…</span>
-          <div className="download-manager__list download-manager__list--loading" aria-hidden="true">
-            {Array.from({ length: 4 }, (_, index) => <DownloadCardSkeleton key={index} />)}
+          <div
+            className="download-manager__list download-manager__list--loading"
+            aria-hidden="true"
+          >
+            {Array.from({ length: 4 }, (_, index) => (
+              <DownloadCardSkeleton key={index} />
+            ))}
           </div>
         </div>
       ) : loadError && downloads.length === 0 ? (
@@ -195,18 +227,28 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
           icon={<TriangleAlert size={28} />}
           tone="danger"
           role="alert"
-          action={<Button
-            variant="outline"
-            tone="danger"
-            size="compact"
-            className={isRefreshing ? 'download-manager__clear-button--pending' : 'download-manager__clear-button'}
-            aria-label={isRefreshing ? '再試行中…' : '再試行'}
-            aria-busy={isRefreshing}
-            onClick={refreshDownloads}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? <RefreshCw className="is-spinning" size={16} aria-hidden="true" /> : '再試行'}
-          </Button>}
+          action={
+            <Button
+              variant="outline"
+              tone="danger"
+              size="compact"
+              className={
+                isRefreshing
+                  ? 'download-manager__clear-button--pending'
+                  : 'download-manager__clear-button'
+              }
+              aria-label={isRefreshing ? '再試行中…' : '再試行'}
+              aria-busy={isRefreshing}
+              onClick={refreshDownloads}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? (
+                <RefreshCw className="is-spinning" size={16} aria-hidden="true" />
+              ) : (
+                '再試行'
+              )}
+            </Button>
+          }
         />
       ) : filteredDownloads.length > 0 ? (
         <div className="download-manager__list" aria-live="polite" aria-busy={isRefreshing}>
@@ -225,9 +267,24 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
         </div>
       ) : (
         <StatePanel
-          title={hasSearchQuery ? '条件に一致するダウンロードがありません' : 'ダウンロードはありません'}
+          title={
+            hasSearchQuery ? '条件に一致するダウンロードがありません' : 'ダウンロードはありません'
+          }
           icon={<Search size={28} />}
-          action={hasSearchQuery && <Button variant="outline" tone="accent" size="compact" className="download-manager__clear-button" type="button" onClick={() => setSearchQuery('')}>検索をクリア</Button>}
+          action={
+            hasSearchQuery && (
+              <Button
+                variant="outline"
+                tone="accent"
+                size="compact"
+                className="download-manager__clear-button"
+                type="button"
+                onClick={() => setSearchQuery('')}
+              >
+                検索をクリア
+              </Button>
+            )
+          }
         />
       )}
 

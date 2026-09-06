@@ -123,7 +123,24 @@ describe('Web Book Cache candidate API', () => {
       return jsonResponse({ success: true })
     })
 
-    const config = { enabled: true }
+    const config = {
+      enabled: true,
+      intervalMinutes: 60,
+      initialLookbackDays: 7,
+      maxPagesPerRun: 10,
+      maxDetailsPerRun: 100,
+      sites: [],
+      autoDownload: {
+        enabled: false,
+        conditionMode: 'All',
+        maxPageCount: 100,
+        maxAutoDownloadsPerRun: 10,
+        maxAutoDownloadsPerDay: 100,
+        minFreeDiskGb: 1,
+        allowedGroupIds: [],
+        excludedTags: [],
+      },
+    }
     assert.deepEqual(await getCacheConfig(), { config: { enabled: true }, hasRuntimeOverride: true })
     assert.deepEqual(await validateCacheConfig(config), { isValid: true, errors: [] })
     assert.deepEqual(await saveCacheConfig(config), { config: { enabled: true }, hasRuntimeOverride: true })

@@ -2,7 +2,8 @@
 
 ## Development and validation
 
-Use the declared package manager, pnpm 11.25.0.
+Use the declared package manager, pnpm 11.25.0. For local verification, use
+Node 24.15 or newer within the 24.x line (validated with Node 24.19.0).
 
 ```sh
 pnpm install
@@ -10,11 +11,15 @@ pnpm dev
 pnpm test
 pnpm lint
 pnpm build
+pnpm verify
 ```
 
-`pnpm build` includes TypeScript checks. `pnpm check` runs lint and type checks
-without bundling. If the tsx CLI cannot create its IPC pipe in a sandbox, run
-`node --import tsx --test tests/*.test.ts` instead of `pnpm test`.
+`pnpm build` includes application TypeScript checks. `pnpm typecheck:test`
+checks tests and fixtures; `pnpm check` runs lint and both type checks without
+bundling. `pnpm verify` runs all checks, tests, and the production build.
+`pnpm test` uses Node's test runner with the tsx loader (no tsx CLI IPC pipe).
+Hook tests mount React in jsdom with mocked requests and connections.
+Tests must not use the real API, SignalR service, credentials, or production data.
 
 The local-only UI fixture can be started with
 `node --import tsx tests/fixtures/review-api.ts`; run Vite with

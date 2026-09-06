@@ -1,26 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type SetStateAction } from 'react'
 
 import {
-  ApiError,
   autocompleteTags,
-  buildBookSearchFilter,
-  buildHitomiSearchUrl,
-  getErrorMessage,
-  getWebPageContent,
-  mapEBookToCard,
-  mapHitomiSearchResponse,
-  searchBooks as searchBooksApi,
 } from '../../api'
-import type { ApiBookCardModel, DisplaySettings } from '../../api'
-import type { BookDownloadHubConnectionState, BookDownloadHubStatusEventKind } from '../../realtime/book-download-hub'
-import { bookDownloadHubClient } from '../../realtime/book-download-hub'
-import { navigate, useRouterLocation } from '../../app/client-router'
-import {
-  applySearchBookDownloadStatuses,
-  getDownloadStatusIdentityKey,
-  normalizeSearchBookDownloadStatus,
-} from '../../realtime/search-book-status'
-import type { BookDownloadStatus, BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
+import type { DisplaySettings } from '../../api'
+import type { BookDownloadHubConnectionState } from '../../realtime/book-download-hub'
+import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
 import { getTagLabel, TAG_TYPE_ORDER } from '../../models'
 import {
   cloneCriteria,
@@ -32,15 +17,11 @@ import {
   HITOMI_SORT_PERIODS,
   normalizeCriteriaForRoute,
   parseCriteriaFromUrl,
-  parseCriteriaForRoute,
-  parseHitomiAppend,
-  parsePageParam,
   resolveTag,
   sameTag,
   validateCriteria,
   type HitomiSortPeriod,
   type SearchDestination,
-  type SearchSyncFreshness,
   type SearchValidationErrors,
 } from './search-utils'
 import { useSearchResults } from './useSearchResults'
@@ -53,16 +34,8 @@ import {
   type TagDisplayNameOverrides,
   withTagDisplayName,
 } from './tag-display-name'
-import {
-  beginForegroundSearchRequest,
-  cancelSearchRequest,
-  createSearchRequestLifecycleState,
-  finishSearchRequest as finishSearchRequestLifecycle,
-  isCurrentSearchRequest,
-  requestBackgroundSearchRequest,
-  resetSearchRequestLifecycle,
-  type SearchRequestToken,
-} from './search-request-lifecycle'
+import { useSearchExecution } from './useSearchExecution'
+import { useSearchUrlSync, type SearchRouteStateBindings } from './useSearchUrlSync'
 
 type Notify = (message: string, tone?: 'success' | 'warning' | 'error') => void
 
@@ -77,27 +50,6 @@ type SearchControllerOptions = {
   notify: Notify
 }
 
-type BufferedSearchStatusEvent = {
-  kind: BookDownloadHubStatusEventKind
-  status: BookDownloadStatus
-}
-
-type SearchRealtimeBuffer = {
-  events: BufferedSearchStatusEvent[]
-}
-
-type SearchResultSnapshot = {
-  books: ApiBookCardModel[]
-  tags: TagEntity[]
-  totalPages: number
-}
-
-type ActiveSearchRequest = {
-  token: SearchRequestToken
-  controller: AbortController
-  buffer: SearchRealtimeBuffer
-}
-
 type TagSearchDestinationSelection = {
   tag: BookTag
   libraryUrl: string
@@ -105,30 +57,6 @@ type TagSearchDestinationSelection = {
 }
 
 const JAPANESE_LANGUAGE_TAG: BookTag = { type: 'Languages', name: 'japanese' }
-
-const statusTimestampValue = (status: BookDownloadStatus | undefined) => {
-  if (!status?.lastUpdated) return undefined
-  const parsed = Date.parse(status.lastUpdated)
-  return Number.isNaN(parsed) ? undefined : parsed
-}
-
-const criteriaRouteKey = (
-  criteria: SearchCriteria,
-  hitomiAppend: HitomiAppend,
-  resultPage: number,
-  isWebSearch: boolean,
-) => JSON.stringify({
-  text: criteria.text,
-  tags: criteria.tags.map((tag) => ({ type: tag.type, name: tag.name })),
-  tagMode: criteria.tagMode,
-  missingTagTypes: criteria.missingTagTypes,
-  dateFrom: criteria.dateFrom,
-  dateTo: criteria.dateTo,
-  pagesMin: criteria.pagesMin,
-  pagesMax: criteria.pagesMax,
-  hitomiAppend: isWebSearch ? hitomiAppend : 'Normal',
-  resultPage,
-})
 
 export function useSearchController({
   isWebSearch,
@@ -140,11 +68,22 @@ export function useSearchController({
   hubConnectionState,
   notify,
 }: SearchControllerOptions) {
-  const routerLocation = useRouterLocation()
-  const routeSearchParams = useMemo(() => new URLSearchParams(routerLocation.search), [routerLocation.search])
-  const routeCriteria = useMemo(() => parseCriteriaForRoute(routeSearchParams, isWebSearch, isMissingTagSearch), [isWebSearch, isMissingTagSearch, routeSearchParams])
-  const routeHitomiAppend = isWebSearch ? parseHitomiAppend(routeSearchParams) : 'Normal'
-  const routeResultPage = parsePageParam(routeSearchParams.get('page'))
+  const searchRouteBindingsRef = useRef<SearchRouteStateBindings | null>(null)
+  const {
+    routerLocation,
+    routeCriteria,
+    routeSearchParams,
+    routeHitomiAppend,
+    routeResultPage,
+    isRouteStateSynchronized,
+    navigateSearchUrl: navigateSearchUrlFromRoute,
+    setResultPage: setResultPageFromRoute,
+  } = useSearchUrlSync({
+    isWebSearch,
+    isLibrarySearch,
+    isMissingTagSearch,
+    routeBindingsRef: searchRouteBindingsRef,
+  })
   const {
     librarySearchBooks,
     webSearchResultBooks,
@@ -156,7 +95,6 @@ export function useSearchController({
     replaceWebSearchBooks,
     stateRef: searchResultsStateRef,
   } = useSearchResults()
-  const [searchResponseTags, setSearchResponseTags] = useState<TagEntity[]>([])
   const searchResultBooks = isWebSearch ? webSearchResultBooks : librarySearchBooks
   const [criteria, setCriteria] = useState<SearchCriteria>(() => cloneCriteria(routeCriteria))
   const [draftMissingTagTypes, setDraftMissingTagTypes] = useState<NyaTagType[]>(() => [...(routeCriteria.missingTagTypes ?? [])])
@@ -176,14 +114,7 @@ export function useSearchController({
   const [tagInputFocused, setTagInputFocused] = useState(false)
   const [highlightedTagIndex, setHighlightedTagIndex] = useState(0)
   const [remoteTagCandidates, setRemoteTagCandidates] = useState<BookTag[]>([])
-  const [searchRevision, setSearchRevision] = useState(0)
-  const [searchState, setSearchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
-  const [searchSyncFreshness, setSearchSyncFreshness] = useState<SearchSyncFreshness>('idle')
-  const [searchLoaderVisible, setSearchLoaderVisible] = useState(false)
-  const [searchError, setSearchError] = useState('')
   const [resultPage, setResultPageState] = useState(routeResultPage)
-  const [searchResultGeneration, setSearchResultGeneration] = useState(0)
-  const [totalResultPages, setTotalResultPages] = useState(1)
   const [paginationPageCount, setPaginationPageCount] = useState(() => window.innerWidth < 880 ? 5 : 7)
   const [tagSearchDestinationDialogOpen, setTagSearchDestinationDialogOpen] = useState(false)
   const [tagSearchDestinationSelection, setTagSearchDestinationSelection] = useState<TagSearchDestinationSelection>()
@@ -194,35 +125,58 @@ export function useSearchController({
   const advancedTriggerRef = useRef<HTMLButtonElement>(null)
   const tagSearchDestinationDialogRef = useRef<HTMLDialogElement>(null)
   const tagSearchDestinationTriggerRef = useRef<HTMLButtonElement | null>(null)
-  const activeSearchRequestRef = useRef<ActiveSearchRequest | null>(null)
-  const searchRequestLifecycleRef = useRef(createSearchRequestLifecycleState())
-  const requestBackgroundSearchRef = useRef<(() => void) | null>(null)
-  const searchRealtimeBufferRef = useRef<SearchRealtimeBuffer | null>(null)
-  const pendingSearchStatusesRef = useRef(new Map<string, BufferedSearchStatusEvent>())
-  const searchRealtimeFrameRef = useRef<number | null>(null)
-  const searchStatusVersionsRef = useRef(new Map<string, number>())
-  const searchStatusReconciliationFrameRef = useRef<number | null>(null)
+  searchRouteBindingsRef.current = {
+    setCriteria,
+    setQuery,
+    setDraftMissingTagTypes,
+    setMissingTagsError,
+    setDraftCriteria,
+    setHitomiAppend,
+    setDraftHitomiAppend,
+    setResultPageState,
+    setAdvancedErrors,
+    setSelected,
+  }
   const currentSearchDestination: SearchDestination = isWebSearch ? 'hitomi' : isMissingTagSearch ? 'missing-tags' : 'library'
-  const routeStateSynchronized = !isLibrarySearch && !isWebSearch
-    ? true
-    : criteriaRouteKey(criteria, hitomiAppend, resultPage, isWebSearch)
-      === criteriaRouteKey(routeCriteria, routeHitomiAppend, routeResultPage, isWebSearch)
+  const routeStateSynchronized = isRouteStateSynchronized({
+    criteria,
+    hitomiAppend,
+    resultPage,
+  })
+
+  const searchExecution = useSearchExecution({
+    isWebSearch,
+    isLibrarySearch,
+    isMissingTagSearch,
+    apiRevision,
+    criteria,
+    hitomiAppend,
+    resultPage,
+    sortType,
+    sortDirection,
+    routeStateSynchronized,
+    setLibrarySearchBooks,
+    updateWebSearchResultBooks,
+  })
+  const {
+    searchResponseTags,
+    setSearchResponseTags,
+    searchResultGeneration,
+    searchState,
+    searchSyncFreshness,
+    searchLoaderVisible,
+    searchError,
+    totalResultPages,
+    refresh,
+  } = searchExecution
 
   const setResultPage = useCallback((value: SetStateAction<number>) => {
-    const nextPage = Math.max(1, Math.floor(typeof value === 'function' ? value(resultPage) : value))
-    if (nextPage === resultPage) return
-    const url = new URL(routerLocation.href)
-    url.searchParams.set('page', String(nextPage))
-    navigate(url)
-  }, [resultPage, routerLocation.href])
+    setResultPageFromRoute(value, resultPage)
+  }, [resultPage, setResultPageFromRoute])
 
   const navigateSearchUrl = useCallback((url: URL) => {
-    if (url.href === routerLocation.href) {
-      setSearchRevision((current) => current + 1)
-      return
-    }
-    navigate(url)
-  }, [routerLocation.href])
+    navigateSearchUrlFromRoute(url, searchExecution.refresh)
+  }, [navigateSearchUrlFromRoute, searchExecution.refresh])
 
   const changeHitomiAppend = useCallback((next: HitomiAppend) => {
     if (!isWebSearch || next === hitomiAppend) return
@@ -232,17 +186,6 @@ export function useSearchController({
     })
     navigateSearchUrl(url)
   }, [criteria, currentSearchDestination, hitomiAppend, isWebSearch, navigateSearchUrl])
-
-  const applyStatusesToActiveSearch = useCallback((statuses: BookDownloadStatus[]) => {
-    if (statuses.length === 0) return
-    const apply = (current: ApiBookCardModel[]) => applySearchBookDownloadStatuses(
-      current,
-      statuses,
-      searchStatusVersionsRef.current,
-    )
-    if (isWebSearch) updateWebSearchResultBooks(apply)
-    else if (isLibrarySearch) setLibrarySearchBooks(apply)
-  }, [isLibrarySearch, isWebSearch, setLibrarySearchBooks, updateWebSearchResultBooks])
 
   const applyTagDisplayName = useCallback((tag: BookTag, displayName?: string) => {
     setTagDisplayNameOverrides((current) => {
@@ -273,318 +216,7 @@ export function useSearchController({
       if (!current || !sameTag(current.tag, tag)) return current
       return { ...current, tag: withTagDisplayName(current.tag, displayName) }
     })
-  }, [setLibrarySearchBooks, updateWebSearchResultBooks])
-
-  const flushPendingSearchStatuses = useCallback(() => {
-    searchRealtimeFrameRef.current = null
-    const events = [...pendingSearchStatusesRef.current.values()]
-    pendingSearchStatusesRef.current.clear()
-    applyStatusesToActiveSearch(events.map((event) => event.status))
-  }, [applyStatusesToActiveSearch])
-
-  const scheduleSearchStatusReconciliation = useCallback(() => {
-    if (searchStatusReconciliationFrameRef.current !== null) return
-    searchStatusReconciliationFrameRef.current = window.requestAnimationFrame(() => {
-      searchStatusReconciliationFrameRef.current = null
-      requestBackgroundSearchRef.current?.()
-    })
-  }, [])
-
-  const queueSearchStatus = useCallback((
-    kind: BookDownloadHubStatusEventKind,
-    status: BookDownloadStatus,
-  ) => {
-    const normalizedStatus = normalizeSearchBookDownloadStatus(status, kind === 'completed')
-    const isTerminalStatus = kind === 'completed'
-      || normalizedStatus.executionState === 'Completed'
-      || normalizedStatus.book?.status === 'Downloaded'
-    if (!isTerminalStatus && !normalizedStatus.lastUpdated && getDownloadStatusIdentityKey(normalizedStatus)) {
-      // Without a timestamp, a progress event cannot be ordered against a
-      // completed card. Keep the terminal UI state and reconcile once for the
-      // whole frame through the normal background-search lifecycle.
-      scheduleSearchStatusReconciliation()
-    }
-    const activeBuffer = searchRealtimeBufferRef.current
-    if (activeBuffer) {
-      activeBuffer.events.push({ kind, status: normalizedStatus })
-      return
-    }
-
-    const key = getDownloadStatusIdentityKey(normalizedStatus)
-    if (!key) return
-    const executionState = normalizedStatus.executionState
-    const isCompletion = kind === 'completed' || executionState === 'Completed'
-    const applyImmediately = kind === 'completed'
-      || kind === 'failed'
-      || kind === 'cancelled'
-      || executionState === 'Completed'
-      || executionState === 'Failed'
-      || executionState === 'Cancelled'
-      || executionState === 'Paused'
-      || executionState === 'Stopped'
-    if (applyImmediately) {
-      const pending = pendingSearchStatusesRef.current.get(key)
-      const pendingTimestamp = statusTimestampValue(pending?.status)
-      const nextTimestamp = statusTimestampValue(normalizedStatus)
-      if (pendingTimestamp !== undefined && nextTimestamp !== undefined) {
-        if (nextTimestamp < pendingTimestamp) return
-        if (nextTimestamp === pendingTimestamp && !isCompletion) return
-      }
-      pendingSearchStatusesRef.current.delete(key)
-      applyStatusesToActiveSearch([normalizedStatus])
-      return
-    }
-
-    const pending = pendingSearchStatusesRef.current.get(key)
-    const pendingTimestamp = statusTimestampValue(pending?.status)
-    const nextTimestamp = statusTimestampValue(normalizedStatus)
-    if (
-      !pending
-      || pendingTimestamp === undefined
-      || nextTimestamp === undefined
-      || nextTimestamp > pendingTimestamp
-    ) {
-      pendingSearchStatusesRef.current.set(key, { kind, status: normalizedStatus })
-    }
-    if (searchRealtimeFrameRef.current === null) {
-      searchRealtimeFrameRef.current = window.requestAnimationFrame(flushPendingSearchStatuses)
-    }
-  }, [applyStatusesToActiveSearch, flushPendingSearchStatuses, scheduleSearchStatusReconciliation])
-
-  const fetchSearchResults = useCallback(async (signal: AbortSignal): Promise<SearchResultSnapshot> => {
-    if (!isWebSearch) {
-      const validation = validateCriteria(criteria, isMissingTagSearch)
-      const validationMessage = validation.date ?? validation.pages ?? validation.missingTags
-      if (validationMessage) throw new ApiError(validationMessage, { category: 'validation' })
-    }
-
-    if (isWebSearch) {
-      const response = await getWebPageContent(
-        buildHitomiSearchUrl(criteria, hitomiAppend, resultPage),
-        signal,
-      )
-      if (response.success === false) {
-        throw new ApiError(response.message ?? 'Hitomi検索に失敗しました。', { category: 'server' })
-      }
-      const mapped = mapHitomiSearchResponse(response)
-      return {
-        books: mapped.books,
-        tags: response.tags ?? [],
-        totalPages: mapped.totalPage,
-      }
-    }
-
-    const response = await searchBooksApi(
-      buildBookSearchFilter(criteria, sortType, sortDirection, resultPage),
-      signal,
-    )
-    if (response.success === false) throw new ApiError(response.message ?? '検索に失敗しました。', { category: 'server' })
-    const entities = response.tags ?? []
-    return {
-      books: (response.books ?? []).map((book) => mapEBookToCard(book, { context: 'library', entities })),
-      tags: entities,
-      totalPages: Math.max(1, response.totalPage ?? 1),
-    }
-  }, [criteria, hitomiAppend, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType])
-
-  const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
-    const previous = activeSearchRequestRef.current
-    if (previous && previous.token.id !== token.id) previous.controller.abort()
-    if (searchRealtimeFrameRef.current !== null) {
-      window.cancelAnimationFrame(searchRealtimeFrameRef.current)
-      searchRealtimeFrameRef.current = null
-    }
-    const pendingEvents = [...pendingSearchStatusesRef.current.values()]
-    pendingSearchStatusesRef.current.clear()
-    const buffer: SearchRealtimeBuffer = {
-      events: [
-        ...(searchRealtimeBufferRef.current?.events ?? []),
-        ...pendingEvents,
-      ],
-    }
-    searchRealtimeBufferRef.current = buffer
-    const request: ActiveSearchRequest = {
-      token,
-      controller: new AbortController(),
-      buffer,
-    }
-    activeSearchRequestRef.current = request
-    return request
-  }, [])
-
-  const isActiveSearchRequest = useCallback((request: ActiveSearchRequest) => (
-    activeSearchRequestRef.current === request
-    && isCurrentSearchRequest(searchRequestLifecycleRef.current, request.token)
-  ), [])
-
-  const applySearchResultSnapshot = useCallback((request: ActiveSearchRequest, snapshot: SearchResultSnapshot) => {
-    let nextBooks = snapshot.books
-    searchStatusVersionsRef.current.clear()
-    if (searchRealtimeBufferRef.current === request.buffer) {
-      searchRealtimeBufferRef.current = null
-      nextBooks = applySearchBookDownloadStatuses(
-        nextBooks,
-        request.buffer.events.map((event) => event.status),
-        searchStatusVersionsRef.current,
-      )
-    }
-    if (isWebSearch) updateWebSearchResultBooks(nextBooks)
-    else setLibrarySearchBooks(nextBooks)
-    setSearchResponseTags(snapshot.tags)
-    setTotalResultPages(snapshot.totalPages)
-    setSearchResultGeneration((current) => current + 1)
-  }, [isWebSearch, setLibrarySearchBooks, updateWebSearchResultBooks])
-
-  const applyBufferedStatusesAfterFailedRequest = useCallback((request: ActiveSearchRequest) => {
-    if (searchRealtimeBufferRef.current !== request.buffer) return
-    searchRealtimeBufferRef.current = null
-    applyStatusesToActiveSearch(request.buffer.events.map((event) => event.status))
-  }, [applyStatusesToActiveSearch])
-
-  const finishActiveSearchRequest = useCallback((request: ActiveSearchRequest) => {
-    if (!isActiveSearchRequest(request)) return false
-    activeSearchRequestRef.current = null
-    if (searchRealtimeBufferRef.current === request.buffer) searchRealtimeBufferRef.current = null
-    const result = finishSearchRequestLifecycle(searchRequestLifecycleRef.current, request.token)
-    searchRequestLifecycleRef.current = result.state
-    if (result.startPendingBackground) requestBackgroundSearchRef.current?.()
-    return result.accepted
-  }, [isActiveSearchRequest])
-
-  const runSearchRequest = useCallback((request: ActiveSearchRequest, onFinally?: () => void) => {
-    const load = async () => {
-      try {
-        const snapshot = await fetchSearchResults(request.controller.signal)
-        if (!isActiveSearchRequest(request)) return
-        applySearchResultSnapshot(request, snapshot)
-        setSearchSyncFreshness('fresh')
-        setSearchError('')
-        setSearchState('success')
-      } catch (error) {
-        if (request.controller.signal.aborted || !isActiveSearchRequest(request)) return
-        applyBufferedStatusesAfterFailedRequest(request)
-        if (request.token.kind === 'foreground') {
-          setSearchError(getErrorMessage(error))
-          setSearchState('error')
-        }
-        setSearchSyncFreshness('stale')
-      } finally {
-        if (isActiveSearchRequest(request)) {
-          onFinally?.()
-          finishActiveSearchRequest(request)
-        }
-      }
-    }
-
-    void load()
-  }, [applyBufferedStatusesAfterFailedRequest, applySearchResultSnapshot, fetchSearchResults, finishActiveSearchRequest, isActiveSearchRequest])
-
-  const startSearchRequest = useCallback((token: SearchRequestToken, onFinally?: () => void) => {
-    const request = createSearchRequest(token)
-    if (token.kind === 'background') setSearchSyncFreshness('syncing')
-    runSearchRequest(request, onFinally)
-    return request
-  }, [createSearchRequest, runSearchRequest])
-
-  const requestBackgroundSearch = useCallback(() => {
-    if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized || (isMissingTagSearch && !criteria.missingTagTypes?.length)) return
-    // Connection/resync events never restart a foreground search or own its loader.
-    const result = requestBackgroundSearchRequest(searchRequestLifecycleRef.current)
-    searchRequestLifecycleRef.current = result.state
-    if (result.token) startSearchRequest(result.token)
-  }, [isLibrarySearch, isWebSearch, isMissingTagSearch, criteria.missingTagTypes, routeStateSynchronized, startSearchRequest])
-
-  useEffect(() => {
-    requestBackgroundSearchRef.current = requestBackgroundSearch
-    return () => {
-      requestBackgroundSearchRef.current = null
-    }
-  }, [requestBackgroundSearch])
-
-  useEffect(() => {
-    if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized) return
-    if (isMissingTagSearch && !criteria.missingTagTypes?.length) {
-      activeSearchRequestRef.current?.controller.abort()
-      activeSearchRequestRef.current = null
-      searchRequestLifecycleRef.current = resetSearchRequestLifecycle(searchRequestLifecycleRef.current)
-      searchRealtimeBufferRef.current = null
-      if (searchStatusReconciliationFrameRef.current !== null) {
-        window.cancelAnimationFrame(searchStatusReconciliationFrameRef.current)
-        searchStatusReconciliationFrameRef.current = null
-      }
-      setLibrarySearchBooks([])
-      setSearchResponseTags([])
-      setTotalResultPages(1)
-      setSearchState('idle')
-      setSearchSyncFreshness('idle')
-      setSearchError('')
-      setSearchLoaderVisible(false)
-      return
-    }
-    const begun = beginForegroundSearchRequest(searchRequestLifecycleRef.current)
-    searchRequestLifecycleRef.current = begun.state
-    let loadingTimer: number | null = null
-    setSearchState('loading')
-    setSearchSyncFreshness('syncing')
-    setSearchError('')
-    setSearchLoaderVisible(false)
-    setSearchResponseTags([])
-    const request = startSearchRequest(begun.token, () => {
-      if (loadingTimer !== null) window.clearTimeout(loadingTimer)
-      loadingTimer = null
-      setSearchLoaderVisible(false)
-    })
-    loadingTimer = window.setTimeout(() => {
-      if (!request.controller.signal.aborted && isActiveSearchRequest(request)) setSearchLoaderVisible(true)
-    }, 1000)
-    return () => {
-      request.controller.abort()
-      if (loadingTimer !== null) window.clearTimeout(loadingTimer)
-      loadingTimer = null
-      searchRequestLifecycleRef.current = cancelSearchRequest(searchRequestLifecycleRef.current, request.token)
-      if (activeSearchRequestRef.current === request) {
-        activeSearchRequestRef.current = null
-        setSearchLoaderVisible(false)
-      }
-    }
-  }, [apiRevision, criteria, hitomiAppend, isActiveSearchRequest, isLibrarySearch, isMissingTagSearch, isWebSearch, resultPage, routeStateSynchronized, routerLocation.pathname, routerLocation.search, runSearchRequest, searchRevision, setLibrarySearchBooks, sortDirection, sortType, startSearchRequest])
-
-  useEffect(() => {
-    if (!isLibrarySearch && !isWebSearch) return
-    const pendingSearchStatuses = pendingSearchStatusesRef.current
-    const searchStatusVersions = searchStatusVersionsRef.current
-    const applyCollection = (statuses: BookDownloadStatus[]) => {
-      statuses.forEach((status) => queueSearchStatus('statusUpdate', status))
-    }
-    const unsubscribe = bookDownloadHubClient.subscribe({
-      onStatus: queueSearchStatus,
-      onRunningDownloads: applyCollection,
-      onQueuedDownloads: applyCollection,
-      onAllDownloadStatuses: (statuses) => applyCollection(Object.values(statuses)),
-      onBookDownloadStatus: (status) => queueSearchStatus('statusUpdate', status),
-      onResyncRequested: () => requestBackgroundSearchRef.current?.(),
-    })
-
-    return () => {
-      unsubscribe()
-      const activeRequest = activeSearchRequestRef.current
-      activeRequest?.controller.abort()
-      activeSearchRequestRef.current = null
-      searchRequestLifecycleRef.current = resetSearchRequestLifecycle(searchRequestLifecycleRef.current)
-      searchRealtimeBufferRef.current = null
-      pendingSearchStatuses.clear()
-      searchStatusVersions.clear()
-      if (searchRealtimeFrameRef.current !== null) {
-        window.cancelAnimationFrame(searchRealtimeFrameRef.current)
-        searchRealtimeFrameRef.current = null
-      }
-      if (searchStatusReconciliationFrameRef.current !== null) {
-        window.cancelAnimationFrame(searchStatusReconciliationFrameRef.current)
-        searchStatusReconciliationFrameRef.current = null
-      }
-      setSearchSyncFreshness('idle')
-    }
-  }, [isLibrarySearch, isWebSearch, queueSearchStatus])
+  }, [setSearchResponseTags, setLibrarySearchBooks, updateWebSearchResultBooks])
 
   useEffect(() => {
     const queryValue = tagInput.trim()
@@ -612,20 +244,6 @@ export function useSearchController({
     window.addEventListener('resize', updatePaginationPageCount)
     return () => window.removeEventListener('resize', updatePaginationPageCount)
   }, [])
-
-  useEffect(() => {
-    if (!isLibrarySearch && !isWebSearch) return
-    setCriteria(cloneCriteria(routeCriteria))
-    setQuery(routeCriteria.text)
-    setDraftMissingTagTypes([...(routeCriteria.missingTagTypes ?? [])])
-    setMissingTagsError(validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
-    setDraftCriteria(cloneCriteria(routeCriteria))
-    setHitomiAppend(routeHitomiAppend)
-    setDraftHitomiAppend(routeHitomiAppend)
-    setResultPageState(routeResultPage)
-    setAdvancedErrors({})
-    setSelected([])
-  }, [isLibrarySearch, isWebSearch, isMissingTagSearch, routeCriteria, routeHitomiAppend, routeResultPage, routerLocation.pathname, routerLocation.search, setSelected])
 
   useEffect(() => {
     if (routerLocation.revision === 0) return
@@ -844,10 +462,6 @@ export function useSearchController({
     navigateSearchUrl(url)
     requestClose('submit')
   }, [currentSearchDestination, draftCriteria, draftHitomiAppend, isWebSearch, isMissingTagSearch, navigateSearchUrl])
-
-  const refresh = useCallback(() => {
-    setSearchRevision((current) => current + 1)
-  }, [])
 
   const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}`
   const searchOperations = useSearchOperations({
