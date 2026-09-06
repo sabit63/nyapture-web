@@ -31,7 +31,7 @@ export type TagChipProps = TagChipSearchProps | TagChipRemoveProps | TagChipStat
 
 const getTagCountLabel = (count: BookTag['count']) => (
   typeof count === 'number' && Number.isFinite(count)
-    ? count.toLocaleString('ja-JP')
+    ? String(count)
     : undefined
 )
 

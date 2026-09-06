@@ -168,7 +168,7 @@ export const createTagSearchDestinationUrls = (
 export const sameTag = (left: BookTag, right: BookTag) => left.type === right.type && left.name.toLocaleLowerCase() === right.name.toLocaleLowerCase()
 
 export const formatTagCount = (count: number | undefined) => (
-  typeof count === 'number' && Number.isFinite(count) ? count.toLocaleString('ja-JP') : null
+  typeof count === 'number' && Number.isFinite(count) ? String(count) : null
 )
 
 export const parsePageParam = (value: string | null) => {
