@@ -323,7 +323,6 @@ export function SearchPage({ controller }: SearchPageProps) {
               </label>
             )}
             <label className="sort-control sort-control--type">
-              <span>並び順</span>
               {isWebSearch ? (
                 <select
                   value={hitomiSortPeriod}

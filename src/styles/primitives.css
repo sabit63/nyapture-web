@@ -249,6 +249,20 @@
 }
 
 .ui-dialog {
+  --font-size-label-sm: clamp(.75rem, .7rem + .15vw, .8125rem);
+  --font-size-label-md: clamp(.8125rem, .75rem + .15vw, .875rem);
+  --font-size-body-sm: var(--font-size-label-md);
+  --font-size-body-md: clamp(.875rem, .8rem + .2vw, 1rem);
+  --font-size-heading-sm: clamp(1rem, .9rem + .3vw, 1.25rem);
+  --font-size-heading-md: clamp(1.125rem, 1rem + .35vw, 1.5rem);
+  --control-font-size-default: var(--font-size-body-md);
+  --control-font-size-compact: var(--font-size-label-md);
+  --control-icon-size-default: clamp(18px, 1.5vw, 22px);
+  --control-icon-size-compact: clamp(16px, 1.3vw, 20px);
+  --control-height-default: 44px;
+  --control-height-compact: 36px;
+  --dialog-padding: clamp(12px, 2vw, 24px);
+  font-size: var(--font-size-body-md);
   max-width: none;
   padding: 0;
   overflow: hidden;
@@ -298,6 +312,7 @@
 }
 
 .ui-dialog__footer {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -305,6 +320,17 @@
   padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-background-deep);
+}
+
+.ui-dialog .ui-dialog__header,
+.ui-dialog .ui-dialog__body,
+.ui-dialog .ui-dialog__footer { padding-inline: var(--dialog-padding); }
+.ui-dialog .ui-dialog__header :is(h1, h2, h3) { font-size: var(--font-size-heading-sm); }
+.ui-dialog .ui-dialog__header > button { flex-shrink: 0; }
+.ui-dialog .ui-dialog__header > button > svg,
+.ui-dialog .ui-dialog__footer button > svg {
+  width: var(--control-icon-size-default);
+  height: var(--control-icon-size-default);
 }
 
 @media (min-width: 640px) {

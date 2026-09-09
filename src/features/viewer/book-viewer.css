@@ -494,7 +494,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--tag-gap-default);
 }
 
 @keyframes book-viewer-skeleton {
@@ -519,7 +519,6 @@
   .book-viewer__details-header { padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5); }
   .book-viewer__details-header h2 { font-size: 1rem; }
   .book-viewer__tag-group-heading h3 { font-size: .9rem; }
-  .book-viewer__tag-chips { gap: var(--space-2); }
 }
 
 @media (prefers-reduced-motion: reduce) {

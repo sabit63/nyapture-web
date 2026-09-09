@@ -3,8 +3,8 @@
 [data-tag-type='Parodies'] { --tag-color: #F3BA72; --tag-accent: #94580E; }
 [data-tag-type='Characters'] { --tag-color: #C4B2FF; --tag-accent: #5C43A5; }
 [data-tag-type='Categories'] { --tag-color: #75D6CC; --tag-accent: #16736B; }
-[data-tag-type='Tags'] { --tag-color: #9BD08B; --tag-accent: #3F732F; }
-[data-tag-type='Languages'] { --tag-color: #A9BFFF; --tag-accent: #3957A4; }
+[data-tag-type='Tags'] { --tag-color: #A9BFFF; --tag-accent: #3957A4; }
+[data-tag-type='Languages'] { --tag-color: #B8C7DD; --tag-accent: #46546B; }
 [data-tag-type='Unknown'] { --tag-color: #B5B5C2; --tag-accent: #626271; }
 
 .tag-chip {
@@ -20,20 +20,21 @@
   background: var(--tag-accent, #626271);
   color: #fff;
   font-weight: 600;
+  line-height: 1.4;
   white-space: nowrap;
   text-align: left;
 }
 
 .tag-chip--compact {
-  height: 25px;
-  padding: var(--space-1) var(--space-2);
-  font-size: .68rem;
+  min-height: var(--tag-height-compact);
+  padding: var(--tag-padding-block) var(--tag-padding-inline);
+  font-size: var(--tag-font-size-compact);
 }
 
 .tag-chip--default {
-  height: 30px;
-  padding: var(--space-1) var(--space-2);
-  font-size: .75rem;
+  min-height: var(--tag-height-default);
+  padding: var(--tag-padding-block) var(--tag-padding-inline);
+  font-size: var(--tag-font-size-default);
 }
 
 button.tag-chip {
@@ -75,6 +76,15 @@ button.tag-chip--long-press-pending {
 }
 
 .tag-chip__remove {
+  width: 1em;
+  height: 1em;
   flex: 0 0 auto;
   color: #fff;
+}
+
+/* Detail and editing surfaces expose the full name; cards keep a single line. */
+:is(.tags-dialog__chips, .book-viewer__tag-chips, .cache-tags, .web-book-detail-dialog__tag-group, .advanced-selected-tags) .tag-chip,
+:is(.tags-dialog__chips, .book-viewer__tag-chips, .cache-tags, .web-book-detail-dialog__tag-group, .advanced-selected-tags) .tag-chip__label {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

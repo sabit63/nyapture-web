@@ -23,7 +23,16 @@
   --font-size-body-md: .875rem;
   --font-size-heading-sm: 1rem;
   --font-size-heading-md: 1.25rem;
+  --font-size-search-title: clamp(.9375rem, .9rem + .1vw, 1rem);
   --font-size-heading-lg: 1.75rem;
+  --tag-font-size-default: .8125rem;
+  --tag-font-size-compact: .785714rem;
+  --tag-height-default: 28px;
+  --tag-height-compact: 26px;
+  --tag-gap-default: 6px;
+  --tag-gap-compact: 4px;
+  --tag-padding-block: 3px;
+  --tag-padding-inline: 6px;
 
   --space-0: 0;
   --space-1: 4px;
@@ -63,6 +72,9 @@
   --control-icon-size-compact: 16px;
   --control-font-size-default: var(--font-size-label-md);
   --control-font-size-compact: var(--font-size-label-sm);
+  --search-control-font-size: .875rem;
+  --search-control-icon-size: 18px;
+  --search-heading-gap: 16px;
 
   /* Semantic radius aliases. The primitive values above are the stable
      geometry contract; feature styles should consume these names. */
@@ -318,6 +330,8 @@
 
 @media (min-width: 880px) {
   :root {
+    --tag-font-size-default: calc(13rem / 14);
+    --tag-font-size-compact: calc(12rem / 14);
     --layout-page-gutter: 32px;
     --layout-page-block-start: 32px;
     --layout-page-block-end: 48px;

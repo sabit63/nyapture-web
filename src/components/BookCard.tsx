@@ -260,19 +260,20 @@ export function BookCard({
               onSearchDestinationRequest={onTagSearchDestinationRequest}
             />
           ))}
-          {hiddenTagCount > 0 && (
+          {book.tags.length > 0 && (
             <Button
               ref={tagsTriggerRef}
-              className="tag-overflow tag-overflow--control"
+              className={`tag-overflow tag-overflow--control ${hiddenTagCount === 0 ? 'tag-overflow--all-inline' : ''}`}
               variant="ghost"
               tone="accent"
               size="compact"
               aria-label={isDownloaded && onTagOverflowDetails
                 ? `${book.title}の詳細情報を表示`
-                : `${book.title}の残り${hiddenTagCount}件のタグを表示`}
+                : `${book.title}の全${book.tags.length}件のタグを表示`}
               onClick={(event) => handleTagOverflowClick(event.currentTarget)}
             >
-              +{hiddenTagCount}
+              <span className="tag-overflow__regular">+{hiddenTagCount}</span>
+              <span className="tag-overflow__narrow">+{book.tags.length}</span>
             </Button>
           )}
         </div>

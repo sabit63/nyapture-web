@@ -14,6 +14,9 @@
 .skip-link:focus { transform: translateY(0); }
 
 .topbar {
+  --control-icon-size-default: clamp(18px, 1.5vw, 22px);
+  --control-icon-size-compact: clamp(16px, 1.3vw, 20px);
+  --font-size-heading-sm: clamp(.9375rem, .9rem + .1vw, 1rem);
   position: fixed;
   z-index: 40;
   inset: 0 0 auto 0;
@@ -51,6 +54,11 @@
 }
 
 .drawer {
+  --control-font-size-default: clamp(.8125rem, .775rem + .1vw, .875rem);
+  --font-size-label-sm: .6875rem;
+  --font-size-body-md: clamp(.9375rem, .9rem + .1vw, 1rem);
+  --nav-icon-size: 18px;
+  max-width: calc(100vw - 24px);
   position: fixed;
   z-index: 55;
   inset: 0 auto 0 0;
@@ -74,9 +82,9 @@
 
 .nav-item {
   width: 100%;
-  min-height: 40px;
+  min-height: 38px;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: var(--nav-icon-size) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--layout-control-gap);
   padding: var(--space-2);
@@ -90,6 +98,11 @@
   font-weight: 500;
   cursor: pointer;
 }
+
+.nav-item > svg { width: var(--nav-icon-size); height: var(--nav-icon-size); }
+.topbar .quick-search input { font-size: clamp(.875rem, .8rem + .2vw, 1rem); }
+.topbar .quick-search button > svg { width: var(--control-icon-size-compact); height: var(--control-icon-size-compact); }
+.topbar .connection__icon { width: var(--control-icon-size-default); height: var(--control-icon-size-default); }
 
 .nav-item:hover:not(:disabled) { background: var(--color-neutral-soft); color: var(--color-text); }
 .nav-item:disabled { opacity: .5; cursor: not-allowed; }

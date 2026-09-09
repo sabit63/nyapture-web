@@ -1,5 +1,7 @@
 :root {
   font-family: var(--font-family-sans);
+  /* Scale rem-based typography across every screen, including component overrides. */
+  font-size: 87.5%;
   color: var(--color-text);
   background: var(--color-background);
   font-synthesis: none;

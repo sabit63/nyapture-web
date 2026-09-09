@@ -21,6 +21,7 @@ import {
 } from '../../realtime/search-book-status'
 import type { BookDownloadStatus, HitomiAppend, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
 import { validateCriteria } from './search-utils'
+import { resolveSearchTags } from './resolve-search-tags'
 import {
   beginForegroundSearchRequest,
   cancelSearchRequest,
@@ -244,10 +245,11 @@ export function useSearchExecution({
       if (response.success === false) {
         throw new ApiError(response.message ?? 'Hitomi検索に失敗しました。', { category: 'server' })
       }
-      const mapped = mapHitomiSearchResponse(response)
+      const tags = await resolveSearchTags(criteria.tags, response.tags ?? [], signal)
+      const mapped = mapHitomiSearchResponse({ ...response, tags })
       return {
         books: mapped.books,
-        tags: response.tags ?? [],
+        tags,
         totalPages: mapped.totalPage,
       }
     }

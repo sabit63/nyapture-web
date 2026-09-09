@@ -366,7 +366,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
         </div></details>
         {formError && <p className="cache-error" role="alert">{formError}</p>}
       </form>
-      <div className="web-cache__toolbar"><p role="status">{loading ? '検索中…' : error ? '検索に失敗しました' : `${totalCount.toLocaleString()}件 · ${applied.page} / ${totalPages}ページ`}</p><div><IconButton aria-label="検索結果を更新" disabled={loading} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={17} /></IconButton></div></div>
+      <div className="web-cache__toolbar"><p role="status">{loading ? '検索中…' : error ? '検索に失敗しました' : `${totalCount.toLocaleString()}件 · ${applied.page} / ${totalPages}ページ`}</p><div><IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" aria-label="検索結果を更新" disabled={loading} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={17} /></IconButton></div></div>
       {error && <StatePanel title="検索できませんでした" description={error} action={<Button onClick={() => setRevision((value) => value + 1)}>再試行</Button>} />}
       {loading ? <StatePanel title="候補を検索しています…" /> : !error && books.length === 0 ? <StatePanel title="該当する候補がありません" description="検索条件を変更するか、管理画面で同期状態を確認してください。" /> : !error && (
         <div className="book-grid" style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}>

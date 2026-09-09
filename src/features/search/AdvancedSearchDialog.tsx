@@ -6,6 +6,7 @@ import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton } fr
 import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatTagCount } from './search-utils'
+import { applyTagEntityMetadata } from './tag-display-name'
 
 export type AdvancedSearchDialogProps = {
   controller: SearchController
@@ -39,6 +40,7 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
     clearAdvancedDraft,
     applyAdvancedSearch,
   } = controller
+  const displayedDraftTags = applyTagEntityMetadata(draftCriteria.tags, controller.searchResponseTags)
 
   return (
     <Dialog
@@ -79,18 +81,16 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
                 }}
               />
             )}
-            {!isWebSearch && (
-              <section className="advanced-dialog__field">
-                <label htmlFor="advanced-search-text">テキスト入力</label>
-                <input
-                  id="advanced-search-text"
-                  type="search"
-                  value={draftCriteria.text}
-                  placeholder="タイトル、作者、タグを検索"
-                  onChange={(event) => setDraftCriteria((current) => ({ ...current, text: event.target.value }))}
-                />
-              </section>
-            )}
+            <section className="advanced-dialog__field">
+              <label htmlFor="advanced-search-text">テキスト入力</label>
+              <input
+                id="advanced-search-text"
+                type="search"
+                value={draftCriteria.text}
+                placeholder="タイトル、作者、タグを検索"
+                onChange={(event) => setDraftCriteria((current) => ({ ...current, text: event.target.value }))}
+              />
+            </section>
 
             <section className="advanced-dialog__field">
               <label htmlFor="advanced-tag-type">タグ選択</label>
@@ -185,7 +185,7 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
               </div>
               {draftCriteria.tags.length > 0 && (
                 <div className="advanced-selected-tags" aria-label="選択済みタグ">
-                  {draftCriteria.tags.map((tag) => (
+                  {displayedDraftTags.map((tag) => (
                     <TagChip
                       key={`${tag.type}:${tag.name}`}
                       tag={tag}
