@@ -8,6 +8,7 @@ import { configureApi, getApiSettings } from '../src/api/client'
 import { mapEBookToCard } from '../src/api/books'
 import type { RecommendationTagDisplayName, RecommendationThumbnailBook } from '../src/api/recommendations'
 import type { BookTag } from '../src/models'
+import { createTagSearchDestinationUrls } from '../src/features/search/search-utils'
 import { installHookDom } from './helpers/react-hook'
 
 registerHooks({ load(url, context, nextLoad) {
@@ -62,6 +63,7 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
   }
   await act(async () => { root.render(createElement(BookRecommendations, {
     book: mapEBookToCard({ groupId: 'source', bookId: 'source' }),
+    getTagSearchHref: (tag) => createTagSearchDestinationUrls(tag).library.href,
     onTagSearch: (tag) => { selections.push(`${tag.type}:${tag.name}`); selectedTags.push(tag) },
   })) })
   await click('[aria-label="関連候補を開く"]')
@@ -72,6 +74,49 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
     setDisplayNames(value?: RecommendationTagDisplayName[]) { currentDisplayNames = value },
     async cleanup() { await act(async () => { root.unmount() }); container.remove() },
   }
+}
+
+for (const type of ['Book', 'Artist', 'Group'] as const) {
+  it(`${type}: exposes a link and leaves new-tab gestures to the browser`, async () => {
+    const fixture = await mount(type, null)
+    try {
+      const link = fixture.container.querySelector<HTMLAnchorElement>('a.recommendations__card')
+      assert.ok(link)
+      const href = new URL(link.href)
+      assert.equal(link.hasAttribute('target'), false)
+      if (type === 'Book') {
+        assert.equal(href.pathname, '/book/viewer')
+        assert.equal(href.searchParams.get('gid'), 'g')
+        assert.equal(href.searchParams.get('id'), 'b')
+      } else {
+        assert.equal(href.pathname, '/search')
+        assert.equal(href.searchParams.get('tag'), `${type === 'Artist' ? 'Artists' : 'Groups'}:candidate-name`)
+      }
+      const originalHref = dom.window.location.href
+      for (const [name, options] of [
+        ['auxclick', { button: 1 }],
+        ['click', { button: 1 }],
+        ['click', { ctrlKey: true }],
+        ['click', { metaKey: true }],
+        ['click', { shiftKey: true }],
+        ['click', { altKey: true }],
+      ] as const) {
+        let preventedByApp: boolean | undefined
+        // Observe the app's decision, then suppress JSDOM's unsupported native navigation.
+        const observe = (event: Event) => { preventedByApp = event.defaultPrevented; event.preventDefault() }
+        document.addEventListener(name, observe, { once: true })
+        await act(async () => { link.dispatchEvent(new dom.window.MouseEvent(name, { ...options, bubbles: true, cancelable: true })) })
+        assert.equal(preventedByApp, false)
+        assert.equal(dom.window.location.href, originalHref)
+        assert.deepEqual(fixture.selections, [])
+        assert.ok(fixture.container.querySelector('dialog[open]'))
+      }
+      await fixture.click('.recommendations__card')
+      assert.equal(fixture.container.querySelector('dialog[open]'), null)
+      if (type === 'Book') assert.equal(dom.window.location.href, link.href)
+      else assert.deepEqual(fixture.selections, [`${type === 'Artist' ? 'Artists' : 'Groups'}:candidate-name`])
+    } finally { await fixture.cleanup() }
+  })
 }
 
 for (const type of ['Artist', 'Group'] as const) {

@@ -72,7 +72,7 @@ function CacheCard({ book, card, disabled, enqueued, onDetail, onEnqueue, onDele
       selectMode={false}
       selected={false}
       onToggle={() => undefined}
-      onOpen={onDetail}
+      onOpen={card.status === 'WebBookInPage' || card.status === 'WebBook' ? onDetail : undefined}
       openDisabled={!valid}
       isDownloadCandidate={isDownloadCandidate(card)}
       actionsDisabled={disabled || !valid}

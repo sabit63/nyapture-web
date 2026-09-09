@@ -34,6 +34,7 @@ const useDeletionHarness = ({ apiRevision, routeKey, notify }: HarnessProps) => 
   const [libraryBooks, setLibraryBooks] = useState<ApiBookCardModel[]>([book])
   const [webBooks, setWebBooks] = useState<ApiBookCardModel[]>([])
   const [selected, setSelected] = useState(['group-1\u0000book-1'])
+  const [selectMode, setSelectMode] = useState(true)
   const searchResultsRef = useRef({
     librarySearchBooks: libraryBooks,
     webSearchResultBooks: webBooks,
@@ -54,12 +55,13 @@ const useDeletionHarness = ({ apiRevision, routeKey, notify }: HarnessProps) => 
     searchResultsRef,
     setLibrarySearchBooks: setLibraryBooks,
     setSelected,
+    setSelectMode,
     updateWebSearchResultBooks: setWebBooks,
     replaceWebSearchBook: () => undefined,
     replaceWebSearchBooks: () => undefined,
     notify,
   })
-  return { ...operations, libraryBooks, selected }
+  return { ...operations, libraryBooks, selected, selectMode }
 }
 
 it('closes immediately, marks deletion pending, and keeps monitoring across route changes', async () => {
@@ -86,8 +88,13 @@ it('closes immediately, marks deletion pending, and keeps monitoring across rout
   }
   const hook = await renderHook(useDeletionHarness, props)
   try {
-    await act(async () => { hook.current.deleteLibraryBook(book) })
+    await act(async () => { hook.current.deleteSelectedLibraryBooks() })
     assert.equal(hook.current.deleteDialogOpen, true)
+    assert.equal(hook.current.selectMode, true)
+    await act(async () => { hook.current.requestDeleteDialogClose('close-button') })
+    assert.equal(hook.current.selectMode, true)
+    assert.deepEqual(hook.current.selected, ['group-1\u0000book-1'])
+    await act(async () => { hook.current.deleteSelectedLibraryBooks() })
 
     const closeReasons: string[] = []
     await act(async () => {
@@ -101,6 +108,7 @@ it('closes immediately, marks deletion pending, and keeps monitoring across rout
     assert.equal(hook.current.deleteDialogOpen, false)
     assert.equal(hook.current.pendingDeletionKeys.has('group-1\u0000book-1'), true)
     assert.deepEqual(hook.current.selected, [])
+    assert.equal(hook.current.selectMode, false)
     assert.equal(hook.current.libraryBooks[0]?.status, 'Downloaded')
     assert.deepEqual(notices, ['1件の削除を開始しました'])
     assert.equal(requests, 1)

@@ -31,6 +31,7 @@ export type SearchOperationsOptions = {
   } }
   setLibrarySearchBooks: (update: SetStateAction<ApiBookCardModel[]>) => void
   setSelected: (update: SetStateAction<string[]>) => void
+  setSelectMode: (enabled: boolean) => void
   updateWebSearchResultBooks: (update: SetStateAction<ApiBookCardModel[]>) => void
   replaceWebSearchBook: (original: BookCardModel, refreshed: ApiBookCardModel) => void
   replaceWebSearchBooks: (replacements: readonly { original: BookCardModel; refreshed: ApiBookCardModel }[]) => void
@@ -47,6 +48,7 @@ export function useSearchOperations({
   searchResultsRef,
   setLibrarySearchBooks,
   setSelected,
+  setSelectMode,
   updateWebSearchResultBooks,
   replaceWebSearchBook,
   replaceWebSearchBooks,
@@ -64,6 +66,7 @@ export function useSearchOperations({
   const deleteDialogRef = useRef<HTMLDialogElement>(null)
   const deleteDialogTriggerRef = useRef<HTMLElement | null>(null)
   const deleteDialogPendingRef = useRef(false)
+  const deleteDialogBulkRef = useRef(false)
   const pendingDeletionKeysRef = useRef<Set<string>>(new Set())
   const deleteOperationControllersRef = useRef(new Set<AbortController>())
   const webDetailDialogRef = useRef<HTMLDialogElement>(null)
@@ -190,6 +193,9 @@ export function useSearchOperations({
     const selectedBooks = webSearchResultBooks.filter((book) => selectedKeys.has(getBookIdentityKey(book)))
     if (selectedBooks.length === 0) return
 
+    setSelected([])
+    setSelectMode(false)
+
     const results = await Promise.allSettled(selectedBooks.map((selectedBook) => fetchWebBook(selectedBook)))
     const refreshed: { original: BookCardModel; refreshed: ApiBookCardModel }[] = []
     results.forEach((result, index) => {
@@ -201,7 +207,7 @@ export function useSearchOperations({
       failed ? `${refreshed.length}件を更新、${failed}件は失敗しました` : `選択した${refreshed.length}件を読み込みました`,
       failed === 0 ? 'success' : refreshed.length === 0 ? 'error' : 'warning',
     )
-  }, [fetchWebBook, notify, replaceWebSearchBooks, selected, webSearchResultBooks])
+  }, [fetchWebBook, notify, replaceWebSearchBooks, selected, setSelected, setSelectMode, webSearchResultBooks])
 
   const downloadWebBook = useCallback(async (book: BookCardModel) => {
     if (book.status === 'Downloaded' || book.status === 'Downloading') return
@@ -274,8 +280,9 @@ export function useSearchOperations({
     }
   }, [fetchWebBook, notify, replaceWebSearchBook, searchResultsRef, updateWebSearchResultBooks])
 
-  const openDeleteDialog = useCallback((books: ApiBookCardModel[], trigger: HTMLElement | null) => {
+  const openDeleteDialog = useCallback((books: ApiBookCardModel[], trigger: HTMLElement | null, bulk = false) => {
     if (!books.length || deleteDialogPendingRef.current) return
+    deleteDialogBulkRef.current = bulk
     deleteDialogTriggerRef.current = trigger
     deleteDialogPendingRef.current = false
     setDeleteDialogBooks(books)
@@ -301,7 +308,7 @@ export function useSearchOperations({
       return selectedKeys.has(key) && !pendingDeletionKeysRef.current.has(key)
     })
     if (!deletedBooks.length) return
-    openDeleteDialog(deletedBooks, trigger ?? null)
+    openDeleteDialog(deletedBooks, trigger ?? null, true)
   }, [librarySearchBooks, openDeleteDialog, selected])
 
   const requestDeleteDialogClose = useCallback((_reason: CloseReason) => {
@@ -341,7 +348,12 @@ export function useSearchOperations({
     setDeleteDialogError('')
     const targetKeys = new Set(targetBooks.map(getBookIdentityKey))
     updatePendingDeletionKeys((current) => new Set([...current, ...targetKeys]))
-    setSelected((current) => current.filter((key) => !targetKeys.has(key)))
+    if (deleteDialogBulkRef.current) {
+      setSelected([])
+      setSelectMode(false)
+    } else {
+      setSelected((current) => current.filter((key) => !targetKeys.has(key)))
+    }
     finishDeleteDialog(requestClose)
     notify(`${targetBooks.length}件の削除を開始しました`)
 
@@ -383,7 +395,7 @@ export function useSearchOperations({
     }).finally(() => {
       deleteOperationControllersRef.current.delete(operationController)
     })
-  }, [deleteDialogBooks, fetchWebBook, finishDeleteDialog, isWebSearch, notify, replaceWebSearchBook, setLibrarySearchBooks, setSelected, updatePendingDeletionKeys, updateWebSearchResultBooks])
+  }, [deleteDialogBooks, fetchWebBook, finishDeleteDialog, isWebSearch, notify, replaceWebSearchBook, setLibrarySearchBooks, setSelected, setSelectMode, updatePendingDeletionKeys, updateWebSearchResultBooks])
 
   const deleteDialogBook = deleteDialogBooks.length === 1 ? deleteDialogBooks[0] : undefined
   const deleteDialogThumbnailRequest = deleteDialogBook?.thumbnailRequest

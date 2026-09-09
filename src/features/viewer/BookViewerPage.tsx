@@ -23,6 +23,7 @@ export type BookViewerPageProps = {
   onRetry?: () => void
   onBookChange: (book: ApiBookCardModel) => void
   onTitleChange: (groupId: string, bookId: string, title: string) => void
+  getTagSearchHref: (tag: BookTag) => string
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   detailsOpen: boolean
@@ -49,6 +50,7 @@ function BookViewerPage({
   onRetry,
   onBookChange,
   onTitleChange,
+  getTagSearchHref,
   onTagSearch,
   onTagSearchDestinationRequest,
   detailsOpen,
@@ -74,6 +76,7 @@ function BookViewerPage({
       <BookViewerReady
         book={book}
         headingRef={headingRef}
+        getTagSearchHref={getTagSearchHref}
         onBookChange={onBookChange}
         onTitleChange={onTitleChange}
         onTagSearch={onTagSearch}
@@ -157,6 +160,7 @@ function BookViewerReady({
   headingRef,
   onBookChange,
   onTitleChange,
+  getTagSearchHref,
   onTagSearch,
   onTagSearchDestinationRequest,
   detailsOpen,
@@ -167,6 +171,7 @@ function BookViewerReady({
   headingRef: RefObject<HTMLHeadingElement | null>
   onBookChange: (book: ApiBookCardModel) => void
   onTitleChange: (groupId: string, bookId: string, title: string) => void
+  getTagSearchHref: (tag: BookTag) => string
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   detailsOpen: boolean
@@ -330,7 +335,7 @@ function BookViewerReady({
         </IconButton>
       )}
 
-      <BookRecommendations key={bookIdentity} book={book} onTagSearch={onTagSearch} />
+      <BookRecommendations key={bookIdentity} book={book} getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch} />
       <BookDetailsSheet
         key={bookIdentity}
         book={book}

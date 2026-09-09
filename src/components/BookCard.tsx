@@ -40,6 +40,8 @@ export type BookCardProps = {
   onOpen?: (trigger?: HTMLElement) => void
   /** Opens only the cover; the title keeps its normal `onOpen` or viewer-link behavior. */
   onCoverOpen?: (trigger?: HTMLElement) => void
+  /** Native destination for cover navigation, including modified and middle clicks. */
+  coverHref?: string
   coverOpenAriaLabel?: string
   onTagOverflowDetails?: (trigger: HTMLButtonElement) => void
   openDisabled?: boolean
@@ -64,6 +66,7 @@ export function BookCard({
   onDownload,
   onOpen,
   onCoverOpen,
+  coverHref,
   coverOpenAriaLabel,
   onTagOverflowDetails,
   openDisabled = false,
@@ -104,9 +107,11 @@ export function BookCard({
   const canDelete = !isDownloaded && (allowWebDelete || !isWebBook) && typeof onDelete === 'function'
   const hasActions = canRefresh || canDownload || canDelete || (extraActions !== undefined && extraActions !== null)
   const coverOpen = onCoverOpen ?? onOpen
+  const coverLink = openDisabled ? undefined : coverHref ?? (coverOpen ? undefined : viewerUrl)
   const tagsDialogTitleId = `tags-dialog-title-${tagsId}`
 
   const handleThumbnailClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     if (event.target instanceof Element && event.target.closest('button,[role="button"]')) {
       event.preventDefault()
       return
@@ -114,6 +119,11 @@ export function BookCard({
     if (selectMode) {
       event.preventDefault()
       onToggle()
+      return
+    }
+    if (coverOpen) {
+      event.preventDefault()
+      coverOpen(event.currentTarget)
       return
     }
     if (typeof window === 'undefined') return
@@ -154,15 +164,15 @@ export function BookCard({
         reloadKey={thumbnailReloadKey}
         loadingPolicy={{ mode: 'page', viewports: 3 }}
         alt={`${book.title}の表紙`}
-        linkHref={coverOpen ? undefined : viewerUrl}
-        linkAriaLabel={coverOpen ? undefined : `${book.title}を${selectMode ? (selected ? '選択解除' : '選択') : '閲覧'}`}
-        linkTabIndex={coverOpen ? undefined : (selectMode ? -1 : undefined)}
-        linkOnClick={coverOpen ? undefined : handleThumbnailClick}
+        linkHref={coverLink ? toPublicPath(coverLink) : undefined}
+        linkAriaLabel={selectMode ? `${book.title}を${selected ? '選択解除' : '選択'}` : coverOpenAriaLabel ?? `${book.title}を閲覧`}
+        linkTabIndex={selectMode ? -1 : undefined}
+        linkOnClick={handleThumbnailClick}
         fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
         fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
         variant={book.cover}
       >
-        {coverOpen && (
+        {coverOpen && !coverLink && (
           <button
             type="button"
             className="book-cover__open-button"

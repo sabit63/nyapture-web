@@ -7,7 +7,6 @@ import type { ApiBookCardModel, DisplaySettings } from '../../api'
 import type { BookDownloadHubConnectionState } from '../../realtime/book-download-hub'
 import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
 import { getTagLabel, TAG_TYPE_ORDER } from '../../models'
-import { toLogicalPath } from '../../app/app-base-path'
 import {
   cloneCriteria,
   createSearchUrlForDestination,
@@ -191,45 +190,45 @@ export function useSearchController({
     navigateSearchUrlFromRoute(url)
   }, [navigateSearchUrlFromRoute, resultPage, routerLocation.href, searchView, setResultPageFromRoute])
 
+  // New searches start in the grid; reading navigation preserves its own URL.
   const navigateSearchUrl = useCallback((url: URL) => {
-    const logicalPath = toLogicalPath(url.pathname)
-    const isLibraryDestination = logicalPath === '/search' || logicalPath === '/search/missing-tags'
-    const destination = searchView === 'continuous' && isLibraryDestination
-      ? applyContinuousSearchParams(url)
-      : url
-    navigateSearchUrlFromRoute(destination, searchExecution.refresh)
-  }, [navigateSearchUrlFromRoute, searchExecution.refresh, searchView])
+    navigateSearchUrlFromRoute(removeContinuousSearchParams(url), searchExecution.refresh)
+  }, [navigateSearchUrlFromRoute, searchExecution.refresh])
 
-  const enterContinuousView = useCallback((book?: ApiBookCardModel) => {
+  const getContinuousViewHref = useCallback((book?: ApiBookCardModel) => {
     const identity = book?.apiGroupId?.trim() && book.apiBookId?.trim()
       ? { groupId: book.apiGroupId.trim(), bookId: book.apiBookId.trim() }
       : undefined
+    return applyContinuousSearchParams(new URL(routerLocation.href), identity).href
+  }, [routerLocation.href])
+
+  const enterContinuousView = useCallback((book?: ApiBookCardModel) => {
     setSelectMode(false)
     setSelected([])
-    navigateSearchUrlFromRoute(applyContinuousSearchParams(new URL(routerLocation.href), identity))
-  }, [navigateSearchUrlFromRoute, routerLocation.href, setSelected])
+    navigateSearchUrlFromRoute(new URL(getContinuousViewHref(book)))
+  }, [navigateSearchUrlFromRoute, getContinuousViewHref, setSelected])
 
   const exitContinuousView = useCallback(() => {
     navigateSearchUrlFromRoute(removeContinuousSearchParams(new URL(routerLocation.href)))
   }, [navigateSearchUrlFromRoute, routerLocation.href])
 
-  const resetContinuousStart = useCallback(() => {
-    if (searchView !== 'continuous' || !continuousStart) return false
-    navigateSearchUrlFromRoute(applyContinuousSearchParams(new URL(routerLocation.href)))
-    return true
-  }, [continuousStart, navigateSearchUrlFromRoute, routerLocation.href, searchView])
+  const resetSearchOrder = useCallback(() => {
+    const url = removeContinuousSearchParams(new URL(routerLocation.href))
+    url.searchParams.set('page', '1')
+    navigateSearchUrlFromRoute(url)
+  }, [navigateSearchUrlFromRoute, routerLocation.href])
 
   const changeSortType = useCallback((next: SortType) => {
+    if (next === sortType) return
     setSortType(next)
-    if (resultPage !== 1) setResultPage(1)
-    else resetContinuousStart()
-  }, [resetContinuousStart, resultPage, setResultPage])
+    resetSearchOrder()
+  }, [resetSearchOrder, sortType])
 
   const changeSortDirection = useCallback((next: SortDirection) => {
+    if (next === sortDirection) return
     setSortDirection(next)
-    if (resultPage !== 1) setResultPage(1)
-    else resetContinuousStart()
-  }, [resetContinuousStart, resultPage, setResultPage])
+    resetSearchOrder()
+  }, [resetSearchOrder, sortDirection])
 
   const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}`
   const searchOperations = useSearchOperations({
@@ -242,6 +241,7 @@ export function useSearchController({
     searchResultsRef: searchResultsStateRef,
     setLibrarySearchBooks,
     setSelected,
+    setSelectMode,
     updateWebSearchResultBooks,
     replaceWebSearchBook,
     replaceWebSearchBooks,
@@ -410,7 +410,7 @@ export function useSearchController({
     navigateSearchUrl(url)
   }, [criteria, draftMissingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query])
 
-  const searchByTag = useCallback((tag: BookTag) => {
+  const getTagSearchHref = useCallback((tag: BookTag) => {
     const resolvedTag = resolveTag(tag)
     const nextTags = [resolvedTag]
     if (isWebSearch && japaneseLanguageEnabled && !sameTag(resolvedTag, JAPANESE_LANGUAGE_TAG)) {
@@ -421,8 +421,12 @@ export function useSearchController({
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? hitomiAppend : undefined,
     })
-    navigateSearchUrl(url)
-  }, [criteria.missingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl])
+    return url.href
+  }, [criteria.missingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled])
+
+  const searchByTag = useCallback((tag: BookTag) => {
+    navigateSearchUrl(new URL(getTagSearchHref(tag)))
+  }, [getTagSearchHref, navigateSearchUrl])
 
   const openTagSearchDestination = useCallback((tag: BookTag, trigger: HTMLButtonElement) => {
     const resolvedTag = resolveTag(tag)
@@ -638,6 +642,7 @@ export function useSearchController({
     ...searchOperations,
     submitSearch,
     searchByTag,
+    getTagSearchHref,
     openTagSearchDestination,
     applyTagDisplayName,
     requestTagSearchDestinationClose,
@@ -665,6 +670,7 @@ export function useSearchController({
     setSortType: changeSortType,
     setSortDirection: changeSortDirection,
     enterContinuousView,
+    getContinuousViewHref,
     exitContinuousView,
     toggleSelection,
     selectAllVisibleBooks,

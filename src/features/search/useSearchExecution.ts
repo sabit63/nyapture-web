@@ -21,6 +21,7 @@ import {
 } from '../../realtime/search-book-status'
 import type { BookDownloadStatus, HitomiAppend, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
 import { validateCriteria } from './search-utils'
+import { applyTagEntityMetadata } from './tag-display-name'
 import { resolveSearchTags } from './resolve-search-tags'
 import {
   beginForegroundSearchRequest,
@@ -146,6 +147,7 @@ export function useSearchExecution({
   const [searchLoaderVisible, setSearchLoaderVisible] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [searchRevision, setSearchRevision] = useState(0)
+  const tagEnrichmentRef = useRef<AbortController | null>(null)
   const activeSearchRequestRef = useRef<ActiveSearchRequest | null>(null)
   const searchRequestLifecycleRef = useRef(createSearchRequestLifecycleState())
   const requestBackgroundSearchRef = useRef<(() => void) | null>(null)
@@ -245,7 +247,7 @@ export function useSearchExecution({
       if (response.success === false) {
         throw new ApiError(response.message ?? 'Hitomi検索に失敗しました。', { category: 'server' })
       }
-      const tags = await resolveSearchTags(criteria.tags, response.tags ?? [], signal)
+      const tags = response.tags ?? []
       const mapped = mapHitomiSearchResponse({ ...response, tags })
       return {
         books: mapped.books,
@@ -268,6 +270,7 @@ export function useSearchExecution({
   }, [criteria, hitomiAppend, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType])
 
   const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
+    tagEnrichmentRef.current?.abort()
     const previous = activeSearchRequestRef.current
     if (previous && previous.token.id !== token.id) previous.controller.abort()
     if (searchRealtimeFrameRef.current !== null) {
@@ -340,6 +343,17 @@ export function useSearchExecution({
         setSearchSyncFreshness('fresh')
         setSearchError('')
         setSearchState('success')
+        if (isWebSearch) {
+          const enrichment = new AbortController()
+          tagEnrichmentRef.current = enrichment
+          void resolveSearchTags(criteria.tags, snapshot.tags, enrichment.signal).then((tags) => {
+            if (enrichment.signal.aborted || tagEnrichmentRef.current !== enrichment) return
+            setSearchResponseTags(tags)
+            updateWebSearchResultBooks((books) => books.map((book) => ({
+              ...book, tags: applyTagEntityMetadata(book.tags, tags),
+            })))
+          })
+        }
       } catch (error) {
         if (request.controller.signal.aborted || !isActiveSearchRequest(request)) return
         applyBufferedStatusesAfterFailedRequest(request)
@@ -357,7 +371,7 @@ export function useSearchExecution({
     }
 
     void load()
-  }, [applyBufferedStatusesAfterFailedRequest, applySearchResultSnapshot, fetchSearchResults, finishActiveSearchRequest, isActiveSearchRequest])
+  }, [applyBufferedStatusesAfterFailedRequest, applySearchResultSnapshot, criteria.tags, fetchSearchResults, finishActiveSearchRequest, isActiveSearchRequest, isWebSearch, updateWebSearchResultBooks])
 
   const startSearchRequest = useCallback((token: SearchRequestToken, onFinally?: () => void) => {
     const request = createSearchRequest(token)
@@ -403,24 +417,15 @@ export function useSearchExecution({
     }
     const begun = beginForegroundSearchRequest(searchRequestLifecycleRef.current)
     searchRequestLifecycleRef.current = begun.state
-    let loadingTimer: number | null = null
     setSearchState('loading')
     setSearchSyncFreshness('syncing')
     setSearchError('')
-    setSearchLoaderVisible(false)
+    setSearchLoaderVisible(true)
     setSearchResponseTags([])
-    const request = startSearchRequest(begun.token, () => {
-      if (loadingTimer !== null) window.clearTimeout(loadingTimer)
-      loadingTimer = null
-      setSearchLoaderVisible(false)
-    })
-    loadingTimer = window.setTimeout(() => {
-      if (!request.controller.signal.aborted && isActiveSearchRequest(request)) setSearchLoaderVisible(true)
-    }, 1000)
+    const request = startSearchRequest(begun.token, () => setSearchLoaderVisible(false))
     return () => {
       request.controller.abort()
-      if (loadingTimer !== null) window.clearTimeout(loadingTimer)
-      loadingTimer = null
+      tagEnrichmentRef.current?.abort()
       searchRequestLifecycleRef.current = cancelSearchRequest(searchRequestLifecycleRef.current, request.token)
       if (activeSearchRequestRef.current === request) {
         activeSearchRequestRef.current = null
@@ -447,6 +452,7 @@ export function useSearchExecution({
 
     return () => {
       unsubscribe()
+      tagEnrichmentRef.current?.abort()
       const activeRequest = activeSearchRequestRef.current
       activeRequest?.controller.abort()
       activeSearchRequestRef.current = null

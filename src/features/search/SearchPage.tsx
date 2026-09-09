@@ -6,7 +6,7 @@ import {
   ChevronDown,
   FileText,
   ListChecks,
-  Images,
+  Scroll,
   LayoutGrid,
   LoaderCircle,
   RefreshCw,
@@ -117,7 +117,6 @@ export function SearchPage({ controller }: SearchPageProps) {
     searchState,
     searchError,
     searchLoadingAnnouncement,
-    searchLoaderVisible,
     searchResultGeneration,
     visibleBooks,
     displaySettings,
@@ -144,6 +143,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     refreshSelectedWebBooks,
     deleteSelectedLibraryBooks,
     toggleSelection,
+    getTagSearchHref,
     searchByTag,
     openTagSearchDestination,
     refreshWebBook,
@@ -154,6 +154,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     applyBookTagChange,
     applyBookTitleChange,
     enterContinuousView,
+    getContinuousViewHref,
     exitContinuousView,
   } = controller
   const selectableVisibleBooks = visibleBooks.filter((book) => !pendingDeletionKeys.has(getBookIdentityKey(book)))
@@ -169,7 +170,6 @@ export function SearchPage({ controller }: SearchPageProps) {
   }, [])
 
   const isSearchLoading = searchState === 'loading'
-  const showSearchLoader = isSearchLoading && searchLoaderVisible
   const showNoResults = searchState === 'success' && visibleBooks.length === 0
   const displayedCriteriaTags = applyTagEntityMetadata(criteria.tags, searchResponseTags)
   const isContinuousView = !isWebSearch && searchView === 'continuous'
@@ -446,7 +446,7 @@ export function SearchPage({ controller }: SearchPageProps) {
         )}
 
         {isSearchLoading && (
-          <p className="sr-only" role="status" aria-live="polite">{searchLoadingAnnouncement}</p>
+          <div className="results-loading-status" role="status" aria-live="polite"><LoaderCircle className="results-spinner" size={16} aria-hidden="true" /><span>{searchLoadingAnnouncement}</span></div>
         )}
 
         {showNoResults && (
@@ -464,13 +464,17 @@ export function SearchPage({ controller }: SearchPageProps) {
         )}
 
         {isSearchLoading && visibleBooks.length === 0 ? (
-          <StatePanel
-            className="results-state-panel"
-            title={searchLoadingAnnouncement}
-            icon={<LoaderCircle className="results-spinner" size={30} strokeWidth={2.1} />}
-          />
+          <BookGrid settings={displaySettings} aria-hidden="true" inert>
+            {Array.from({ length: 10 }, (_, index) => (
+              <div className="search-skeleton" key={index}>
+                <div className="search-skeleton__cover" />
+                <div className="search-skeleton__line" />
+                <div className="search-skeleton__line search-skeleton__line--short" />
+              </div>
+            ))}
+          </BookGrid>
         ) : showNoResults ? null : (
-          <div className={`results-stage ${showSearchLoader ? 'results-stage--loading-visible' : ''}`}>
+          <div className={`results-stage ${isSearchLoading ? 'results-stage--loading-visible' : ''}`}>
             {isContinuousView ? (
               readableBooks.length > 0 ? (
                 <SearchContinuousReader
@@ -481,6 +485,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                   isLoading={isSearchLoading}
                   onActiveBookChange={setActiveContinuousBook}
                   onBookJump={enterContinuousView}
+                  getTagSearchHref={getTagSearchHref}
                   onResultPageChange={goToResultPage}
                   onTagSearch={searchByTag}
                 />
@@ -522,6 +527,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                         ? (trigger) => openWebBookDetail(book, trigger)
                         : undefined}
                       onCoverOpen={canStartContinuous ? () => enterContinuousView(book) : undefined}
+                      coverHref={canStartContinuous ? getContinuousViewHref(book) : undefined}
                       coverOpenAriaLabel={canStartContinuous ? `${book.title}から連続閲覧` : undefined}
                       onDelete={(trigger) => deleteLibraryBook(book, trigger)}
                       onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
@@ -530,11 +536,6 @@ export function SearchPage({ controller }: SearchPageProps) {
                   )
                 })}
               </BookGrid>
-            )}
-            {showSearchLoader && (
-              <div className="results-loading-overlay" aria-hidden="true">
-                <LoaderCircle className="results-spinner" size={30} strokeWidth={2.1} />
-              </div>
             )}
           </div>
         )}
@@ -582,7 +583,7 @@ export function SearchPage({ controller }: SearchPageProps) {
               if (!isContinuousView) enterContinuousView()
             }}
           >
-            <Images size={16} aria-hidden="true" />
+            <Scroll size={16} aria-hidden="true" />
           </IconButton>
         </div>,
         viewModeHeaderActionHost,

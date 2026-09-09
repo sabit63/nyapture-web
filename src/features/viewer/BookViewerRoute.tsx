@@ -15,6 +15,7 @@ export type BookViewerRouteProps = {
   route: BookViewerRouteData
   apiRevision: number
   onBookChange: (book: ApiBookCardModel) => void
+  getTagSearchHref: (tag: BookTag) => string
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest: (tag: BookTag, trigger: HTMLButtonElement) => void
   tagDisplayNameOverrides: TagDisplayNameOverrides
@@ -28,6 +29,7 @@ export function BookViewerRoute({
   route,
   apiRevision,
   onBookChange,
+  getTagSearchHref,
   onTagSearch,
   onTagSearchDestinationRequest,
   tagDisplayNameOverrides,
@@ -113,7 +115,7 @@ export function BookViewerRoute({
       onRetry={() => setViewerRevision((current) => current + 1)}
       onBookChange={updateViewerBook}
       onTitleChange={updateViewerBookTitle}
-      onTagSearch={onTagSearch}
+      getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch}
       onTagSearchDestinationRequest={onTagSearchDestinationRequest}
       detailsOpen={detailsOpen}
       onDetailsOpenChange={onDetailsOpenChange}

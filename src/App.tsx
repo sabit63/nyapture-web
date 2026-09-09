@@ -198,7 +198,7 @@ function App() {
           route={viewerRoute}
           onBookChange={searchController.applyBookTagChange}
           apiRevision={apiSettingsController.apiRevision}
-          onTagSearch={searchController.searchByTag}
+          getTagSearchHref={searchController.getTagSearchHref} onTagSearch={searchController.searchByTag}
           onTagSearchDestinationRequest={searchController.openTagSearchDestination}
           tagDisplayNameOverrides={searchController.tagDisplayNameOverrides}
           detailsOpen={bookViewerDetailsOpen}

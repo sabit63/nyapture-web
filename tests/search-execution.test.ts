@@ -51,6 +51,7 @@ const makeStatus = (overrides: Partial<BookDownloadStatus> = {}): BookDownloadSt
 
 type ExecutionProps = {
   apiRevision: number
+  isWebSearch?: boolean
   criteria?: SearchCriteria
 }
 
@@ -60,8 +61,8 @@ const mountExecution = (initialProps: ExecutionProps) => renderHook((props: Exec
   const [libraryBooks, setLibraryBooks] = useState<ApiBookCardModel[]>([])
   const [webBooks, setWebBooks] = useState<ApiBookCardModel[]>([])
   const execution = useSearchExecution({
-    isWebSearch: false,
-    isLibrarySearch: true,
+    isWebSearch: props.isWebSearch ?? false,
+    isLibrarySearch: !props.isWebSearch,
     isMissingTagSearch: false,
     apiRevision: props.apiRevision,
     criteria: props.criteria ?? EMPTY_CRITERIA,
@@ -247,4 +248,42 @@ test('execution boundary exposes realtime ordering and snapshot projection rules
     new Map(),
   )
   assert.equal(projected[0].status, 'Downloaded')
+})
+
+
+test('web results finish before optional tags and stale enrichment cannot replace new tags', async () => {
+  const dom = installHookDom('http://localhost/search')
+  const originalFetch = globalThis.fetch
+  const requests: { response: ReturnType<typeof deferred<Response>> }[] = []
+  globalThis.fetch = (async () => {
+    const response = deferred<Response>()
+    requests.push({ response })
+    return response.promise
+  }) as typeof fetch
+  const criteria = { ...emptyCriteria(), tags: [{ type: 'Artists' as const, name: 'artist' }] }
+  const mounted = await mountExecution({ apiRevision: 1, isWebSearch: true, criteria })
+  const json = (value: unknown) => new Response(JSON.stringify(value), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  })
+  try {
+    assert.equal(mounted.current.searchLoaderVisible, true)
+    requests[0].response.resolve(json({ success: true, onlineBookPage: { books: [] }, tags: [] }))
+    await act(flushPromises)
+    assert.equal(requests.length, 2)
+    assert.equal(mounted.current.searchState, 'success')
+    assert.equal(mounted.current.searchLoaderVisible, false)
+    await mounted.rerender({ apiRevision: 2, isWebSearch: true, criteria })
+    requests[2].response.resolve(json({
+      success: true, onlineBookPage: { books: [] },
+      tags: [{ type: 'Artists', name: 'artist', displayName: 'Current' }],
+    }))
+    await act(flushPromises)
+    requests[1].response.resolve(json({ status: 'Approved', primaryAdditionalName: 'Stale' }))
+    await act(flushPromises)
+    assert.equal(mounted.current.searchResponseTags[0]?.displayName, 'Current')
+  } finally {
+    await mounted.unmount()
+    globalThis.fetch = originalFetch
+    dom.cleanup()
+  }
 })

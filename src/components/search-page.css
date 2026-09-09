@@ -141,7 +141,6 @@
 .results-stage { position: relative; }
 .book-grid { transition: opacity 160ms ease; }
 .book-grid[aria-busy='false'] { animation: results-settle 160ms ease-out; }
-.results-loading-overlay { animation: results-settle 160ms ease-out; }
 .selection-toolbar-reveal {
   display: grid;
   grid-template-rows: 0fr;
@@ -165,8 +164,12 @@
 .selection-toolbar-reveal[data-open='true'] > .selection-toolbar { padding-bottom: var(--space-3); }
 @keyframes results-settle { from { opacity: .65; } to { opacity: 1; } }
 .results-stage--loading-visible .book-grid,
-.results-stage--loading-visible .continuous-reader { opacity: .48; }
-.results-loading-overlay { position: absolute; z-index: 3; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.results-stage--loading-visible .continuous-reader { opacity: .78; }
+.results-loading-status { position: fixed; top: calc(var(--header-height, 64px) + 12px); left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text); box-shadow: 0 3px 12px #0002; pointer-events: none; font-size: .8rem; }
+.search-skeleton { overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); padding-bottom: 12px; }
+.search-skeleton__cover { aspect-ratio: 5 / 7; background: var(--color-surface-hover); }
+.search-skeleton__line { height: 12px; margin: 12px 12px 0; border-radius: 4px; background: var(--color-surface-hover); }
+.search-skeleton__line--short { width: 55%; }
 .results-spinner { color: var(--color-accent-text); animation: ui-spin .85s linear infinite; }
 
 .book-grid {
@@ -262,3 +265,9 @@
 .missing-search-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
 .missing-search-actions span { color: var(--color-text-muted); font-size: var(--font-size-body-sm); }
 .missing-search-actions button { flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .results-spinner { animation: none; }
+  .book-grid { transition: none; }
+  .book-grid[aria-busy="false"] { animation: none; }
+}

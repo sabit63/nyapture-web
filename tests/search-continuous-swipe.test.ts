@@ -85,7 +85,7 @@ it('changes books for deliberate touch, mouse, and trackpad gestures outside con
         onActiveBookChange: () => undefined,
         onBookJump: (nextBook: ApiBookCardModel) => jumps.push(nextBook),
         onResultPageChange: () => undefined,
-        onTagSearch: () => undefined,
+        getTagSearchHref: () => '/search', onTagSearch: () => undefined,
       }))
     })
 
@@ -141,7 +141,7 @@ it('changes books for deliberate touch, mouse, and trackpad gestures outside con
         onActiveBookChange: () => undefined,
         onBookJump: (nextBook: ApiBookCardModel) => jumps.push(nextBook),
         onResultPageChange: () => undefined,
-        onTagSearch: () => undefined,
+        getTagSearchHref: () => '/search', onTagSearch: () => undefined,
       }))
     })
     const secondPages = container.querySelector('.continuous-reader__pages')
@@ -214,7 +214,7 @@ it('opens recommendations for the active continuous book, isolates gestures, and
     await act(async () => { root.render(createElement(SearchContinuousReader, {
       books, startIndex, isLoading, resultPage: 1, totalResultPages: 1,
       onActiveBookChange: () => undefined, onBookJump: () => { jumps++ },
-      onResultPageChange: () => undefined, onTagSearch: (tag) => tags.push(`${tag.type}:${tag.name}`),
+      onResultPageChange: () => undefined, getTagSearchHref: () => '/search', onTagSearch: (tag) => tags.push(`${tag.type}:${tag.name}`),
     })) })
   }
   const click = async (selector: string) => {

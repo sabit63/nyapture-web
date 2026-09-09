@@ -39,6 +39,7 @@ type SearchContinuousReaderProps = {
   onActiveBookChange: (book: ApiBookCardModel) => void
   onBookJump: (book: ApiBookCardModel) => void
   onResultPageChange: (page: number) => void
+  getTagSearchHref: (tag: BookTag) => string
   onTagSearch: (tag: BookTag) => void
 }
 
@@ -107,6 +108,7 @@ export function SearchContinuousReader({
   onActiveBookChange,
   onBookJump,
   onResultPageChange,
+  getTagSearchHref,
   onTagSearch,
 }: SearchContinuousReaderProps) {
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
@@ -346,7 +348,7 @@ export function SearchContinuousReader({
       {!isLoading && <BookRecommendations
         key={readableIdentity(activeBook)}
         book={activeBook}
-        onTagSearch={onTagSearch}
+        getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch}
       />}
 
       <Dialog

@@ -1,11 +1,11 @@
 import { BookOpen, BookX, Clock3, CloudOff, Inbox, RefreshCw, Sparkles, UserRound, Users, X } from 'lucide-react'
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createBookPageThumbnailRequest, mapEBookToCard } from '../../api/books'
 import { requestBlob } from '../../api/client'
 import { usableRecommendations } from '../../api/recommendations'
 import type { RecommendationHit, RecommendationTagDisplayName, RecommendationType } from '../../api/recommendations'
-import { navigate } from '../../app/client-router'
+import { InternalLink, navigate } from '../../app/client-router'
 import { Thumbnail } from '../../components/Thumbnail'
 import { IconButton } from '../../components/ui'
 import type { BookCardModel, BookTag } from '../../models'
@@ -38,7 +38,7 @@ const recommendationTag = (type: BookTag['type'], name: string, displayNames?: R
   displayName: displayNames?.find((tag) => tag.type === type && tag.name === name)?.displayName?.trim() || undefined,
 })
 
-function RecommendationCard({ hit, displayNames, onSelect }: { hit: RecommendationHit; displayNames?: RecommendationTagDisplayName[]; onSelect: () => void }) {
+function RecommendationCard({ hit, displayNames, href, onSelect }: { hit: RecommendationHit; displayNames?: RecommendationTagDisplayName[]; href: string; onSelect: (event: MouseEvent<HTMLAnchorElement>) => void }) {
   const key = hit.key!
   const isBook = key.entityType === 'Book'
   const book = useMemo(() => isBook ? mapEBookToCard({ ...hit.book, groupId: key.groupId, bookId: key.bookId }) : undefined, [hit.book, isBook, key])
@@ -50,7 +50,7 @@ function RecommendationCard({ hit, displayNames, onSelect }: { hit: Recommendati
   const tags = (isBook ? hit.commonTags : hit.entity?.representativeTags) ?? []
   const EntityIcon = key.entityType === 'Artist' ? UserRound : Users
   const count = hit.entity?.totalBookCount
-  return <button type="button" className={`recommendations__card ${isBook ? '' : 'recommendations__card--entity'}`} onClick={onSelect}>
+  return <InternalLink href={href} className={`recommendations__card ${isBook ? '' : 'recommendations__card--entity'}`} onClick={onSelect}>
     {isBook ? <Thumbnail load={request ? load : undefined} alt="" fallbackText="" fallbackAriaLabel="表紙なし"
       retryOnError={false} className="recommendations__cover" loadingPolicy="page" />
       : <span className="recommendations__avatar"><Thumbnail
@@ -64,10 +64,10 @@ function RecommendationCard({ hit, displayNames, onSelect }: { hit: Recommendati
       {!isBook && typeof count === 'number' && Number.isFinite(count) && count >= 0 && <span className="recommendations__count" aria-label={`${count}作品`}><BookOpen size={14} aria-hidden="true" />{count.toLocaleString()}</span>}
       <span className="recommendations__tags">{tags.filter((tag) => typeof tag === 'string').slice(0, 3).map((tag, index) => <span key={`${tag}:${index}`}>{getTagLabel(recommendationTag('Tags', tag, displayNames))}</span>)}</span>
     </span>
-  </button>
+  </InternalLink>
 }
 
-export function BookRecommendations({ book, onTagSearch }: { book: BookCardModel; onTagSearch: (tag: BookTag) => void }) {
+export function BookRecommendations({ book, onTagSearch, getTagSearchHref }: { book: BookCardModel; onTagSearch: (tag: BookTag) => void; getTagSearchHref: (tag: BookTag) => string }) {
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<RecommendationType>('Book')
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -107,11 +107,20 @@ export function BookRecommendations({ book, onTagSearch }: { book: BookCardModel
     }
   }, [open])
 
-  const select = (hit: RecommendationHit) => {
+  const getHref = (hit: RecommendationHit) => {
+    const key = hit.key!
+    return key.entityType === 'Book'
+      ? `/book/viewer?${new URLSearchParams({ gid: key.groupId!, id: key.bookId! })}`
+      : getTagSearchHref(recommendationTag(key.entityType === 'Artist' ? 'Artists' : 'Groups', key.tagName!, result?.tagDisplayNames))
+  }
+
+  const select = (event: MouseEvent<HTMLAnchorElement>, hit: RecommendationHit) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
     setOpen(false)
     const key = hit.key!
     if (key.entityType === 'Book') {
-      navigate(`/book/viewer?${new URLSearchParams({ gid: key.groupId!, id: key.bookId! })}`)
+      navigate(getHref(hit))
     } else {
       onTagSearch(recommendationTag(key.entityType === 'Artist' ? 'Artists' : 'Groups', key.tagName!, result?.tagDisplayNames))
     }
@@ -145,7 +154,7 @@ export function BookRecommendations({ book, onTagSearch }: { book: BookCardModel
           <span role="status" className="sr-only">{loading ? '関連候補を読み込んでいます' : items.length ? `${items.length}件の関連候補` : label}</span>
           {loading ? <div className="recommendations__grid" aria-hidden="true">{Array.from({ length: 6 }, (_, index) => <span key={index} className="recommendations__skeleton" />)}</div>
             : items.length > 0 && result?.status === 'success' ? <div className={tab === 'Book' ? 'recommendations__grid' : 'recommendations__list'}>
-              {items.map((hit) => <RecommendationCard key={JSON.stringify(hit.key)} hit={hit} displayNames={result?.tagDisplayNames} onSelect={() => select(hit)} />)}
+              {items.map((hit) => <RecommendationCard key={JSON.stringify(hit.key)} hit={hit} displayNames={result?.tagDisplayNames} href={getHref(hit)} onSelect={(event) => select(event, hit)} />)}
             </div> : <div className="recommendations__empty">
               <StatusIcon key={label} label={label} animated={waiting && !canRetry}><StateIcon size={36} strokeWidth={1.4} aria-hidden="true" /></StatusIcon>
               {canRetry && <IconButton aria-label="関連候補を再試行" title="再試行" onClick={retry}><RefreshCw size={20} aria-hidden="true" /></IconButton>}
