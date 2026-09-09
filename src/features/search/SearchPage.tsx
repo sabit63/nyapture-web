@@ -482,6 +482,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                   onActiveBookChange={setActiveContinuousBook}
                   onBookJump={enterContinuousView}
                   onResultPageChange={goToResultPage}
+                  onTagSearch={searchByTag}
                 />
               ) : (
                 <StatePanel

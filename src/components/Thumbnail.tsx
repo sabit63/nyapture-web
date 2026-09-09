@@ -62,6 +62,8 @@ export type ThumbnailProps = {
   linkOnClick?: MouseEventHandler<HTMLAnchorElement>
   /** Text rendered in the fallback when the image is missing or cannot load. */
   fallbackText?: string
+  /** Optional icon for entity-specific missing/failed image states. */
+  fallbackIcon?: ReactNode
   /** Accessible name for the fallback region. */
   fallbackAriaLabel?: string
   /** Whether a failed image should expose the retry action. */
@@ -97,6 +99,7 @@ function ThumbnailInstance({
   linkTabIndex,
   linkOnClick,
   fallbackText,
+  fallbackIcon,
   fallbackAriaLabel,
   retryOnError = true,
   className,
@@ -441,7 +444,7 @@ function ThumbnailInstance({
       {imageLink}
       {imageState === 'error' && (
         <div className="book-cover__fallback" role="group" aria-label={fallbackAriaLabel ?? `${alt}を表示できません`}>
-          <ImageOff size={34} strokeWidth={1.4} aria-hidden="true" />
+          {fallbackIcon ?? <ImageOff size={34} strokeWidth={1.4} aria-hidden="true" />}
           <span>{fallbackText ?? 'サムネイルはありません'}</span>
           {(src || load) && retryOnError && (
             <button type="button" onClick={() => handlersRef.current.retry()}>

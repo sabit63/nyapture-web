@@ -298,6 +298,8 @@ export type ApiRequestOptions = {
   body?: unknown
   signal?: AbortSignal
   timeoutSeconds?: number
+  /** Upper bound for successful-response polling delays; defaults to 60. */
+  retryAfterMaxSeconds?: number
   auth?: 'read' | 'edit'
   headers?: HeadersInit
 }
@@ -375,7 +377,7 @@ const extractResponseMessage = (payload: unknown, response: Response): string =>
 }
 
 /** Parse the OpenAPI Retry-After delay-seconds header and bound it for polling. */
-const parseRetryAfterSeconds = (headers: Headers): number | undefined => {
+const parseRetryAfterSeconds = (headers: Headers, maximum = 60): number | undefined => {
   const value = headers.get('Retry-After')?.trim()
   if (!value || !/^\d+$/.test(value)) return undefined
 
@@ -383,7 +385,8 @@ const parseRetryAfterSeconds = (headers: Headers): number | undefined => {
   // before clamping them to the client-supported polling range.
   const seconds = BigInt(value)
   if (seconds < 1n) return 1
-  if (seconds > 60n) return 60
+  const bound = Number.isSafeInteger(maximum) && maximum > 0 ? Math.min(maximum, 2147483) : 60
+  if (seconds > BigInt(bound)) return bound
   return Number(seconds)
 }
 
@@ -521,7 +524,7 @@ export class ApiClient {
       const payload = await parseTextPayload(response, isAborted)
       if (!response.ok) throw createHttpError(payload, response, this.settings)
 
-      const retryAfterSeconds = parseRetryAfterSeconds(response.headers)
+      const retryAfterSeconds = parseRetryAfterSeconds(response.headers, options.retryAfterMaxSeconds)
       const location = asNonEmptyString(response.headers.get('Location'))
       return {
         body: payload as T,

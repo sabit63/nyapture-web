@@ -11,6 +11,8 @@ import {
 
 import { getBookPageBlob, requestBlob, type ApiBookCardModel } from '../../api'
 import { Thumbnail } from '../../components/Thumbnail'
+import type { BookTag } from '../../models'
+import { BookRecommendations } from '../viewer/BookRecommendations'
 import { Button, Dialog, DialogBody, DialogHeader, IconButton } from '../../components/ui'
 import { BookPageImage } from '../viewer/BookPageImage'
 import { BookPageLoader } from '../viewer/book-page-loading'
@@ -37,6 +39,7 @@ type SearchContinuousReaderProps = {
   onActiveBookChange: (book: ApiBookCardModel) => void
   onBookJump: (book: ApiBookCardModel) => void
   onResultPageChange: (page: number) => void
+  onTagSearch: (tag: BookTag) => void
 }
 
 type BookProgress = {
@@ -65,7 +68,7 @@ const readableIdentity = (book: ApiBookCardModel) => `${book.apiGroupId}\u0000${
 
 const isSwipeControl = (target: EventTarget | null) => (
   target instanceof Element
-  && Boolean(target.closest('button, a, input, select, textarea, [role="dialog"]'))
+  && Boolean(target.closest('button, a, input, select, textarea, dialog, [role="dialog"]'))
 )
 
 function ContinuousNavigatorThumbnail({ book }: { book: ApiBookCardModel }) {
@@ -104,6 +107,7 @@ export function SearchContinuousReader({
   onActiveBookChange,
   onBookJump,
   onResultPageChange,
+  onTagSearch,
 }: SearchContinuousReaderProps) {
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
   const [activeProgress, setActiveProgress] = useState<BookProgress>({ bookIndex: startIndex, page: 1 })
@@ -338,6 +342,12 @@ export function SearchContinuousReader({
         </IconButton>
         <span className="sr-only" aria-live="polite">表示倍率{zoomPercent}%</span>
       </div>
+
+      {!isLoading && <BookRecommendations
+        key={readableIdentity(activeBook)}
+        book={activeBook}
+        onTagSearch={onTagSearch}
+      />}
 
       <Dialog
         className="continuous-reader__navigator-dialog"

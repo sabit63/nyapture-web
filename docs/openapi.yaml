@@ -86,6 +86,70 @@ x-signalr-hubs:
         $ref: "#/components/schemas/DashboardLogEntryDto"
 
 paths:
+  /api/book/{groupId}/{bookId}/recommendations:
+    get:
+      tags: [Recommendations]
+      summary: Book起点の関連作品・作者・グループ
+      operationId: getBookRecommendations
+      parameters:
+        - {name: groupId, in: path, required: true, schema: {type: string}}
+        - {name: bookId, in: path, required: true, schema: {type: string}}
+        - {name: targetType, in: query, schema: {type: string, enum: [Book, Artist, Group, Both], default: Book}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        "200": {$ref: "#/components/responses/RecommendationResult"}
+        "202": {$ref: "#/components/responses/RecommendationPending"}
+        "404": {$ref: "#/components/responses/RecommendationNotFound"}
+        "503": {$ref: "#/components/responses/RecommendationUnavailable"}
+        "400": {description: キー・対象型・件数が不正}
+  /api/books/{groupId}/{bookId}/recommendations:
+    get:
+      tags: [Recommendations]
+      summary: Bookレコメンドの複数形パス別名
+      operationId: getBookRecommendationsAlias
+      parameters:
+        - {name: groupId, in: path, required: true, schema: {type: string}}
+        - {name: bookId, in: path, required: true, schema: {type: string}}
+        - {name: targetType, in: query, schema: {type: string, enum: [Book, Artist, Group, Both], default: Book}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        "200": {$ref: "#/components/responses/RecommendationResult"}
+        "202": {$ref: "#/components/responses/RecommendationPending"}
+        "404": {$ref: "#/components/responses/RecommendationNotFound"}
+        "503": {$ref: "#/components/responses/RecommendationUnavailable"}
+        "400": {description: キー・対象型・件数が不正}
+  /api/recommendations/entities/{entityType}:
+    get:
+      tags: [Recommendations]
+      summary: Artist・Groupのタグ傾向による関連検索
+      operationId: getEntityRecommendations
+      parameters:
+        - {name: entityType, in: path, required: true, schema: {type: string, enum: [Artist, Group]}}
+        - {name: tagName, in: query, required: true, schema: {type: string}}
+        - {name: targetType, in: query, schema: {type: string, enum: [Book, Artist, Group, Both], default: Both}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        "200": {$ref: "#/components/responses/RecommendationResult"}
+        "202": {$ref: "#/components/responses/RecommendationPending"}
+        "404": {$ref: "#/components/responses/RecommendationNotFound"}
+        "503": {$ref: "#/components/responses/RecommendationUnavailable"}
+        "400": {description: タグ名・型・件数が不正}
+  /api/recommendations/status:
+    get:
+      tags: [Recommendations]
+      summary: レコメンド索引の世代・生成件数・稼働状態
+      operationId: getRecommendationStatus
+      responses:
+        "200":
+          description: メトリクス。countsAvailable=falseの件数は実測値ではない。
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RecommendationMetrics"}
+        "503":
+          description: レコメンド機能またはDBが利用不能
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RecommendationMetrics"}
   # ============================================================
   # Book API
   # ============================================================
@@ -2461,7 +2525,147 @@ paths:
                 example: alive
 
 components:
+  responses:
+    RecommendationResult:
+      description: success（空候補を含む）またはno_features。旧投影使用時はisStale=true。
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/RecommendationResponse"}
+    RecommendationPending:
+      description: 正本は存在するが投影作成待ち
+      headers:
+        Retry-After: {schema: {type: integer, example: 60}}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/RecommendationResponse"}
+    RecommendationNotFound:
+      description: 起点が存在しない、または削除済み
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/RecommendationResponse"}
+    RecommendationUnavailable:
+      description: 任意機能が無効、または検索投影を利用できない
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/RecommendationResponse"}
   schemas:
+    RecommendationKey:
+      type: object
+      required: [entityType]
+      properties:
+        entityType: {type: string, enum: [Book, Artist, Group]}
+        groupId: {type: string}
+        bookId: {type: string}
+        tagName: {type: string}
+    RecommendationEntity:
+      type: object
+      properties:
+        key: {$ref: "#/components/schemas/RecommendationKey"}
+        totalBookCount: {type: integer}
+        semanticBookCount: {type: integer}
+        exactBookCount: {type: integer}
+        representativeTags: {type: array, items: {type: string}}
+        thumbnailBook:
+          description: 保存完了・保存先あり・1ページ以上の所属BookのうちuploadedTimeが最新のもの。対象なしはnull。
+          anyOf: [{$ref: "#/components/schemas/RecommendationThumbnailBook"}, {type: "null"}]
+    RecommendationThumbnailBook:
+      type: object
+      required: [groupId, bookId, uploadedTime]
+      properties:
+        groupId: {type: string}
+        bookId: {type: string}
+        uploadedTime: {type: string, format: date-time}
+    RecommendationHit:
+      type: object
+      properties:
+        key: {$ref: "#/components/schemas/RecommendationKey"}
+        score: {type: number, description: 一致確率ではない。同一起点内でのみ比較可能。}
+        signals:
+          type: object
+          properties:
+            titleRank: {type: [integer, "null"], minimum: 1}
+            semanticTagRank: {type: [integer, "null"], minimum: 1}
+            exactTagRank: {type: [integer, "null"], minimum: 1}
+        commonTags: {type: array, items: {type: string}}
+        reasons: {type: array, items: {type: string}}
+        book:
+          anyOf: [{$ref: "#/components/schemas/EBook"}, {type: "null"}]
+        entity:
+          anyOf: [{$ref: "#/components/schemas/RecommendationEntity"}, {type: "null"}]
+    RecommendationTagDisplayName:
+      type: object
+      required: [type, name, displayName]
+      properties:
+        type: {$ref: "#/components/schemas/NyaTagType"}
+        name: {type: string, description: 変更されない元のタグ名}
+        displayName: {type: string, description: 承認済みの日本語表示名（追加名）}
+    RecommendationResponse:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [success, no_features, pending, not_found, unavailable]}
+        profileVersion: {type: [string, "null"]}
+        exactWeightingVersion: {type: [string, "null"], example: sqrt-idf-v1}
+        generateEmbeddings: {type: [boolean, "null"]}
+        tagDisplayNames:
+          type: array
+          description: 応答内のタグの承認済み表示名。typeとnameで対応付ける。未登録・未承認・取得失敗時は該当項目なし。
+          items: {$ref: "#/components/schemas/RecommendationTagDisplayName"}
+        isStale: {type: boolean}
+        detail: {type: [string, "null"]}
+        sourceEntity:
+          anyOf: [{$ref: "#/components/schemas/RecommendationEntity"}, {type: "null"}]
+        items:
+          type: [array, "null"]
+          items: {$ref: "#/components/schemas/RecommendationHit"}
+    RecommendationMetrics:
+      type: object
+      properties:
+        status: {type: string, enum: [ready, pending, unavailable]}
+        profileVersion: {type: [string, "null"]}
+        exactWeightingVersion: {type: [string, "null"], example: sqrt-idf-v1}
+        generateEmbeddings: {type: [boolean, "null"]}
+        model: {type: string}
+        modelRevision: {type: [string, "null"]}
+        preprocessingVersion: {type: [string, "null"]}
+        countsAvailable: {type: boolean}
+        catalogBooks: {type: integer, format: int64}
+        evaluatedBooks: {type: integer, format: int64}
+        pendingBooks: {type: integer, format: int64}
+        failedBooks: {type: integer, format: int64}
+        missingTitle: {type: integer, format: int64}
+        missingSemantic: {type: integer, format: int64}
+        missingExact: {type: integer, format: int64}
+        artistCount: {type: integer, format: int64}
+        groupCount: {type: integer, format: int64}
+        entityTotalBookCount: {type: integer, format: int64}
+        entitySemanticBookCount: {type: integer, format: int64}
+        entityExactBookCount: {type: integer, format: int64}
+        entityMissingSemantic: {type: integer, format: int64}
+        entityMissingExact: {type: integer, format: int64}
+        entityPendingCount: {type: integer, format: int64}
+        lastReconciledAt: {type: [string, "null"], format: date-time}
+        oldestPendingAt: {type: [string, "null"], format: date-time}
+        projectionDelaySeconds: {type: [number, "null"]}
+        lastError: {type: [string, "null"]}
+        qualityStatus: {type: string, example: tag_similarity_only}
+        embeddingRuntimeStatus: {type: string, enum: [ready, unavailable, model_mismatch, unknown, disabled]}
+        generationThrottling:
+          description: このAPIインスタンスの生成用CPU制御。検索リクエストは待機対象外。
+          anyOf: [{$ref: "#/components/schemas/CpuThrottleStatus"}, {type: "null"}]
+        embeddingThrottling:
+          description: 埋め込みサービスのhealthから取得するCPU制御。生成無効時はdisabled、旧サービスや取得不能時はnull。
+          anyOf: [{$ref: "#/components/schemas/CpuThrottleStatus"}, {type: "null"}]
+    CpuThrottleStatus:
+      type: object
+      properties:
+        enabled: {type: boolean}
+        state: {type: string, enum: [disabled, initializing, ready, throttled, unavailable]}
+        cpuUsagePercent: {type: [number, "null"], minimum: 0, maximum: 100}
+        measurementScope: {type: string, enum: [none, linux_host_or_vm, windows_host, unsupported]}
+        lastMeasuredAt: {type: [string, "null"], format: date-time}
+        waitReason: {type: [string, "null"], enum: [null, initial_measurement, cpu_high, measurement_unavailable, measurement_stale]}
+        isWaiting: {type: boolean, description: 生成処理がCPU待機中か。埋め込み側ではAPIの再送待機を表す。}
     # ----------------------------------------------------------
     # 基本レスポンス
     # ----------------------------------------------------------

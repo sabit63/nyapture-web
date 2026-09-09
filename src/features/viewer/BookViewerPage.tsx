@@ -5,6 +5,7 @@ import type { ApiBookCardModel } from '../../api'
 import { getBookPageBlob } from '../../api'
 import { useViewerGeometry } from './use-viewer-geometry'
 import { BookDetailsSheet } from './BookDetailsSheet'
+import { BookRecommendations } from './BookRecommendations'
 import { BookPageLoader } from './book-page-loading'
 import { BookPageImage } from './BookPageImage'
 import type { BookCardModel, BookTag } from '../../models'
@@ -329,6 +330,7 @@ function BookViewerReady({
         </IconButton>
       )}
 
+      <BookRecommendations key={bookIdentity} book={book} onTagSearch={onTagSearch} />
       <BookDetailsSheet
         key={bookIdentity}
         book={book}
