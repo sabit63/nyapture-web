@@ -22,6 +22,8 @@ test('settings migrate on save, commit atomically, and reset API without losing 
     assert.equal(legacy.api.apiUrl, 'https://legacy.test')
     assert.equal(legacy.display.thumbnailColumns, 3)
     assert.equal(legacy.display.colorTheme, 'default')
+    assert.equal(legacy.display.searchLimit, 50)
+    assert.equal(legacy.display.recommendationLimit, 20)
     assert.equal(values.has(APP_SETTINGS_STORAGE_KEY), false)
     saveAppSettings(legacy)
     assert.equal(writes, 1)
@@ -31,6 +33,12 @@ test('settings migrate on save, commit atomically, and reset API without losing 
     assert.equal(values.get(APP_SETTINGS_STORAGE_KEY), committed)
     assert.equal(loadAppSettings().display.thumbnailColumns, 3)
     assert.equal(loadAppSettings().display.colorTheme, 'default')
+    for (const limit of [20, 50, 100] as const) {
+      reject = false
+      saveAppSettings({ ...legacy, display: { ...legacy.display, searchLimit: limit, recommendationLimit: limit } })
+      assert.equal(loadAppSettings().display.searchLimit, limit)
+      assert.equal(loadAppSettings().display.recommendationLimit, limit)
+    }
     reject = false
     saveAppSettings({ api: DEFAULT_API_SETTINGS, display: legacy.display })
     assert.equal(loadAppSettings().api.apiUrl, DEFAULT_API_SETTINGS.apiUrl)
@@ -55,12 +63,12 @@ test('color theme round-trips and invalid values fall back to default', () => {
       api: DEFAULT_API_SETTINGS,
       display: { thumbnailColumns: 4, colorTheme: 'amethyst' },
     })
-    assert.deepEqual(loadAppSettings().display, { autoThumbnailColumns: false, thumbnailColumns: 4, colorTheme: 'amethyst' })
+    assert.deepEqual(loadAppSettings().display, { searchLimit: 50, recommendationLimit: 20, autoThumbnailColumns: false, thumbnailColumns: 4, colorTheme: 'amethyst' })
 
     const persisted = JSON.parse(values.get(APP_SETTINGS_STORAGE_KEY) ?? '{}')
     persisted.display.colorTheme = 'unknown'
     values.set(APP_SETTINGS_STORAGE_KEY, JSON.stringify(persisted))
-    assert.deepEqual(loadAppSettings().display, { autoThumbnailColumns: false, thumbnailColumns: 4, colorTheme: 'default' })
+    assert.deepEqual(loadAppSettings().display, { searchLimit: 50, recommendationLimit: 20, autoThumbnailColumns: false, thumbnailColumns: 4, colorTheme: 'default' })
   } finally {
     if (previous) Object.defineProperty(globalThis, 'localStorage', previous)
     else Reflect.deleteProperty(globalThis, 'localStorage')

@@ -8,7 +8,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AppShell } from './app/AppShell'
-import { RecommendationDebugContext } from './features/settings/RecommendationDebugContext'
+import { RecommendationDebugContext, RecommendationLimitContext } from './features/settings/RecommendationDebugContext'
 import { navigateBackOrFallback, RouterRuntime, useRouterLocation } from './app/client-router'
 import { RouteBoundary } from './app/RouteBoundary'
 import { useSnackbar } from './components/Snackbar'
@@ -105,6 +105,7 @@ function App() {
 
   return (
     <RecommendationDebugContext value={apiSettingsController.displaySettings.recommendationDebug === true}>
+    <RecommendationLimitContext value={apiSettingsController.displaySettings.recommendationLimit ?? 20}>
     <AppShell
       currentPath={currentPath}
       drawerOpen={shellController.drawerOpen}
@@ -222,6 +223,7 @@ function App() {
       />
       <RouterRuntime />
     </AppShell>
+    </RecommendationLimitContext>
     </RecommendationDebugContext>
   )
 }

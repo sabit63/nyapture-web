@@ -161,7 +161,6 @@ function BookViewerReady({
   headingRef,
   onBookChange,
   onTitleChange,
-  getTagSearchHref,
   onTagSearch,
   onTagSearchDestinationRequest,
   detailsOpen,
@@ -327,7 +326,7 @@ function BookViewerReady({
         </>
       )}
 
-      <BookRecommendations key={bookIdentity} book={book} getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch} />
+      <BookRecommendations key={bookIdentity} book={book} />
       </ViewerControlPanel>
 
       {showScrollTop && (

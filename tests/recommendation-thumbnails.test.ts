@@ -28,7 +28,7 @@ beforeEach(() => {
 })
 afterEach(() => { configureApi(originalSettings); dom.cleanup() })
 
-async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: RecommendationThumbnailBook | null | undefined, failImage = false, displayNames?: RecommendationTagDisplayName[], debug = false, sourceTag?: BookTag & { type: 'Artists' | 'Groups' }) {
+async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: RecommendationThumbnailBook | null | undefined, failImage = false, displayNames?: RecommendationTagDisplayName[], debug = false, sourceTag?: BookTag & { type: 'Artists' | 'Groups' }, defaultNavigation = false) {
   const { BookRecommendations } = await import('../src/features/viewer/BookRecommendations')
   const container = document.createElement('div')
   document.body.append(container)
@@ -65,9 +65,10 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
   }
   await act(async () => { root.render(createElement(RecommendationDebugContext, { value: debug }, createElement(BookRecommendations, {
     ...(sourceTag ? { sourceTag } : { book: mapEBookToCard({ groupId: 'source', bookId: 'source' }) }),
-    getTagSearchHref: (tag) => createTagSearchDestinationUrls(tag).library.href,
-    onTagSearch: (tag) => { selections.push(`${tag.type}:${tag.name}`); selectedTags.push(tag) },
+    ...(defaultNavigation ? {} : { getTagSearchHref: (tag: BookTag) => createTagSearchDestinationUrls(tag).library.href,
+    onTagSearch: (tag: BookTag) => { selections.push(`${tag.type}:${tag.name}`); selectedTags.push(tag) } }),
   }))) })
+  if (defaultNavigation) assert.equal(requests.length, 0, 'recommendations load only when opened')
   await click(sourceTag ? 'button[aria-haspopup="dialog"]' : '[aria-label="タグ関連作品を開く"]')
   if (type !== 'Book') await click(`[role="tab"]:nth-child(${(type === 'Artist' ? 2 : 3) - (sourceTag ? 1 : 0)})`)
   return {
@@ -75,6 +76,26 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
     setThumbnail(value: RecommendationThumbnailBook) { currentThumbnail = value },
     setDisplayNames(value?: RecommendationTagDisplayName[]) { currentDisplayNames = value },
     async cleanup() { await act(async () => { root.unmount() }); container.remove() },
+  }
+}
+
+for (const path of ['/search/missing-tags?missingTagType=Artists', '/hitomila/search?append=Normal', '/web-cache?q=old']) {
+  for (const type of ['Artist', 'Group'] as const) {
+    it(`${path}: existing recommendations open ${type} in normal search`, async () => {
+      dom.window.history.replaceState(null, '', path)
+      const fixture = await mount(type, null, false, undefined, false, undefined, true)
+      try {
+        const link = fixture.container.querySelector<HTMLAnchorElement>('.recommendations__card--entity')!
+        const destination = new URL(link.href)
+        assert.equal(destination.pathname, '/search')
+        assert.equal(destination.searchParams.get('tag'), `${type === 'Artist' ? 'Artists' : 'Groups'}:candidate-name`)
+        assert.equal(destination.searchParams.has('append'), false)
+        assert.equal(destination.searchParams.has('missingTagType'), false)
+        await fixture.click('.recommendations__card--entity')
+        assert.equal(dom.window.location.href, destination.href)
+        assert.equal(fixture.container.querySelector('dialog[open]'), null)
+      } finally { await fixture.cleanup() }
+    })
   }
 }
 

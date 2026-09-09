@@ -3,6 +3,24 @@ import test from 'node:test'
 
 import type { SearchCriteria } from '../src/models'
 import { buildBookSearchFilter } from '../src/api/books'
+import { normalizeDisplaySettings, RESULT_LIMIT_OPTIONS } from '../src/api/display-settings-storage'
+
+test('search limits default to 50 and support 20, 50, and 100 for normal and missing-tag search', () => {
+  for (const missingTagTypes of [[], ['Artists']] as const) {
+    const criteria = { ...emptyCriteria(), missingTagTypes: [...missingTagTypes] }
+    assert.equal(buildBookSearchFilter(criteria, 'uploaded', 'desc').limit, 50)
+    for (const limit of RESULT_LIMIT_OPTIONS) {
+      const filter = buildBookSearchFilter(criteria, 'uploaded', 'desc', 2, limit)
+      assert.equal(filter.limit, limit)
+      assert.equal(filter.page, 2)
+    }
+  }
+  assert.equal(normalizeDisplaySettings().searchLimit, 50)
+  assert.equal(normalizeDisplaySettings().recommendationLimit, 20)
+  const invalid = normalizeDisplaySettings(JSON.parse('{"searchLimit":30,"recommendationLimit":null}'))
+  assert.equal(invalid.searchLimit, 50)
+  assert.equal(invalid.recommendationLimit, 20)
+})
 import {
   createSearchUrlForDestination,
   createTagSearchDestinationUrls,

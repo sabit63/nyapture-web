@@ -3643,6 +3643,8 @@ components:
     DataStoreDiagnosticsResponse:
       type: object
       properties:
+        vectorDatabase:
+          $ref: "#/components/schemas/VectorDatabaseDiagnosticsDto"
         generatedAt:
           type: string
           format: date-time
@@ -3668,6 +3670,113 @@ components:
           oneOf:
             - $ref: "#/components/schemas/DataStoreStatisticsDto"
             - type: "null"
+
+    VectorDatabaseDiagnosticsDto:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        workerEnabled:
+          type: [boolean, "null"]
+        status:
+          type: string
+          enum: [disabled, not_initialized, building, ready, unavailable]
+        observedAt:
+          type: string
+          format: date-time
+        providerVersion:
+          type: [string, "null"]
+          description: pgvector extension version
+        activeProfileVersion:
+          type: [string, "null"]
+        configuredMode:
+          oneOf:
+            - $ref: "#/components/schemas/RecommendationModeDto"
+            - type: "null"
+        activeMode:
+          oneOf:
+            - $ref: "#/components/schemas/RecommendationModeDto"
+            - type: "null"
+        totalStorageBytes:
+          type: [integer, "null"]
+          format: int64
+          description: recommendation schema relation sizes including indexes, TOAST and retired generations
+        sharedStorageBytes:
+          type: [integer, "null"]
+          format: int64
+        lastAttemptAt:
+          type: [string, "null"]
+          format: date-time
+        lastSuccessAt:
+          type: [string, "null"]
+          format: date-time
+        lastError:
+          type: [string, "null"]
+        generations:
+          type: array
+          items:
+            $ref: "#/components/schemas/VectorGenerationDiagnosticsDto"
+
+    RecommendationModeDto:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [A, B, C, D]
+          description: A Jaccard, B exact tag cosine, C semantic cosine, D RRF
+        exactWeightingVersion:
+          type: string
+        generateEmbeddings:
+          type: boolean
+        modelId:
+          type: string
+        modelRevision:
+          type: string
+        directionMethods:
+          type: object
+          description: Direction overrides keyed by source->target
+          additionalProperties:
+            type: string
+            enum: [A, B, C, D]
+
+    VectorGenerationDiagnosticsDto:
+      type: object
+      properties:
+        profileVersion:
+          type: string
+        state:
+          type: string
+          enum: [active, building, retired]
+        createdAt:
+          type: string
+          format: date-time
+        lastReconciledAt:
+          type: [string, "null"]
+          format: date-time
+        catalogBooks:
+          type: integer
+          format: int64
+        evaluatedBooks:
+          type: integer
+          format: int64
+          description: Projected Book count last recorded by the worker, not overall build completion
+        failedBooks:
+          type: integer
+          format: int64
+        pendingBooks:
+          type: [integer, "null"]
+          format: int64
+        pendingEntities:
+          type: [integer, "null"]
+          format: int64
+        bookStorageBytes:
+          type: integer
+          format: int64
+        entityStorageBytes:
+          type: integer
+          format: int64
+        mode:
+          $ref: "#/components/schemas/RecommendationModeDto"
 
     DataStoreTopologyDto:
       type: object

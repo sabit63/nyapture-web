@@ -109,8 +109,6 @@ export function SearchContinuousReader({
   onActiveBookChange,
   onBookJump,
   onResultPageChange,
-  getTagSearchHref,
-  onTagSearch,
 }: SearchContinuousReaderProps) {
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
   const [activeProgress, setActiveProgress] = useState<BookProgress>({ bookIndex: startIndex, page: 1 })
@@ -123,9 +121,23 @@ export function SearchContinuousReader({
   const wheelGestureTimerRef = useRef<number | undefined>(undefined)
   const progressTriggerRef = useRef<HTMLButtonElement>(null)
   const navigatorCloseRef = useRef<HTMLButtonElement>(null)
+  const navigatorCurrentRef = useRef<HTMLButtonElement>(null)
   const orderKey = useMemo(() => books.map(readableIdentity).join('\u0001'), [books])
   const zoomPercent = VIEWER_ZOOM_LEVELS[zoomIndex]
   const activeBook = books[activeProgress.bookIndex] ?? books[startIndex]
+  useEffect(() => {
+    if (!navigatorOpen) return
+    const frame = window.requestAnimationFrame(() => {
+      const current = navigatorCurrentRef.current
+      const body = current?.closest<HTMLElement>('.continuous-reader__navigator-body')
+      if (!current || !body) return
+      const itemRect = current.getBoundingClientRect()
+      const bodyRect = body.getBoundingClientRect()
+      body.scrollTop += itemRect.top - bodyRect.top - body.clientTop
+        - (body.clientHeight - itemRect.height) / 2
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [navigatorOpen, activeBook])
   const mountedIndices = useMemo(
     () => new Set(getContinuousReaderWindowIndices(windowIndex, books.length)),
     [books.length, windowIndex],
@@ -352,7 +364,6 @@ export function SearchContinuousReader({
       {!isLoading && <BookRecommendations
         key={readableIdentity(activeBook)}
         book={activeBook}
-        getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch}
       />}
       </ViewerControlPanel>
 
@@ -387,6 +398,7 @@ export function SearchContinuousReader({
                 {books.map((book, index) => (
                   <li key={readableIdentity(book)}>
                     <button
+                      ref={index === activeProgress.bookIndex ? navigatorCurrentRef : undefined}
                       type="button"
                       aria-current={index === activeProgress.bookIndex ? 'true' : undefined}
                       onClick={() => {

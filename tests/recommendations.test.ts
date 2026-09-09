@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import { getBookRecommendations, usableRecommendations } from '../src/api/recommendations'
+import { getBookRecommendations, getEntityRecommendations, usableRecommendations } from '../src/api/recommendations'
 import { useRecommendations } from '../src/features/viewer/use-recommendations'
 import { act, deferred, installHookDom, renderHook } from './helpers/react-hook'
 
@@ -12,6 +12,19 @@ const reply = (status = 'success', retryAfter = '60') => new Response(JSON.strin
 })
 
 describe('recommendation requests', () => {
+  it('requests and retains 20, 50, or 100 recommendations for books and entities', async () => {
+    for (const limit of [20, 50, 100]) {
+      globalThis.fetch = async (input) => {
+        assert.equal(new URL(String(input)).searchParams.get('limit'), String(limit))
+        return reply()
+      }
+      const signal = new AbortController().signal
+      await getBookRecommendations('g', 'b', 'Book', signal, limit)
+      await getEntityRecommendations('Artist', 'a', 'Group', signal, limit)
+      const items = Array.from({ length: 110 }, (_, index) => ({ key: { entityType: 'Artist' as const, tagName: String(index) } }))
+      assert.equal(usableRecommendations(items, 'Artist', limit).length, limit)
+    }
+  })
   it('encodes identities, limits each type, and respects long Retry-After values', async () => {
     globalThis.fetch = async (input) => {
       const url = new URL(String(input))
@@ -43,6 +56,17 @@ describe('recommendation requests', () => {
 })
 
 describe('recommendation lifecycle', () => {
+  it('fetches again when the limit changes and keeps tab caches separate by limit', async () => {
+    const requests: string[] = []
+    globalThis.fetch = async (input) => { requests.push(new URL(String(input)).searchParams.get('limit')!); return reply() }
+    const hook = await renderHook(({ limit }: { limit: number }) => useRecommendations('g', 'b', true, 'Book', undefined, limit), { limit: 20 })
+    try {
+      await hook.rerender({ limit: 100 })
+      await hook.rerender({ limit: 50 })
+      await hook.rerender({ limit: 20 })
+      assert.deepEqual(requests, ['20', '100', '50'])
+    } finally { await hook.unmount() }
+  })
   it('loads only selected tabs and reuses results after closing', async () => {
     const requests: string[] = []
     globalThis.fetch = async (input) => { requests.push(new URL(String(input)).searchParams.get('targetType')!); return reply() }

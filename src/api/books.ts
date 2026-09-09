@@ -184,6 +184,7 @@ export const buildBookSearchFilter = (
   sortType: SortType,
   direction: SortDirection,
   page = 1,
+  limit = 50,
 ): BookSearchFilter => {
   const tagSet = criteria.tags.reduce<TagSet>((result, tag) => ({
     ...result,
@@ -202,7 +203,7 @@ export const buildBookSearchFilter = (
     sortType: apiSort,
     isAsc: direction === 'asc',
     isAnd: criteria.tagMode === 'and',
-    limit: 50,
+    limit,
     page,
   }
 }

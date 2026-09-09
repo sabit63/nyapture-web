@@ -153,6 +153,7 @@ export function useSearchController({
   })
 
   const searchExecution = useSearchExecution({
+    searchLimit: displaySettings.searchLimit ?? 50,
     isWebSearch,
     isLibrarySearch,
     isMissingTagSearch,

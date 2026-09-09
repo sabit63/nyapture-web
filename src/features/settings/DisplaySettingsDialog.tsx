@@ -1,6 +1,7 @@
 import { Save, X } from 'lucide-react'
 
 import type { DisplaySettings } from '../../api'
+import { RESULT_LIMIT_OPTIONS, type ResultLimit } from '../../api/display-settings-storage'
 import { MIN_THUMBNAIL_COLUMNS, MAX_THUMBNAIL_COLUMNS } from '../../api'
 import {
   Dialog,
@@ -107,6 +108,16 @@ export function DisplaySettingsDialog({ controller }: DisplaySettingsDialogProps
             <section className="api-settings-dialog__section" aria-labelledby="display-settings-section-title">
               <h3 id="display-settings-section-title">検索結果</h3>
               <section className="advanced-dialog__field">
+                <label htmlFor="display-settings-search-limit">取得件数</label>
+                <select id="display-settings-search-limit" value={displaySettingsDraft.searchLimit ?? 50}
+                  onChange={(event) => {
+                    setDisplaySettingsSaveError('')
+                    setDisplaySettingsDraft((current) => ({ ...current, searchLimit: Number(event.target.value) as ResultLimit }))
+                  }}>
+                  {RESULT_LIMIT_OPTIONS.map((limit) => <option key={limit} value={limit}>{limit}件</option>)}
+                </select>
+              </section>
+              <section className="advanced-dialog__field">
                 <label htmlFor="display-settings-thumbnail-columns">サムネイル列数</label>
                 <div className="display-settings-columns-row">
                 <button type="button" role="switch" className="display-settings-auto-columns"
@@ -143,6 +154,16 @@ export function DisplaySettingsDialog({ controller }: DisplaySettingsDialogProps
             {displaySettingsSaveError && <p className="advanced-field-error api-settings-dialog__body-error" role="alert">{displaySettingsSaveError}</p>}
             <section className="api-settings-dialog__section" aria-labelledby="display-settings-recommendations-title">
               <h3 id="display-settings-recommendations-title">レコメンド</h3>
+              <section className="advanced-dialog__field">
+                <label htmlFor="display-settings-recommendation-limit">取得件数</label>
+                <select id="display-settings-recommendation-limit" value={displaySettingsDraft.recommendationLimit ?? 20}
+                  onChange={(event) => {
+                    setDisplaySettingsSaveError('')
+                    setDisplaySettingsDraft((current) => ({ ...current, recommendationLimit: Number(event.target.value) as ResultLimit }))
+                  }}>
+                  {RESULT_LIMIT_OPTIONS.map((limit) => <option key={limit} value={limit}>{limit}件</option>)}
+                </select>
+              </section>
               <button type="button" role="switch" className="display-settings-auto-columns"
                 aria-checked={displaySettingsDraft.recommendationDebug === true}
                 onClick={() => {

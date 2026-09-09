@@ -449,6 +449,25 @@
   margin: 0;
 }
 
+.dashboard-detail__vector .dashboard-detail__panel {
+  display: grid;
+  gap: var(--layout-grid-gap, var(--space-4));
+}
+
+.dashboard-detail__vector dd,
+.dashboard-detail__vector h3,
+.dashboard-detail__vector .dashboard-detail__error {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-detail__vector details > summary {
+  cursor: pointer;
+}
+
+.dashboard-detail__vector details[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
 .dashboard-detail__definition-grid > div,
 .dashboard-detail__storage {
   min-width: 0;

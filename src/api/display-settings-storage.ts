@@ -5,12 +5,19 @@ export const MAX_THUMBNAIL_COLUMNS = 10
 export const DEFAULT_COLOR_THEME = 'default'
 
 export type ColorTheme = 'default' | 'amethyst'
+export const RESULT_LIMIT_OPTIONS = [20, 50, 100] as const
+export type ResultLimit = typeof RESULT_LIMIT_OPTIONS[number]
+export const normalizeResultLimit = (value: unknown, fallback: ResultLimit): ResultLimit => (
+  value === 20 || value === 50 || value === 100 ? value : fallback
+)
 
 const DISPLAY_SETTINGS_STORAGE_VERSION = 1
 
 export type ThumbnailColumnCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 
 export type DisplaySettings = {
+  searchLimit?: ResultLimit
+  recommendationLimit?: ResultLimit
   recommendationDebug?: boolean
   autoThumbnailColumns?: boolean
   thumbnailColumns: ThumbnailColumnCount
@@ -34,6 +41,8 @@ export class DisplaySettingsStorageError extends Error {
 }
 
 const defaultDisplaySettings = (): DisplaySettings => ({
+  searchLimit: 50,
+  recommendationLimit: 20,
   autoThumbnailColumns: true,
   thumbnailColumns: DEFAULT_THUMBNAIL_COLUMNS,
   colorTheme: DEFAULT_COLOR_THEME,
@@ -73,6 +82,8 @@ export const normalizeColorTheme = (value: unknown): ColorTheme => (
 )
 
 export const normalizeDisplaySettings = (settings: Partial<DisplaySettings> = { autoThumbnailColumns: true }): DisplaySettings => ({
+  searchLimit: normalizeResultLimit(settings.searchLimit, 50),
+  recommendationLimit: normalizeResultLimit(settings.recommendationLimit, 20),
   ...(settings.recommendationDebug === true ? { recommendationDebug: true } : {}),
   autoThumbnailColumns: settings.autoThumbnailColumns === true,
   thumbnailColumns: normalizeThumbnailColumnCount(settings.thumbnailColumns),

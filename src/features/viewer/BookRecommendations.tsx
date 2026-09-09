@@ -12,8 +12,12 @@ import type { BookCardModel, BookTag } from '../../models'
 import { getTagLabel } from '../../models'
 import { useRecommendations } from './use-recommendations'
 import './book-recommendations.css'
-import { RecommendationDebugContext } from '../settings/RecommendationDebugContext'
+import { RecommendationDebugContext, RecommendationLimitContext } from '../settings/RecommendationDebugContext'
 import { RecommendationHitDebug, RecommendationResponseDebug } from './RecommendationDebug'
+import { createTagSearchDestinationUrls } from '../search/search-utils'
+
+const libraryTagHref = (tag: BookTag) => createTagSearchDestinationUrls(tag).library.href
+const searchLibraryTag = (tag: BookTag) => navigate(libraryTagHref(tag))
 
 const tabs = [
   { type: 'Book', label: '作品', icon: BookOpen },
@@ -81,7 +85,7 @@ function RecommendationCard({ hit, displayNames, href, onSelect }: { hit: Recomm
   </InternalLink>
 }
 
-type RecommendationsProps = { onTagSearch: (tag: BookTag) => void; getTagSearchHref: (tag: BookTag) => string } & (
+type RecommendationsProps = { onTagSearch?: (tag: BookTag) => void; getTagSearchHref?: (tag: BookTag) => string } & (
   { book: BookCardModel; sourceTag?: never } | { book?: never; sourceTag: BookTag & { type: 'Artists' | 'Groups' } }
 )
 
@@ -90,8 +94,9 @@ export function BookRecommendations(props: RecommendationsProps) {
   return <RecommendationsPanel key={identity} {...props} />
 }
 
-function RecommendationsPanel({ book, sourceTag, onTagSearch, getTagSearchHref }: RecommendationsProps) {
+function RecommendationsPanel({ book, sourceTag, onTagSearch = searchLibraryTag, getTagSearchHref = libraryTagHref }: RecommendationsProps) {
   const debug = useContext(RecommendationDebugContext)
+  const limit = useContext(RecommendationLimitContext)
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<RecommendationType>(sourceTag ? 'Artist' : 'Book')
   const visibleTabs = sourceTag ? tabs.filter((entry) => entry.type !== 'Book') : tabs
@@ -100,9 +105,9 @@ function RecommendationsPanel({ book, sourceTag, onTagSearch, getTagSearchHref }
   const closeRef = useRef<HTMLButtonElement>(null)
   const outsideRef = useRef(false)
   const id = useId()
-  const { state, retry } = useRecommendations(book?.groupId ?? '', sourceTag?.name ?? book?.bookId ?? '', open, tab, sourceTag ? sourceTag.type === 'Artists' ? 'Artist' : 'Group' : undefined)
+  const { state, retry } = useRecommendations(book?.groupId ?? '', sourceTag?.name ?? book?.bookId ?? '', open, tab, sourceTag ? sourceTag.type === 'Artists' ? 'Artist' : 'Group' : undefined, limit)
   const result = state?.result
-  const items = usableRecommendations(result?.items, tab)
+  const items = usableRecommendations(result?.items, tab, limit)
   const waiting = result?.status === 'pending'
   const loading = !state || state.loading && !waiting
   const label = state?.error ?? (result?.status === 'no_features' ? '関連候補を探すための情報が不足しています'

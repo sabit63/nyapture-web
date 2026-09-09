@@ -60,6 +60,7 @@ export type SearchExecutionOptions = {
   isLibrarySearch: boolean
   isMissingTagSearch: boolean
   apiRevision: number
+  searchLimit?: number
   criteria: SearchCriteria
   hitomiAppend: HitomiAppend
   resultPage: number
@@ -130,6 +131,7 @@ export function useSearchExecution({
   isLibrarySearch,
   isMissingTagSearch,
   apiRevision,
+  searchLimit = 50,
   criteria,
   hitomiAppend,
   resultPage,
@@ -257,7 +259,7 @@ export function useSearchExecution({
     }
 
     const response = await searchBooksApi(
-      buildBookSearchFilter(criteria, sortType, sortDirection, resultPage),
+      buildBookSearchFilter(criteria, sortType, sortDirection, resultPage, searchLimit),
       signal,
     )
     if (response.success === false) throw new ApiError(response.message ?? '検索に失敗しました。', { category: 'server' })
@@ -267,7 +269,7 @@ export function useSearchExecution({
       tags: entities,
       totalPages: Math.max(1, response.totalPage ?? 1),
     }
-  }, [criteria, hitomiAppend, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType])
+  }, [criteria, hitomiAppend, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
 
   const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
     tagEnrichmentRef.current?.abort()

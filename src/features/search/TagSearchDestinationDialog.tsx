@@ -7,7 +7,8 @@ import {
   getTagAdditionalName,
   upsertTagAdditionalNames,
 } from '../../api'
-import { InternalLink } from '../../app/client-router'
+import { InternalLink, navigate } from '../../app/client-router'
+import { createTagSearchDestinationUrls } from './search-utils'
 import { getTagLabel, TAG_TYPE_LABELS } from '../../models'
 import {
   Button,
@@ -139,8 +140,7 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
             </div>
             {controller.tagSearchDestinationDialogOpen && (selection.tag.type === 'Artists' || selection.tag.type === 'Groups') && <BookRecommendations
               sourceTag={{ ...selection.tag, type: selection.tag.type }}
-              getTagSearchHref={controller.getTagSearchHref}
-              onTagSearch={(tag) => { requestClose('submit'); controller.searchByTag(tag) }}
+              onTagSearch={(tag) => { requestClose('submit'); navigate(createTagSearchDestinationUrls(tag).library.href) }}
             />}
             <IconButton
               variant="ghost"

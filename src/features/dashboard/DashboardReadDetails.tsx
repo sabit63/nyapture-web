@@ -34,6 +34,7 @@ import {
   StatusBadge,
 } from './index'
 import { Button } from '../../components/ui'
+import { VectorDatabaseDetails } from './VectorDatabaseDetails'
 
 const mutationError = (error: unknown) =>
   error instanceof ApiError && error.status === 403
@@ -162,6 +163,7 @@ export function DataStoreDetails({
           <span>Observed {formatDateTime(statistics?.observedAt)}</span>
         </div>
       </DetailSection>
+      <VectorDatabaseDetails data={data.vectorDatabase} />
       <DetailSection title="Resources" count={formatNumber(resources.length)}>
         <div
           className="dashboard-detail__table-wrap"

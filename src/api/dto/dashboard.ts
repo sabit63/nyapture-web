@@ -119,6 +119,7 @@ export type DataStoreStatisticsDto = {
 }
 
 export type DataStoreDiagnosticsResponse = {
+  vectorDatabase?: VectorDatabaseDiagnosticsDto
   generatedAt?: string | null
   isConnected?: boolean | null
   providerVersion?: string | null
@@ -129,6 +130,48 @@ export type DataStoreDiagnosticsResponse = {
   topology?: DataStoreTopologyDto | null
   resources?: DataStoreResourceDto[] | null
   statistics?: DataStoreStatisticsDto | null
+}
+
+export type RecommendationModeDto = {
+  method?: 'A' | 'B' | 'C' | 'D'
+  exactWeightingVersion?: string
+  generateEmbeddings?: boolean
+  modelId?: string
+  modelRevision?: string
+  directionMethods?: Record<string, 'A' | 'B' | 'C' | 'D'>
+}
+
+export type VectorGenerationDiagnosticsDto = {
+  profileVersion?: string
+  state?: 'active' | 'building' | 'retired'
+  createdAt?: string
+  lastReconciledAt?: string | null
+  catalogBooks?: number
+  /** Projected books recorded by the worker, not overall build completion. */
+  evaluatedBooks?: number
+  failedBooks?: number
+  pendingBooks?: number | null
+  pendingEntities?: number | null
+  bookStorageBytes?: number
+  entityStorageBytes?: number
+  mode?: RecommendationModeDto
+}
+
+export type VectorDatabaseDiagnosticsDto = {
+  enabled?: boolean
+  workerEnabled?: boolean | null
+  status?: 'disabled' | 'not_initialized' | 'building' | 'ready' | 'unavailable'
+  observedAt?: string
+  providerVersion?: string | null
+  activeProfileVersion?: string | null
+  configuredMode?: RecommendationModeDto | null
+  activeMode?: RecommendationModeDto | null
+  totalStorageBytes?: number | null
+  sharedStorageBytes?: number | null
+  lastAttemptAt?: string | null
+  lastSuccessAt?: string | null
+  lastError?: string | null
+  generations?: VectorGenerationDiagnosticsDto[]
 }
 
 export type MongoDbDiagnosticsResponse = {
