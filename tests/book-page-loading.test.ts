@@ -27,12 +27,18 @@ const deferred = <T>() => {
   return { promise, resolve, reject }
 }
 
-test('request width is DPR-aware, bucketed, and capped', () => {
-  assert.equal(getBookPageRequestWidth(0, 2), 1024)
-  assert.equal(getBookPageRequestWidth(320, 1), 640)
-  assert.equal(getBookPageRequestWidth(390, 2), 1024)
-  assert.equal(getBookPageRequestWidth(760, 2), 1600)
-  assert.equal(getBookPageRequestWidth(900, 3), 1600)
+test('request width uses viewer buckets and original above 1920 while capping DPR', () => {
+  assert.equal(getBookPageRequestWidth(0, 2), 1280)
+  assert.equal(getBookPageRequestWidth(320, 1), 720)
+  assert.equal(getBookPageRequestWidth(390, 2), 1280)
+  assert.equal(getBookPageRequestWidth(760, 2), 1920)
+  assert.equal(getBookPageRequestWidth(900, 3), 1920)
+  for (const width of [720, 1280, 1920] as const) {
+    assert.equal(getBookPageRequestWidth(width, 1), width)
+  }
+  assert.equal(getBookPageRequestWidth(721, 1), 1280)
+  assert.equal(getBookPageRequestWidth(1281, 1), 1920)
+  assert.equal(getBookPageRequestWidth(1921, 1), null)
 })
 
 test('retry rules include ambiguous 404 and transient failures only', () => {
@@ -87,7 +93,7 @@ test('default request cap includes an aborted request until its promise settles'
     createObjectUrl: () => 'unused',
     revokeObjectUrl: () => undefined,
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   for (let pageNumber = 1; pageNumber <= 6; pageNumber += 1) {
     loader.setRetentionRange(pageNumber, true)
     loader.setLoadRange(pageNumber, true)
@@ -124,7 +130,7 @@ test('custom concurrency and pipeline limits cap and drain queued requests', asy
     createObjectUrl: () => `blob:custom-limit-${++nextUrl}`,
     revokeObjectUrl: () => undefined,
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   for (let pageNumber = 1; pageNumber <= 6; pageNumber += 1) {
     loader.setRetentionRange(pageNumber, true)
     loader.setLoadRange(pageNumber, true)
@@ -146,7 +152,7 @@ test('custom concurrency and pipeline limits cap and drain queued requests', asy
     1,
     firstCandidate.candidateGeneration!,
     firstCandidate.candidateUrl!,
-    640,
+    720,
     896,
   )
   await flushPromises()
@@ -180,7 +186,7 @@ test('404 retries are per-page, delayed, and stop after two attempts', async () 
     createObjectUrl: () => 'unused',
     revokeObjectUrl: () => undefined,
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
@@ -232,7 +238,7 @@ test('retry delay preserves its remaining time outside the load range', async ()
     createObjectUrl: () => 'unused',
     revokeObjectUrl: () => undefined,
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
@@ -282,7 +288,7 @@ test('multiple retrying pages share a single live wake timer', async () => {
     createObjectUrl: () => 'unused',
     revokeObjectUrl: () => undefined,
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   for (let pageNumber = 1; pageNumber <= 2; pageNumber += 1) {
     loader.setRetentionRange(pageNumber, true)
     loader.setLoadRange(pageNumber, true)
@@ -310,17 +316,17 @@ test('resolution upgrades retain the displayed image and revoke only replaced bl
     createObjectUrl: () => `blob:upgrade-${++nextUrl}`,
     revokeObjectUrl: (url) => revoked.push(url),
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
   requests[0].resolve(new Blob(['small']))
   await flushPromises()
   const firstCandidate = loader.getSnapshot(1)
-  loader.candidateLoaded(1, firstCandidate.candidateGeneration!, firstCandidate.candidateUrl!, 640, 896)
+  loader.candidateLoaded(1, firstCandidate.candidateGeneration!, firstCandidate.candidateUrl!, 720, 896)
   assert.equal(loader.getSnapshot(1).displayedUrl, 'blob:upgrade-1')
 
-  loader.setRequestWidth(1024)
+  loader.setRequestWidth(1280)
   await flushPromises()
   assert.equal(loader.getSnapshot(1).displayedUrl, 'blob:upgrade-1')
   assert.equal(loader.getSnapshot(1).isUpgrading, true)
@@ -330,14 +336,14 @@ test('resolution upgrades retain the displayed image and revoke only replaced bl
   assert.equal(loader.getSnapshot(1).isUpgrading, false)
   assert.deepEqual(revoked, [])
 
-  loader.setRequestWidth(1600)
+  loader.setRequestWidth(1920)
   await flushPromises()
   requests[2].resolve(new Blob(['large']))
   await flushPromises()
   const secondCandidate = loader.getSnapshot(1)
   assert.equal(secondCandidate.displayedUrl, 'blob:upgrade-1')
   assert.equal(secondCandidate.candidateUrl, 'blob:upgrade-2')
-  loader.candidateLoaded(1, secondCandidate.candidateGeneration!, secondCandidate.candidateUrl!, 1024, 1434)
+  loader.candidateLoaded(1, secondCandidate.candidateGeneration!, secondCandidate.candidateUrl!, 1280, 1434)
   assert.equal(loader.getSnapshot(1).displayedUrl, 'blob:upgrade-2')
   assert.deepEqual(revoked, ['blob:upgrade-1'])
 
@@ -359,7 +365,7 @@ test('stale candidate generations cannot replace a newer candidate', async () =>
     createObjectUrl: () => `blob:generation-${++nextUrl}`,
     revokeObjectUrl: (url) => revoked.push(url),
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
@@ -377,10 +383,10 @@ test('stale candidate generations cannot replace a newer candidate', async () =>
   await flushPromises()
   const currentCandidate = loader.getSnapshot(1)
 
-  loader.candidateLoaded(1, staleCandidate.candidateGeneration!, staleCandidate.candidateUrl!, 640, 896)
+  loader.candidateLoaded(1, staleCandidate.candidateGeneration!, staleCandidate.candidateUrl!, 720, 896)
   assert.equal(loader.getSnapshot(1).candidateUrl, currentCandidate.candidateUrl)
   assert.deepEqual(revoked, ['blob:generation-1'])
-  loader.candidateLoaded(1, currentCandidate.candidateGeneration!, currentCandidate.candidateUrl!, 640, 896)
+  loader.candidateLoaded(1, currentCandidate.candidateGeneration!, currentCandidate.candidateUrl!, 720, 896)
   assert.equal(loader.getSnapshot(1).displayedUrl, 'blob:generation-2')
   loader.dispose()
   assert.deepEqual(revoked, ['blob:generation-1', 'blob:generation-2'])
@@ -399,7 +405,7 @@ test('snapshot identity and object URL ownership remain stable', async () => {
   const initial = loader.getSnapshot(1)
   assert.equal(loader.getSnapshot(1), initial)
 
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   const loading = loader.getSnapshot(1)
@@ -440,7 +446,7 @@ test('development remount keeps the loader alive and final detach disposes it', 
   detachFirstMount()
   const detachSecondMount = loader.attach()
   await flushPromises()
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
@@ -469,7 +475,7 @@ test('fetch-through-decode pipeline is capped at six and drains after completion
     createObjectUrl: () => `blob:pipeline-${++nextUrl}`,
     revokeObjectUrl: (url) => revoked.push(url),
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   for (let pageNumber = 1; pageNumber <= 8; pageNumber += 1) {
     loader.setRetentionRange(pageNumber, true)
     loader.setLoadRange(pageNumber, true)
@@ -496,7 +502,7 @@ test('fetch-through-decode pipeline is capped at six and drains after completion
     1,
     firstCandidate.candidateGeneration!,
     firstCandidate.candidateUrl!,
-    640,
+    720,
     896,
   )
   await flushPromises()
@@ -536,7 +542,7 @@ test('decode timeout revokes the candidate, retries, and drains the next queued 
     revokeObjectUrl: (url) => revoked.push(url),
     random: () => 0,
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   for (let pageNumber = 1; pageNumber <= 7; pageNumber += 1) {
     loader.setRetentionRange(pageNumber, true)
     loader.setLoadRange(pageNumber, true)
@@ -585,7 +591,7 @@ test('decode timeout pauses with the page and pipeline slot retained in a backgr
     createObjectUrl: () => 'blob:background',
     revokeObjectUrl: (url) => revoked.push(url),
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
@@ -638,7 +644,7 @@ test('a stale watchdog callback cannot timeout a candidate after background rear
     createObjectUrl: () => 'blob:rearmed',
     revokeObjectUrl: (url) => revoked.push(url),
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   loader.setRetentionRange(1, true)
   loader.setLoadRange(1, true)
   await flushPromises()
@@ -683,7 +689,7 @@ test('undecoded candidates leave the pipeline immediately when they leave the lo
     createObjectUrl: () => `blob:eviction-${++nextUrl}`,
     revokeObjectUrl: (url) => revoked.push(url),
   })
-  loader.setRequestWidth(640)
+  loader.setRequestWidth(720)
   for (let pageNumber = 1; pageNumber <= 7; pageNumber += 1) {
     loader.setRetentionRange(pageNumber, true)
     loader.setLoadRange(pageNumber, true)
@@ -702,5 +708,32 @@ test('undecoded candidates leave the pipeline immediately when they leave the lo
   assert.equal(loader.getPipelineCount(), BOOK_PAGE_MAX_PIPELINE)
   assert.deepEqual(revoked, ['blob:eviction-1'])
   assert.equal(loader.getSnapshot(1).phase, 'deferred')
+  loader.dispose()
+})
+
+test('original width loads and upgrades without downgrading or repeating requests', async () => {
+  const widths: Array<number | null> = []
+  let nextUrl = 0
+  const loader = new BookPageLoader({
+    totalPages: 1,
+    loadPage: async (_page, width) => { widths.push(width); return new Blob(['image']) },
+    createObjectUrl: () => `blob:original-${++nextUrl}`,
+    revokeObjectUrl: () => undefined,
+  })
+  loader.setLoadRange(1, true)
+  loader.setRequestWidth(1920)
+  await flushPromises()
+  const first = loader.getSnapshot(1)
+  loader.candidateLoaded(1, first.candidateGeneration!, first.candidateUrl!, 1920, 2400)
+  loader.setRequestWidth(null)
+  await flushPromises()
+  assert.equal(loader.getSnapshot(1).displayedUrl, first.candidateUrl)
+  const original = loader.getSnapshot(1)
+  loader.candidateLoaded(1, original.candidateGeneration!, original.candidateUrl!, 2400, 3000)
+  loader.setRequestWidth(720)
+  loader.setRequestWidth(null)
+  await flushPromises()
+  assert.deepEqual(widths, [1920, null])
+  assert.equal(loader.getSnapshot(1).displayedUrl, original.candidateUrl)
   loader.dispose()
 })

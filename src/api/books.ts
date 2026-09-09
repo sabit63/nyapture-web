@@ -50,10 +50,10 @@ export const createBookPageThumbnailRequest = (
       groupId: normalizedGroupId,
       bookId: normalizedBookId,
       page: 1,
-      width: 500,
-      height: 700,
-      strategy: 'speed',
-      fallback_to_original: true,
+      width: 720,
+      strategy: 'balanced',
+      format: 'webp',
+      fallback_to_original: false,
     },
   }
 }

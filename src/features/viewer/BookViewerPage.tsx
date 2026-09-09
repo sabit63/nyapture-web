@@ -193,7 +193,7 @@ function BookViewerReady({
               groupId: book.groupId,
               bookId: book.bookId,
               page: pageNumber,
-              width,
+              width: width ?? undefined,
               format: 'webp',
               fallbackToOriginal: false,
             },

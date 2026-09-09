@@ -446,7 +446,7 @@ function ContinuousBookSection({
       groupId,
       bookId,
       page: pageNumber,
-      width,
+      width: width ?? undefined,
       format: 'webp',
       fallbackToOriginal: false,
     }, signal),

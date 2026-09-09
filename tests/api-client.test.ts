@@ -292,6 +292,7 @@ describe('getBookPageBlob query contract', () => {
 
     await getBookPageBlob({ groupId: 'group', bookId: 'book', page: 1 })
     assert.equal(new URL(requestUrl).searchParams.get('fallback_to_original'), 'true')
+    assert.equal(new URL(requestUrl).searchParams.has('width'), false)
   })
 })
 

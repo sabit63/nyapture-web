@@ -1,10 +1,11 @@
-export const BOOK_PAGE_REQUEST_WIDTHS = [640, 1024, 1600] as const
+export const BOOK_PAGE_REQUEST_WIDTHS = [720, 1280, 1920] as const
 export const BOOK_PAGE_MAX_CONCURRENCY = 4
 export const BOOK_PAGE_MAX_PIPELINE = 6
 export const BOOK_PAGE_MAX_AUTO_RETRIES = 2
 export const BOOK_PAGE_DECODE_TIMEOUT_MS = 30_000
 
-export type BookPageRequestWidth = (typeof BOOK_PAGE_REQUEST_WIDTHS)[number]
+// null requests the original width; undefined is reserved for an unmeasured reader.
+export type BookPageRequestWidth = (typeof BOOK_PAGE_REQUEST_WIDTHS)[number] | null
 export type BookPagePhase = 'deferred' | 'queued' | 'loading' | 'decoding' | 'retryWaiting' | 'loaded' | 'error'
 
 export type BookPageSnapshot = Readonly<{
@@ -100,10 +101,10 @@ export const getBookPageRequestWidth = (
   devicePixelRatio: number,
 ): BookPageRequestWidth => {
   const normalizedWidth = asFinitePositive(readerWidth)
-  if (normalizedWidth === undefined) return 1024
+  if (normalizedWidth === undefined) return 1280
   const normalizedRatio = Math.min(asFinitePositive(devicePixelRatio) ?? 1, 2)
   const target = Math.ceil(normalizedWidth * normalizedRatio)
-  return BOOK_PAGE_REQUEST_WIDTHS.find((width) => width >= target) ?? 1600
+  return BOOK_PAGE_REQUEST_WIDTHS.find((width) => width >= target) ?? null
 }
 
 const errorStatus = (error: unknown) => {
@@ -272,7 +273,7 @@ export class BookPageLoader {
   }
 
   setRequestWidth(width: BookPageRequestWidth) {
-    if (this.requestWidth !== undefined && width <= this.requestWidth) return
+    if (this.requestWidth !== undefined && (width ?? Infinity) <= (this.requestWidth ?? Infinity)) return
     this.requestWidth = width
     this.records.forEach((record) => {
       if (this.isInLoadRange(record)) this.admit(record)
@@ -479,7 +480,7 @@ export class BookPageLoader {
       return
     }
     if (
-      record.displayedAsset.requestWidth < this.requestWidth
+      (record.displayedAsset.requestWidth ?? Infinity) < (this.requestWidth ?? Infinity)
       && record.failedUpgradeWidth !== this.requestWidth
     ) {
       this.queueRecord(record, 'upgrade')
