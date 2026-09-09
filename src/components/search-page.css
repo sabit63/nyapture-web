@@ -72,7 +72,7 @@
 .connection--loading .connection__icon { animation: ui-spin .85s linear infinite; }
 
 .filter-panel {
-  width: min(100%, var(--container-wide));
+  width: 100%;
   margin: 0 auto var(--layout-section-gap);
 }
 
@@ -84,9 +84,9 @@
   width: calc(100% + var(--layout-page-gutter) + var(--layout-page-gutter));
   display: grid;
   grid-template-columns:
-    minmax(var(--layout-page-gutter), 1fr)
-    minmax(0, var(--container-wide))
-    minmax(var(--layout-page-gutter), 1fr);
+    var(--layout-page-gutter)
+    minmax(0, 1fr)
+    var(--layout-page-gutter);
   margin-inline: calc(0px - var(--layout-page-gutter));
 }
 
@@ -190,19 +190,19 @@
 
 
 .missing-search-title {
-  width: min(100%, var(--container-wide));
+  width: 100%;
   margin: 0 auto var(--space-4);
   font-size: var(--font-size-heading-md);
 }
 
 .hitomi-search-title {
-  width: min(100%, var(--container-wide));
+  width: 100%;
   margin: 0 auto var(--space-6);
   font-size: var(--font-size-heading-md);
 }
 
 .missing-search-panel {
-  width: min(100%, var(--container-wide));
+  width: 100%;
   margin: 0 auto var(--layout-section-gap);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
