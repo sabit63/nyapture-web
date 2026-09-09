@@ -2,7 +2,7 @@
   "name": "nyapture-web",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@11.25.0",
+  "packageManager": "pnpm@12.3.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,18 +17,18 @@
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",
-    "lucide-react": "^1.39.0",
+    "lucide-react": "^1.41.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
-    "@types/node": "^24.13.3",
+    "@types/node": "^26.4.1",
     "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^30.0.1",
-    "oxlint": "1.80.0",
+    "oxlint": "1.81.0",
     "tsx": "^4.23.13",
     "typescript": "~7.0.2",
     "vite": "^8.2.2"
