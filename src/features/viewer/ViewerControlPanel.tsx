@@ -3,7 +3,9 @@ import { useId, useRef, useState, type ReactNode } from 'react'
 import { IconButton } from '../../components/ui'
 
 export function ViewerControlPanel({ children }: { children: ReactNode }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)').matches === true
+  ))
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   return (

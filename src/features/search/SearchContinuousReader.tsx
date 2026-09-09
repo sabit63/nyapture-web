@@ -367,10 +367,13 @@ export function SearchContinuousReader({
           return true
         }}
       >
-        {({ requestClose }) => (
+        {({ requestClose }) => navigatorOpen ? (
           <div className="continuous-reader__navigator-panel">
             <DialogHeader className="continuous-reader__navigator-header">
-              <h2 id="continuous-reader-navigator-title">作品一覧</h2>
+              <div>
+                <h2 id="continuous-reader-navigator-title">作品一覧</h2>
+                <p>{books.length}作品・{activeProgress.bookIndex + 1}作品目を閲覧中</p>
+              </div>
               <IconButton
                 ref={navigatorCloseRef}
                 aria-label="作品一覧を閉じる"
@@ -393,15 +396,20 @@ export function SearchContinuousReader({
                     >
                       <span className="continuous-reader__navigator-number">{index + 1}</span>
                       <ContinuousNavigatorThumbnail book={book} />
-                      <strong>{book.title}</strong>
-                      <small>{book.totalPage}P</small>
+                      <span className="continuous-reader__navigator-card-body">
+                        <strong>{book.title}</strong>
+                        <span className="continuous-reader__navigator-meta">
+                          <span>{book.totalPage}ページ</span>
+                          {index === activeProgress.bookIndex && <span className="continuous-reader__navigator-current">閲覧中</span>}
+                        </span>
+                      </span>
                     </button>
                   </li>
                 ))}
               </ol>
             </DialogBody>
           </div>
-        )}
+        ) : null}
       </Dialog>
     </div>
   )
