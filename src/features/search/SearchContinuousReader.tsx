@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight, List, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { ViewerControlPanel } from '../viewer/ViewerControlPanel'
+import { BookOpen, ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from 'lucide-react'
 import {
   useEffect,
   useCallback,
@@ -317,14 +318,17 @@ export function SearchContinuousReader({
         type="button"
         className="continuous-reader__progress"
         aria-label={`作品一覧を開く。現在${activeProgress.bookIndex + 1}冊目、全${books.length}冊、${activeProgress.page}ページ目、全${activeBook.totalPage}ページ`}
+        aria-haspopup="dialog"
         aria-expanded={navigatorOpen}
         onClick={() => setNavigatorOpen(true)}
       >
-        <List size={14} aria-hidden="true" />
-        <span>Book {activeProgress.bookIndex + 1}/{books.length}</span>
-        <span>Page {activeProgress.page}/{activeBook.totalPage}</span>
+        <BookOpen size={14} aria-hidden="true" />
+        <span>{activeProgress.bookIndex + 1}/{books.length}</span>
+        <span className="continuous-reader__progress-divider" aria-hidden="true" />
+        <span>{activeProgress.page} / {activeBook.totalPage}</span>
       </button>
 
+      <ViewerControlPanel>
       <div className="book-viewer__zoom-controls" role="group" aria-label="画像の表示倍率">
         <IconButton
           className="book-viewer__floating-control"
@@ -350,6 +354,7 @@ export function SearchContinuousReader({
         book={activeBook}
         getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch}
       />}
+      </ViewerControlPanel>
 
       <Dialog
         className="continuous-reader__navigator-dialog"

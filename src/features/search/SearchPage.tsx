@@ -84,7 +84,7 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
         className="search-detail"
         size="compact"
         type="button"
-        aria-label="詳細検索"
+        aria-label="検索"
         aria-expanded={advancedOpen}
         aria-controls="advanced-search-dialog"
         onClick={openAdvancedSearch}

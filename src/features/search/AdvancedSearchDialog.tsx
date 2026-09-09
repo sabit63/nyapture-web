@@ -1,4 +1,4 @@
-import { Eraser, Search, X } from 'lucide-react'
+import { ChevronDown, Search, X } from 'lucide-react'
 
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, HITOMI_APPENDS, getTagLabel } from '../../models'
 import { TagChip } from '../../components/TagChip'
@@ -37,7 +37,6 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
     setAdvancedErrors,
     selectDraftTag,
     removeDraftTag,
-    clearAdvancedDraft,
     applyAdvancedSearch,
   } = controller
   const displayedDraftTags = applyTagEntityMetadata(draftCriteria.tags, controller.searchResponseTags)
@@ -57,16 +56,45 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
         <form className="advanced-dialog__panel" noValidate onSubmit={(event) => applyAdvancedSearch(event, requestClose)}>
           <DialogHeader className="advanced-dialog__header">
             <div>
-              <h2 id="advanced-search-title">詳細検索</h2>
+              <h2 id="advanced-search-title">検索</h2>
             </div>
-            <IconButton
-              size="default"
-              type="button"
-              aria-label="詳細検索を閉じる"
-              onClick={() => requestClose('close-button')}
-            >
-              <X size={19} aria-hidden="true" />
-            </IconButton>
+            <div className="advanced-search-dialog__header-actions">
+              {!isWebSearch && (
+                <fieldset className="advanced-tag-mode-toggle">
+                  <legend className="sr-only">タグの一致条件</legend>
+                  <label className={draftCriteria.tagMode === 'and' ? 'is-active' : undefined}>
+                    <input
+                      className="sr-only"
+                      type="radio"
+                      name="advanced-tag-mode"
+                      value="and"
+                      checked={draftCriteria.tagMode === 'and'}
+                      onChange={() => setDraftCriteria((current) => ({ ...current, tagMode: 'and' }))}
+                    />
+                    <span>And</span>
+                  </label>
+                  <label className={draftCriteria.tagMode === 'or' ? 'is-active' : undefined}>
+                    <input
+                      className="sr-only"
+                      type="radio"
+                      name="advanced-tag-mode"
+                      value="or"
+                      checked={draftCriteria.tagMode === 'or'}
+                      onChange={() => setDraftCriteria((current) => ({ ...current, tagMode: 'or' }))}
+                    />
+                    <span>Or</span>
+                  </label>
+                </fieldset>
+              )}
+              <IconButton
+                size="default"
+                type="button"
+                aria-label="検索を閉じる"
+                onClick={() => requestClose('close-button')}
+              >
+                <X size={19} aria-hidden="true" />
+              </IconButton>
+            </div>
           </DialogHeader>
 
           <DialogBody className="advanced-dialog__body">
@@ -195,13 +223,6 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
                   ))}
                 </div>
               )}
-              {!isWebSearch && (
-                <fieldset className="advanced-tag-mode">
-                  <legend>タグの一致条件</legend>
-                  <label><input type="radio" name="advanced-tag-mode" value="and" checked={draftCriteria.tagMode === 'and'} onChange={() => setDraftCriteria((current) => ({ ...current, tagMode: 'and' }))} />すべて一致</label>
-                  <label><input type="radio" name="advanced-tag-mode" value="or" checked={draftCriteria.tagMode === 'or'} onChange={() => setDraftCriteria((current) => ({ ...current, tagMode: 'or' }))} />いずれか一致</label>
-                </fieldset>
-              )}
             </section>
 
             {isWebSearch && (
@@ -215,36 +236,42 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
 
             {!isWebSearch && (
               <>
-                <fieldset className="advanced-dialog__field advanced-range-field">
-                  <legend>日時範囲</legend>
-                  <div className="advanced-range-grid">
-                    <label htmlFor="advanced-date-from">開始日</label>
-                    <input id="advanced-date-from" type="date" value={draftCriteria.dateFrom} aria-invalid={Boolean(advancedErrors.date)} aria-describedby={advancedErrors.date ? 'advanced-date-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, dateFrom: event.target.value })); setAdvancedErrors((current) => ({ ...current, date: undefined })) }} />
-                    <label htmlFor="advanced-date-to">終了日</label>
-                    <input id="advanced-date-to" type="date" value={draftCriteria.dateTo} aria-invalid={Boolean(advancedErrors.date)} aria-describedby={advancedErrors.date ? 'advanced-date-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, dateTo: event.target.value })); setAdvancedErrors((current) => ({ ...current, date: undefined })) }} />
-                  </div>
-                  {advancedErrors.date && <p id="advanced-date-error" className="advanced-field-error" role="alert">{advancedErrors.date}</p>}
-                </fieldset>
+                <details key={`date-range:${advancedOpen}`} className="advanced-range-section">
+                  <summary>
+                    <span>日時</span>
+                    <ChevronDown size={17} aria-hidden="true" />
+                  </summary>
+                  <fieldset className="advanced-dialog__field advanced-range-field">
+                    <legend className="sr-only">日時</legend>
+                    <div className="advanced-range-grid">
+                      <input id="advanced-date-from" type="date" aria-label="開始日" value={draftCriteria.dateFrom} aria-invalid={Boolean(advancedErrors.date)} aria-describedby={advancedErrors.date ? 'advanced-date-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, dateFrom: event.target.value })); setAdvancedErrors((current) => ({ ...current, date: undefined })) }} />
+                      <span aria-hidden="true">～</span>
+                      <input id="advanced-date-to" type="date" aria-label="終了日" value={draftCriteria.dateTo} aria-invalid={Boolean(advancedErrors.date)} aria-describedby={advancedErrors.date ? 'advanced-date-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, dateTo: event.target.value })); setAdvancedErrors((current) => ({ ...current, date: undefined })) }} />
+                    </div>
+                    {advancedErrors.date && <p id="advanced-date-error" className="advanced-field-error" role="alert">{advancedErrors.date}</p>}
+                  </fieldset>
+                </details>
 
-                <fieldset className="advanced-dialog__field advanced-range-field">
-                  <legend>ページ数範囲</legend>
-                  <div className="advanced-range-grid">
-                    <label htmlFor="advanced-pages-min">最小ページ数</label>
-                    <input id="advanced-pages-min" type="number" min="1" step="1" inputMode="numeric" value={draftCriteria.pagesMin} aria-invalid={Boolean(advancedErrors.pages)} aria-describedby={advancedErrors.pages ? 'advanced-pages-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, pagesMin: event.target.value })); setAdvancedErrors((current) => ({ ...current, pages: undefined })) }} />
-                    <label htmlFor="advanced-pages-max">最大ページ数</label>
-                    <input id="advanced-pages-max" type="number" min="1" step="1" inputMode="numeric" value={draftCriteria.pagesMax} aria-invalid={Boolean(advancedErrors.pages)} aria-describedby={advancedErrors.pages ? 'advanced-pages-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, pagesMax: event.target.value })); setAdvancedErrors((current) => ({ ...current, pages: undefined })) }} />
-                  </div>
-                  {advancedErrors.pages && <p id="advanced-pages-error" className="advanced-field-error" role="alert">{advancedErrors.pages}</p>}
-                </fieldset>
+                <details key={`page-range:${advancedOpen}`} className="advanced-range-section">
+                  <summary>
+                    <span>ページ数</span>
+                    <ChevronDown size={17} aria-hidden="true" />
+                  </summary>
+                  <fieldset className="advanced-dialog__field advanced-range-field">
+                    <legend className="sr-only">ページ数</legend>
+                    <div className="advanced-range-grid">
+                      <input id="advanced-pages-min" type="number" min="1" step="1" inputMode="numeric" aria-label="最小ページ数" value={draftCriteria.pagesMin} aria-invalid={Boolean(advancedErrors.pages)} aria-describedby={advancedErrors.pages ? 'advanced-pages-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, pagesMin: event.target.value })); setAdvancedErrors((current) => ({ ...current, pages: undefined })) }} />
+                      <span aria-hidden="true">～</span>
+                      <input id="advanced-pages-max" type="number" min="1" step="1" inputMode="numeric" aria-label="最大ページ数" value={draftCriteria.pagesMax} aria-invalid={Boolean(advancedErrors.pages)} aria-describedby={advancedErrors.pages ? 'advanced-pages-error' : undefined} onChange={(event) => { setDraftCriteria((current) => ({ ...current, pagesMax: event.target.value })); setAdvancedErrors((current) => ({ ...current, pages: undefined })) }} />
+                    </div>
+                    {advancedErrors.pages && <p id="advanced-pages-error" className="advanced-field-error" role="alert">{advancedErrors.pages}</p>}
+                  </fieldset>
+                </details>
               </>
             )}
           </DialogBody>
 
-          <DialogFooter className="advanced-dialog__footer">
-            <IconButton size="default" type="button" aria-label="検索条件をクリア" onClick={clearAdvancedDraft}>
-              <Eraser size={17} aria-hidden="true" />
-            </IconButton>
-            <span />
+          <DialogFooter className="advanced-dialog__footer advanced-search-dialog__footer">
             <IconButton
               className="advanced-dialog__submit"
               variant="solid"

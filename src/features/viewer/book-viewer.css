@@ -192,32 +192,25 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--color-border-overlay-strong);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-overlay);
+  background: var(--color-surface);
   color: var(--color-text);
   box-shadow: 0 7px 20px #08081028;
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   cursor: pointer;
 }
 
 .icon-button.book-viewer__floating-control:disabled {
   color: var(--color-text-dim);
-  opacity: .52;
+  opacity: 1;
   cursor: not-allowed;
 }
 
-.icon-button.book-viewer__scroll-top {
-  position: fixed;
-  z-index: 27;
-  right: var(--layout-page-gutter);
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-}
-
 .icon-button.book-viewer__floating-control:hover:not(:disabled) {
-  border-color: #6f6f83;
-  background: var(--color-overlay-strong);
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
   color: var(--color-text);
 }
 
@@ -579,3 +572,63 @@
 }
 
 .book-viewer__tag-footer .book-viewer__tag-error { color: var(--color-danger-text); }
+
+
+/* Shared reading controls with a lightly translucent background. */
+.book-viewer__control-panel {
+  position: fixed;
+  z-index: 27;
+  right: var(--layout-page-gutter);
+  bottom: calc(var(--space-4) + var(--control-height-default) + var(--space-2) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  isolation: isolate;
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+}
+/* Blur the backing surface without making fixed dialogs relative to the panel. */
+.book-viewer__control-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border: 1px solid var(--color-border-overlay-strong);
+  border-radius: inherit;
+  background: var(--color-overlay);
+  box-shadow: 0 7px 20px #08081028;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.book-viewer__control-panel .book-viewer__zoom-controls {
+  position: static;
+}
+.book-viewer__control-panel .recommendations__trigger {
+  position: static;
+  order: -1;
+}
+.book-viewer__control-panel .book-viewer__floating-control {
+  color: var(--color-text-muted);
+  background: transparent;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+.book-viewer__control-panel-content:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.book-viewer__control-panel-content[hidden] { display: none; }
+
+.book-viewer__control-panel.book-viewer__scroll-top-panel {
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
+.book-viewer__control-panel .book-viewer__floating-control:disabled {
+  color: var(--color-text-dim);
+}
+.book-viewer__control-panel .book-viewer__floating-control:hover:not(:disabled) {
+  color: var(--color-text);
+}

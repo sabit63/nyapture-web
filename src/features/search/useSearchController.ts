@@ -503,15 +503,6 @@ export function useSearchController({
     return null
   }, [])
 
-  const clearAdvancedDraft = useCallback(() => {
-    setDraftCriteria((current) => ({ ...emptyCriteria(), ...(isMissingTagSearch ? { missingTagTypes: [...(current.missingTagTypes ?? [])] } : {}) }))
-    setDraftHitomiAppend('Normal')
-    setAdvancedErrors({})
-    setTagType('Artists')
-    setTagInput('')
-    setHighlightedTagIndex(0)
-  }, [isMissingTagSearch])
-
   const selectDraftTag = useCallback((tag: BookTag) => {
     setDraftCriteria((current) => ({
       ...current,
@@ -656,7 +647,6 @@ export function useSearchController({
     afterAdvancedClose,
     resolveAdvancedRestoreFocus,
     applyAdvancedSearch,
-    clearAdvancedDraft,
     selectDraftTag,
     removeDraftTag,
     setDraftCriteria,

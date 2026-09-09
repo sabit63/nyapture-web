@@ -187,7 +187,7 @@
   --color-accent-muted-hover: #f0c5e3;
   --color-accent-border-soft: #6e4c68;
   --color-accent-border-soft-hover: #8a557c;
-  --color-accent-fill-overlay: #c1339ee8;
+  --color-accent-fill-overlay: #c1339ea6;
   --color-accent-wash-border: #d55ab34a;
   --color-accent-highlight: #eb80cc;
   --color-accent-source-border: #dc6eca;
@@ -306,7 +306,7 @@
   --color-accent-muted-hover: var(--color-text);
   --color-accent-border-soft: color-mix(in oklch, var(--color-accent-fill) 52%, var(--color-background));
   --color-accent-border-soft-hover: color-mix(in oklch, var(--color-accent-fill) 72%, var(--color-background));
-  --color-accent-fill-overlay: color-mix(in oklch, var(--color-accent-fill) 91%, transparent);
+  --color-accent-fill-overlay: color-mix(in oklch, var(--color-accent-fill) 65%, transparent);
   --color-accent-wash-border: color-mix(in oklch, var(--color-accent-fill) 30%, transparent);
   --color-accent-highlight: var(--color-accent-text);
   --color-accent-source-border: var(--color-accent-hover);

@@ -1,3 +1,4 @@
+import { ViewerControlPanel } from './ViewerControlPanel'
 import { ArrowUp, ImageOff, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
@@ -289,7 +290,6 @@ function BookViewerReady({
       </section>
 
       {totalPages > 0 && (
-        <>
           <div
             className="book-viewer__page-indicator"
             role="img"
@@ -297,6 +297,10 @@ function BookViewerReady({
           >
             {currentPage} / {totalPages}
           </div>
+      )}
+      <ViewerControlPanel>
+      {totalPages > 0 && (
+        <>
           <div className="book-viewer__zoom-controls" role="group" aria-label="画像の表示倍率">
             <IconButton
               className="book-viewer__floating-control"
@@ -323,9 +327,13 @@ function BookViewerReady({
         </>
       )}
 
+      <BookRecommendations key={bookIdentity} book={book} getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch} />
+      </ViewerControlPanel>
+
       {showScrollTop && (
+        <div className="book-viewer__control-panel book-viewer__scroll-top-panel">
         <IconButton
-          className="book-viewer__floating-control book-viewer__scroll-top"
+          className="book-viewer__floating-control"
           variant="ghost"
           tone="neutral"
           aria-label="先頭へ戻る"
@@ -333,9 +341,9 @@ function BookViewerReady({
         >
           <ArrowUp size={18} aria-hidden="true" />
         </IconButton>
+        </div>
       )}
 
-      <BookRecommendations key={bookIdentity} book={book} getTagSearchHref={getTagSearchHref} onTagSearch={onTagSearch} />
       <BookDetailsSheet
         key={bookIdentity}
         book={book}

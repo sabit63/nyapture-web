@@ -5,6 +5,10 @@
   touch-action: pan-y pinch-zoom;
 }
 
+.continuous-reader .book-viewer__control-panel {
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+
 .continuous-reader__sections {
   display: flex;
   flex-direction: column;
@@ -46,22 +50,24 @@
 .continuous-reader__progress {
   position: fixed;
   z-index: 27;
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-  left: var(--layout-page-gutter);
-  min-height: 30px;
+  top: calc(var(--topbar-height) + var(--space-1));
+  right: var(--layout-page-gutter);
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-border-overlay-strong);
   border-radius: var(--radius-control);
-  background: #000000a8;
+  background: var(--color-overlay);
   color: var(--color-text-muted);
   box-shadow: 0 7px 20px #08081028;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
-  font-size: var(--font-size-label-sm);
+  font-size: var(--font-size-label-md);
   font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -211,10 +217,6 @@
 }
 
 @media (max-width: 639px) {
-  .continuous-reader__progress {
-    left: var(--space-2);
-  }
-
   .continuous-reader__result-navigation {
     gap: var(--space-2);
   }
@@ -227,3 +229,5 @@
 @media (prefers-reduced-motion: reduce) {
   .continuous-reader__progress { scroll-behavior: auto; }
 }
+
+.continuous-reader__progress-divider { width: 1px; height: 12px; background: var(--color-border-overlay-strong); }

@@ -127,7 +127,7 @@ export function BookRecommendations({ book, onTagSearch, getTagSearchHref }: { b
   }
 
   return <>
-    <IconButton ref={triggerRef} className="book-viewer__floating-control recommendations__trigger" aria-label="関連候補を開く" title="関連"
+    <IconButton ref={triggerRef} className="book-viewer__floating-control recommendations__trigger" aria-label="タグ関連作品を開く" title="タグ関連作品"
       aria-haspopup="dialog" aria-expanded={open} aria-controls={id} onClick={() => setOpen(true)}><Sparkles size={20} aria-hidden="true" /></IconButton>
     <dialog ref={dialogRef} id={id} aria-labelledby={`${id}-title`} className="recommendations"
       onCancel={(event) => { event.preventDefault(); setOpen(false) }}
@@ -135,7 +135,7 @@ export function BookRecommendations({ book, onTagSearch, getTagSearchHref }: { b
       onClick={(event) => { if (outsideRef.current && event.target === event.currentTarget) setOpen(false); outsideRef.current = false }}>
       {open && <div className="recommendations__panel">
         <header className="recommendations__header">
-          <Sparkles size={20} aria-hidden="true" /><h2 id={`${id}-title`}>関連</h2>
+          <Sparkles size={20} aria-hidden="true" /><h2 id={`${id}-title`}>タグ関連</h2>
           {result?.isStale && items.length > 0 && <StatusIcon label="候補は更新待ちです"><Clock3 size={16} aria-hidden="true" /></StatusIcon>}
           <IconButton aria-label="関連候補を更新" title="更新" disabled={Boolean(loading || state?.loading || waiting && !canRetry)} onClick={retry}><RefreshCw size={18} aria-hidden="true" /></IconButton>
           <IconButton ref={closeRef} aria-label="関連候補を閉じる" title="閉じる" onClick={() => setOpen(false)}><X size={20} aria-hidden="true" /></IconButton>
