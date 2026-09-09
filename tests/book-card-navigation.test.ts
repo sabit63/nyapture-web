@@ -161,3 +161,78 @@ it('Web Cache changes persisted results to viewer links while retaining candidat
     dom.cleanup()
   }
 })
+
+it('keeps unrelated cards idle while opening details and tag actions', async () => {
+  const { SearchPage } = await import('../src/features/search/SearchPage')
+  const { useSearchController } = await import('../src/features/search/useSearchController')
+  const dom = installHookDom('http://localhost/search')
+  dom.window.scrollTo = () => undefined
+  dom.window.HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
+  globalThis.fetch = async () => new Response(JSON.stringify({ success: true,
+    books: [book, { ...book, bookId: 'book-2', apiBookId: 'book-2' }], totalPage: 1,
+  }), { headers: { 'Content-Type': 'application/json' } })
+  const options = {
+    isWebSearch: false, isLibrarySearch: true, isMissingTagSearch: false,
+    isBookViewer: false, apiRevision: 0,
+    displaySettings: { thumbnailColumns: 5 as const, colorTheme: 'default' as const },
+    hubConnectionState: 'idle' as const, notify: () => {},
+  }
+  let controller!: ReturnType<typeof useSearchController>
+  function Page() {
+    controller = useSearchController(options)
+    return createElement(SearchPage, { controller })
+  }
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => { root.render(createElement(Page)) })
+    assert.equal(container.querySelectorAll('.book-card').length, 2)
+    await act(async () => { controller.applyBookTagChange({ ...controller.visibleBooks[0], tags: [{ type: 'Artists', name: 'fixture' }] }) })
+    const otherBook = controller.visibleBooks[1]
+    const tags = otherBook.tags
+    let reads = 0
+    Object.defineProperty(otherBook, 'tags', { configurable: true, get() { reads++; return tags } })
+    const trigger = container.querySelector<HTMLButtonElement>('.tag-overflow')!
+    assert.ok(trigger)
+    await act(async () => { trigger.click() })
+    assert.ok(container.querySelector('#book-viewer-details[open]'))
+    assert.equal(reads, 0, 'details must not render or filter other cards')
+    await act(async () => { controller.openTagSearchDestination({ type: 'Artists', name: 'fixture' }, trigger) })
+    assert.equal(controller.tagSearchDestinationDialogOpen, true)
+    assert.equal(reads, 0, 'tag actions must not render or filter other cards')
+    await act(async () => { controller.toggleSelection('group-1:book-2') })
+    assert.ok(reads > 0, 'result changes still render the grid')
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    dom.cleanup()
+  }
+})
+
+it('mounts tag contents on demand and supports reopening', async () => {
+  const { BookCard } = await import('../src/components/BookCard')
+  const dom = installHookDom()
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await act(async () => { root.render(createElement(BookCard, {
+      book: { ...book, tags: [{ type: 'Artists', name: 'fixture' }] },
+      selectMode: false, selected: false, onToggle: () => {}, onTagSearch: () => {},
+    })) })
+    const trigger = container.querySelector<HTMLButtonElement>('.tag-overflow')!
+    assert.equal(container.querySelector('.tags-dialog__panel'), null)
+    for (let index = 0; index < 2; index++) {
+      await act(async () => { trigger.click() })
+      assert.equal(container.querySelectorAll('.tags-dialog__chips .tag-chip').length, 1)
+      const close = container.querySelector<HTMLButtonElement>('.tags-dialog__header button')!
+      await act(async () => { close.click() })
+      assert.equal(container.querySelector('.tags-dialog__panel'), null)
+    }
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    dom.cleanup()
+  }
+})

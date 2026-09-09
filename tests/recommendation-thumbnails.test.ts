@@ -66,7 +66,7 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
     getTagSearchHref: (tag) => createTagSearchDestinationUrls(tag).library.href,
     onTagSearch: (tag) => { selections.push(`${tag.type}:${tag.name}`); selectedTags.push(tag) },
   })) })
-  await click('[aria-label="関連候補を開く"]')
+  await click('[aria-label="タグ関連作品を開く"]')
   if (type !== 'Book') await click(`[role="tab"]:nth-child(${type === 'Artist' ? 2 : 3})`)
   return {
     container, requests, selections, selectedTags, click,

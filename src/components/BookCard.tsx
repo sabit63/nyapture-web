@@ -301,7 +301,7 @@ export function BookCard({
           return true
         }}
       >
-        {({ requestClose }) => (
+        {({ requestClose }) => tagsOpen ? (
           <div className="tags-dialog__panel">
             <DialogHeader className="tags-dialog__header">
               <div>
@@ -341,7 +341,7 @@ export function BookCard({
               })}
             </DialogBody>
           </div>
-        )}
+        ) : null}
       </Dialog>
     </article>
   )

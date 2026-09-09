@@ -14,19 +14,18 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookGrid } from '../../components/BookGrid'
 import { createPortal } from 'react-dom'
 
 import type { ApiBookCardModel } from '../../api'
 import { retryPendingScrollRestoration } from '../../app/client-router'
-import { BookCard } from '../../components/BookCard'
+import { SearchResultsGrid } from './SearchResultsGrid'
 import { TagChip } from '../../components/TagChip'
 import { Button, IconButton, StatePanel } from '../../components/ui'
 import { HITOMI_APPENDS, TAG_TYPE_LABELS } from '../../models'
 import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
-import { isDownloadCandidate } from './download-candidate'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
 import { applyTagEntityMetadata } from './tag-display-name'
 import { MissingTagFields } from './MissingTagFields'
@@ -34,7 +33,7 @@ import type { SearchController } from './useSearchController'
 import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
 import { BookDetailsSheet } from '../viewer/BookDetailsSheet'
 import { SearchContinuousReader } from './SearchContinuousReader'
-import { isReadableBook, resolveContinuousStart } from './search-continuous-utils'
+import { resolveContinuousStart } from './search-continuous-utils'
 
 export const SEARCH_CONTINUOUS_DETAILS_ACTION_ID = 'search-continuous-details-action'
 export const SEARCH_VIEW_MODE_ACTION_ID = 'search-view-mode-action'
@@ -157,6 +156,11 @@ export function SearchPage({ controller }: SearchPageProps) {
     getContinuousViewHref,
     exitContinuousView,
   } = controller
+  const openBookDetails = useCallback((book: ApiBookCardModel, trigger: HTMLButtonElement) => {
+    detailsTriggerRef.current = trigger
+    setDetailsBook(book)
+    setDetailsOpen(true)
+  }, [])
   const selectableVisibleBooks = visibleBooks.filter((book) => !pendingDeletionKeys.has(getBookIdentityKey(book)))
 
   useEffect(() => {
@@ -498,44 +502,25 @@ export function SearchPage({ controller }: SearchPageProps) {
                 />
               )
             ) : (
-              <BookGrid
-                settings={displaySettings}
-                aria-busy={isSearchLoading}
-                inert={isSearchLoading ? true : undefined}
-              >
-                {visibleBooks.map((book) => {
-                  const bookKey = getBookIdentityKey(book)
-                  const deletionPending = pendingDeletionKeys.has(bookKey)
-                  const canStartContinuous = !isWebSearch && !selectMode && isReadableBook(book)
-                  return (
-                    <BookCard
-                      key={bookKey}
-                      book={book}
-                      selectMode={selectMode}
-                      selected={selected.includes(bookKey)}
-                      onToggle={() => toggleSelection(bookKey)}
-                      actionsDisabled={deletionPending}
-                      onTagSearch={searchByTag}
-                      onTagSearchDestinationRequest={openTagSearchDestination}
-                      onTagOverflowDetails={(trigger) => {
-                        detailsTriggerRef.current = trigger
-                        setDetailsBook(book)
-                        setDetailsOpen(true)
-                      }}
-                      isDownloadCandidate={isWebSearch && isDownloadCandidate(book)}
-                      onOpen={isWebSearch && !selectMode && !(book.apiGroupId?.trim() && book.apiBookId?.trim())
-                        ? (trigger) => openWebBookDetail(book, trigger)
-                        : undefined}
-                      onCoverOpen={canStartContinuous ? () => enterContinuousView(book) : undefined}
-                      coverHref={canStartContinuous ? getContinuousViewHref(book) : undefined}
-                      coverOpenAriaLabel={canStartContinuous ? `${book.title}から連続閲覧` : undefined}
-                      onDelete={(trigger) => deleteLibraryBook(book, trigger)}
-                      onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
-                      onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
-                    />
-                  )
-                })}
-              </BookGrid>
+              <SearchResultsGrid
+                visibleBooks={visibleBooks}
+                displaySettings={displaySettings}
+                pendingDeletionKeys={pendingDeletionKeys}
+                isWebSearch={isWebSearch}
+                selectMode={selectMode}
+                selected={selected}
+                toggleSelection={toggleSelection}
+                searchByTag={searchByTag}
+                openTagSearchDestination={openTagSearchDestination}
+                openWebBookDetail={openWebBookDetail}
+                enterContinuousView={enterContinuousView}
+                getContinuousViewHref={getContinuousViewHref}
+                deleteLibraryBook={deleteLibraryBook}
+                refreshWebBook={refreshWebBook}
+                downloadWebBook={downloadWebBook}
+                isSearchLoading={isSearchLoading}
+                onDetailsRequest={openBookDetails}
+              />
             )}
           </div>
         )}

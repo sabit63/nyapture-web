@@ -225,7 +225,7 @@ it('opens recommendations for the active continuous book, isolates gestures, and
   try {
     await render(0)
     assert.equal(requests.length, 0)
-    await click('[aria-label="関連候補を開く"]')
+    await click('[aria-label="タグ関連作品を開く"]')
     assert.deepEqual(requests, ['/api/book/group-1/book-1/recommendations'])
     const panel = container.querySelector('.recommendations__content')!
     await act(async () => {
@@ -241,12 +241,12 @@ it('opens recommendations for the active continuous book, isolates gestures, and
     await click('.recommendations__card--entity')
     assert.deepEqual(tags, ['Artists:artist-name'])
     assert.equal(container.querySelector('.recommendations')?.hasAttribute('open'), false)
-    await click('[aria-label="関連候補を開く"]')
+    await click('[aria-label="タグ関連作品を開く"]')
     assert.equal(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent, '作者')
     assert.equal(requests.length, 2)
     await render(1)
     assert.equal(container.querySelector('.recommendations')?.hasAttribute('open'), false)
-    await click('[aria-label="関連候補を開く"]')
+    await click('[aria-label="タグ関連作品を開く"]')
     assert.equal(requests.at(-1), '/api/book/group-1/book-2/recommendations')
     assert.equal(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent, '作品')
     await render(1, true)

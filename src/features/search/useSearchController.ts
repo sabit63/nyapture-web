@@ -349,7 +349,7 @@ export function useSearchController({
   }), [searchOperations.pendingDeletionKeys, searchResultBooks, tagDisplayNameOverrides])
 
   // The missing-tag API evaluates ordinary conditions together with the missing types.
-  const filteredBooks = isWebSearch || isMissingTagSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
+  const filteredBooks = useMemo(() => isWebSearch || isMissingTagSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
     const normalizedQuery = criteria.text.trim().toLocaleLowerCase()
     if (normalizedQuery) {
       const searchableText = [
@@ -370,10 +370,10 @@ export function useSearchController({
     if (criteria.pagesMin && book.totalPage < Number(criteria.pagesMin)) return false
     if (criteria.pagesMax && book.totalPage > Number(criteria.pagesMax)) return false
     return true
-  })
+  }), [isWebSearch, isMissingTagSearch, displayedSearchResultBooks, criteria])
   const visibleBooks = filteredBooks
   const hasCriteria = criteriaHasValues(criteria)
-  const localTagCandidates = displayedSearchResultBooks
+  const localTagCandidates = useMemo(() => displayedSearchResultBooks
     .flatMap((book) => book.tags)
     .filter((tag) => tag.type === tagType)
     .filter((tag, index, all) => all.findIndex((candidate) => candidate.type === tag.type && candidate.name === tag.name) === index)
@@ -383,7 +383,7 @@ export function useSearchController({
       if (!normalizedInput) return true
       return getTagLabel(tag).toLocaleLowerCase().includes(normalizedInput) || tag.name.toLocaleLowerCase().includes(normalizedInput)
     })
-    .slice(0, 8)
+    .slice(0, 8), [displayedSearchResultBooks, tagType, draftCriteria.tags, tagInput])
   const tagCandidates = tagInput.trim() ? remoteTagCandidates : localTagCandidates
   const showTagCandidates = tagInputFocused && tagCandidates.length > 0
   const japaneseLanguageEnabled = criteria.tags.some((tag) => sameTag(tag, JAPANESE_LANGUAGE_TAG))
