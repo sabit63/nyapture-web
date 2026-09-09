@@ -66,3 +66,27 @@ test('color theme round-trips and invalid values fall back to default', () => {
     else Reflect.deleteProperty(globalThis, 'localStorage')
   }
 })
+
+test('recommendation debug defaults off and persists only an explicit boolean opt-in', () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  const values = new Map<string, string>()
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  } })
+  try {
+    const settings = loadAppSettings()
+    assert.notEqual(settings.display.recommendationDebug, true)
+    saveAppSettings({ ...settings, display: { ...settings.display, recommendationDebug: true } })
+    assert.equal(loadAppSettings().display.recommendationDebug, true)
+    saveAppSettings({ ...settings, display: { ...settings.display, recommendationDebug: false } })
+    assert.notEqual(loadAppSettings().display.recommendationDebug, true)
+    const record = JSON.parse(values.get(APP_SETTINGS_STORAGE_KEY)!)
+    record.display.recommendationDebug = 'true'
+    values.set(APP_SETTINGS_STORAGE_KEY, JSON.stringify(record))
+    assert.notEqual(loadAppSettings().display.recommendationDebug, true)
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'localStorage', previous)
+    else Reflect.deleteProperty(globalThis, 'localStorage')
+  }
+})

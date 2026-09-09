@@ -141,6 +141,18 @@ export function DisplaySettingsDialog({ controller }: DisplaySettingsDialogProps
             </section>
 
             {displaySettingsSaveError && <p className="advanced-field-error api-settings-dialog__body-error" role="alert">{displaySettingsSaveError}</p>}
+            <section className="api-settings-dialog__section" aria-labelledby="display-settings-recommendations-title">
+              <h3 id="display-settings-recommendations-title">レコメンド</h3>
+              <button type="button" role="switch" className="display-settings-auto-columns"
+                aria-checked={displaySettingsDraft.recommendationDebug === true}
+                onClick={() => {
+                  setDisplaySettingsSaveError('')
+                  setDisplaySettingsDraft((current) => ({ ...current, recommendationDebug: !current.recommendationDebug }))
+                }}>
+                <span className="display-settings-auto-columns__track" aria-hidden="true" />
+                <span>レコメンドのDebug詳細を表示</span>
+              </button>
+            </section>
           </DialogBody>
 
           <DialogFooter className="advanced-dialog__footer display-settings-dialog__footer">

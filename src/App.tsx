@@ -8,6 +8,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 
 import { AppShell } from './app/AppShell'
+import { RecommendationDebugContext } from './features/settings/RecommendationDebugContext'
 import { navigateBackOrFallback, RouterRuntime, useRouterLocation } from './app/client-router'
 import { RouteBoundary } from './app/RouteBoundary'
 import { useSnackbar } from './components/Snackbar'
@@ -103,6 +104,7 @@ function App() {
       : WifiOff
 
   return (
+    <RecommendationDebugContext value={apiSettingsController.displaySettings.recommendationDebug === true}>
     <AppShell
       currentPath={currentPath}
       drawerOpen={shellController.drawerOpen}
@@ -220,6 +222,7 @@ function App() {
       />
       <RouterRuntime />
     </AppShell>
+    </RecommendationDebugContext>
   )
 }
 

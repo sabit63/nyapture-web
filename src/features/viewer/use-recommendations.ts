@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getBookRecommendations } from '../../api/recommendations'
+import { getBookRecommendations, getEntityRecommendations } from '../../api/recommendations'
 import type { RecommendationResult, RecommendationType } from '../../api/recommendations'
 import { ApiError } from '../../api/client'
 
@@ -12,7 +12,7 @@ export type RecommendationState = {
 }
 
 // The owning panel is keyed by book identity; cache lifetime is one viewer visit.
-export function useRecommendations(groupId: string, bookId: string, open: boolean, type: RecommendationType) {
+export function useRecommendations(groupId: string, bookId: string, open: boolean, type: RecommendationType, entityType?: 'Artist' | 'Group') {
   const cache = useRef<Partial<Record<RecommendationType, RecommendationState>>>({})
   const [revision, setRevision] = useState(0)
   const [, render] = useState(0)
@@ -31,7 +31,9 @@ export function useRecommendations(groupId: string, bookId: string, open: boolea
     async function fetchResult(attempts: number) {
       publish({ ...cache.current[type], loading: true, error: undefined, attempts })
       try {
-        const result = await getBookRecommendations(groupId, bookId, type, controller.signal)
+        const result = entityType
+          ? await getEntityRecommendations(entityType, bookId, type === 'Group' ? 'Group' : 'Artist', controller.signal)
+          : await getBookRecommendations(groupId, bookId, type, controller.signal)
         if (controller.signal.aborted) return
         const state = { result, attempts, nextCheckAt: Date.now() + (result.retryAfterSeconds ?? 60) * 1000 }
         publish(state)
@@ -46,7 +48,7 @@ export function useRecommendations(groupId: string, bookId: string, open: boolea
     if (!cached || cached.loading) void fetchResult(cached?.attempts ?? 0)
     else schedule(cached)
     return () => { controller.abort(); clearTimeout(timer) }
-  }, [groupId, bookId, open, type, revision])
+  }, [groupId, bookId, open, type, revision, entityType])
 
   return {
     state: cache.current[type],

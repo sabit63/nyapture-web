@@ -11,12 +11,14 @@ const DISPLAY_SETTINGS_STORAGE_VERSION = 1
 export type ThumbnailColumnCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 
 export type DisplaySettings = {
+  recommendationDebug?: boolean
   autoThumbnailColumns?: boolean
   thumbnailColumns: ThumbnailColumnCount
   colorTheme: ColorTheme
 }
 
 type PersistedDisplaySettings = {
+  recommendationDebug?: boolean
   autoThumbnailColumns?: boolean
   version: typeof DISPLAY_SETTINGS_STORAGE_VERSION
   thumbnailColumns: ThumbnailColumnCount
@@ -71,6 +73,7 @@ export const normalizeColorTheme = (value: unknown): ColorTheme => (
 )
 
 export const normalizeDisplaySettings = (settings: Partial<DisplaySettings> = { autoThumbnailColumns: true }): DisplaySettings => ({
+  ...(settings.recommendationDebug === true ? { recommendationDebug: true } : {}),
   autoThumbnailColumns: settings.autoThumbnailColumns === true,
   thumbnailColumns: normalizeThumbnailColumnCount(settings.thumbnailColumns),
   colorTheme: normalizeColorTheme(settings.colorTheme),

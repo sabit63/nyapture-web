@@ -10,6 +10,7 @@ import type { RecommendationTagDisplayName, RecommendationThumbnailBook } from '
 import type { BookTag } from '../src/models'
 import { createTagSearchDestinationUrls } from '../src/features/search/search-utils'
 import { installHookDom } from './helpers/react-hook'
+import { RecommendationDebugContext } from '../src/features/settings/RecommendationDebugContext'
 
 registerHooks({ load(url, context, nextLoad) {
   return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : nextLoad(url, context)
@@ -27,7 +28,7 @@ beforeEach(() => {
 })
 afterEach(() => { configureApi(originalSettings); dom.cleanup() })
 
-async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: RecommendationThumbnailBook | null | undefined, failImage = false, displayNames?: RecommendationTagDisplayName[]) {
+async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: RecommendationThumbnailBook | null | undefined, failImage = false, displayNames?: RecommendationTagDisplayName[], debug = false, sourceTag?: BookTag & { type: 'Artists' | 'Groups' }) {
   const { BookRecommendations } = await import('../src/features/viewer/BookRecommendations')
   const container = document.createElement('div')
   document.body.append(container)
@@ -40,11 +41,12 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input))
     requests.push(url)
-    if (url.pathname.endsWith('/recommendations')) return new Response(JSON.stringify({
+    if (url.pathname.endsWith('/recommendations') || url.pathname.startsWith('/api/recommendations/entities/')) return new Response(JSON.stringify({
       status: 'success', tagDisplayNames: currentDisplayNames, items: url.searchParams.get('targetType') === type ? [{
         key: { entityType: type, tagName: 'candidate-name', groupId: 'g', bookId: 'b' },
         book: type === 'Book' ? { title: 'Original book title' } : undefined,
         commonTags: ['shared', 'blank', 'raw'],
+        score: 0.125, signals: { titleRank: null, exactTagRank: 2 }, reasons: ['タグの一致'],
         entity: { totalBookCount: 4, thumbnailBook: currentThumbnail, representativeTags: ['shared', 'blank', 'raw'] },
       }] : [],
     }))
@@ -61,13 +63,13 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
     assert.ok(target)
     await act(async () => { target.click() })
   }
-  await act(async () => { root.render(createElement(BookRecommendations, {
-    book: mapEBookToCard({ groupId: 'source', bookId: 'source' }),
+  await act(async () => { root.render(createElement(RecommendationDebugContext, { value: debug }, createElement(BookRecommendations, {
+    ...(sourceTag ? { sourceTag } : { book: mapEBookToCard({ groupId: 'source', bookId: 'source' }) }),
     getTagSearchHref: (tag) => createTagSearchDestinationUrls(tag).library.href,
     onTagSearch: (tag) => { selections.push(`${tag.type}:${tag.name}`); selectedTags.push(tag) },
-  })) })
-  await click('[aria-label="タグ関連作品を開く"]')
-  if (type !== 'Book') await click(`[role="tab"]:nth-child(${type === 'Artist' ? 2 : 3})`)
+  }))) })
+  await click(sourceTag ? 'button[aria-haspopup="dialog"]' : '[aria-label="タグ関連作品を開く"]')
+  if (type !== 'Book') await click(`[role="tab"]:nth-child(${(type === 'Artist' ? 2 : 3) - (sourceTag ? 1 : 0)})`)
   return {
     container, requests, selections, selectedTags, click,
     setThumbnail(value: RecommendationThumbnailBook) { currentThumbnail = value },
@@ -189,7 +191,7 @@ for (const type of ['Book', 'Artist', 'Group'] as const) {
     try {
       assert.equal(fixture.container.querySelector('.recommendations__card strong')?.textContent,
         type === 'Book' ? 'Original book title' : type === 'Artist' ? '作者表示名' : 'グループ表示名')
-      assert.deepEqual(Array.from(fixture.container.querySelectorAll('.recommendations__tags > span')).map((el) => el.textContent), ['共通表示名', 'blank', 'raw'])
+      assert.deepEqual(Array.from(fixture.container.querySelectorAll('.recommendations__tags > span')).map((el) => el.textContent), type === 'Book' ? ['共通表示名', 'blank', 'raw'] : [])
       assert.equal(fixture.requests.length, type === 'Book' ? 1 : 2)
       if (type !== 'Book') {
         await fixture.click('.recommendations__card--entity')
@@ -205,9 +207,62 @@ it('refreshing uses new display names and falls back when translations are no lo
     fixture.setDisplayNames([{ type: 'Artists', name: 'candidate-name', displayName: '更新した表示名' }])
     await fixture.click('[aria-label="関連候補を更新"]')
     assert.equal(fixture.container.querySelector('.recommendations__card strong')?.textContent, '更新した表示名')
-    assert.equal(fixture.container.querySelector('.recommendations__tags > span')?.textContent, 'shared')
+    assert.equal(fixture.container.querySelector('.recommendations__tags'), null)
     fixture.setDisplayNames(undefined)
     await fixture.click('[aria-label="関連候補を更新"]')
     assert.equal(fixture.container.querySelector('.recommendations__card strong')?.textContent, 'candidate-name')
   } finally { await fixture.cleanup() }
 })
+
+for (const type of ['Book', 'Artist', 'Group'] as const) {
+  it(`${type}: debug details distinguish missing ranks, preserve raw scores and do not navigate`, async () => {
+    const fixture = await mount(type, null, false, displayNames, true)
+    try {
+      const details = fixture.container.querySelector<HTMLElement>('[aria-label="候補1のDebug詳細"]')!
+      assert.ok(details)
+      assert.ok(fixture.container.querySelector('[aria-label="レコメンドAPIのDebug詳細"]'))
+      const fields = new Map(Array.from(details.querySelectorAll('dl > div')).map((row) => [row.querySelector('dt')?.textContent, row.querySelector('dd')?.textContent]))
+      assert.equal(fields.get('score（一致率ではありません）'), '0.125')
+      assert.equal(fields.get('titleRank'), 'null')
+      assert.equal(fields.get('semanticTagRank'), '未提供')
+      assert.equal(fields.get('exactTagRank'), '2')
+      assert.equal(fields.get('推薦理由'), 'タグの一致')
+      assert.ok(fields.get('共通タグ')?.includes('共通表示名 (shared)'))
+      assert.equal(details.closest('a'), null)
+      await fixture.click('summary')
+      assert.ok(fixture.container.querySelector('details[open]'))
+      assert.deepEqual(fixture.selections, [])
+      assert.ok(fixture.container.querySelector('dialog[open]'))
+    } finally { await fixture.cleanup() }
+  })
+}
+it('normal mode does not render debug details', async () => {
+  const fixture = await mount('Book', null)
+  try { assert.equal(fixture.container.querySelector('.recommendations__debug'), null) }
+  finally { await fixture.cleanup() }
+})
+
+for (const sourceType of ['Artists', 'Groups'] as const) {
+  for (const targetType of ['Artist', 'Group'] as const) {
+    it(`${sourceType} to ${targetType}: searches using original names and retains entity navigation`, async () => {
+      const sourceTag = { type: sourceType, name: 'original/作者 & group?', displayName: '表示名' }
+      const fixture = await mount(targetType, null, false, displayNames, true, sourceTag)
+      try {
+        assert.deepEqual(Array.from(fixture.container.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent), ['作者', 'グループ'])
+        assert.ok(fixture.container.querySelector('h2')?.textContent?.includes('表示名'))
+        const request = fixture.requests.at(-1)!
+        assert.equal(request.pathname, `/api/recommendations/entities/${sourceType === 'Artists' ? 'Artist' : 'Group'}`)
+        assert.equal(request.searchParams.get('tagName'), sourceTag.name)
+        assert.equal(request.searchParams.get('targetType'), targetType)
+        assert.equal(request.searchParams.get('limit'), '20')
+        assert.ok(fixture.container.querySelector('.recommendations__debug'))
+        const count = fixture.requests.length
+        await fixture.click('[aria-label="関連候補を閉じる"]')
+        await fixture.click('button[aria-haspopup="dialog"]')
+        assert.equal(fixture.requests.length, count)
+        await fixture.click('.recommendations__card')
+        assert.deepEqual(fixture.selections, [`${targetType === 'Artist' ? 'Artists' : 'Groups'}:candidate-name`])
+      } finally { await fixture.cleanup() }
+    })
+  }
+}

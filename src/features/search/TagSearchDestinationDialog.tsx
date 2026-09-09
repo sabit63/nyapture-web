@@ -18,6 +18,7 @@ import {
   buttonClassName,
 } from '../../components/ui'
 import type { SearchController } from './useSearchController'
+import { BookRecommendations } from '../viewer/BookRecommendations'
 
 export type TagSearchDestinationDialogProps = {
   controller: SearchController
@@ -136,6 +137,11 @@ export function TagSearchDestinationDialog({ controller }: TagSearchDestinationD
               <span>{tagTypeLabel}</span>
               <h2 id="tag-search-destination-title">{tagLabel}</h2>
             </div>
+            {controller.tagSearchDestinationDialogOpen && (selection.tag.type === 'Artists' || selection.tag.type === 'Groups') && <BookRecommendations
+              sourceTag={{ ...selection.tag, type: selection.tag.type }}
+              getTagSearchHref={controller.getTagSearchHref}
+              onTagSearch={(tag) => { requestClose('submit'); controller.searchByTag(tag) }}
+            />}
             <IconButton
               variant="ghost"
               tone="neutral"
