@@ -5,14 +5,19 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
+  outline: 1px solid transparent;
+  outline-offset: 0;
   border-radius: var(--radius-surface);
   background: var(--color-surface);
   box-shadow: 0 1px 0 #ffffff05;
   --thumbnail-loaded-opacity: 1;
-  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  transition: border-color .16s ease, outline-color .16s ease, box-shadow .16s ease;
 }
 
-.book-card:hover { border-color: var(--color-border-strong); transform: translateY(-2px); box-shadow: var(--shadow-raised); }
+/* Keep the hover hit area fixed so a pointer at the edge cannot toggle it. */
+.book-card:hover { border-color: var(--color-border-strong); outline-color: var(--color-border-strong); box-shadow: var(--shadow-raised); }
+.book-card--download-candidate:hover { outline-color: #d0a1ff; }
+.book-card.book-card--selected:hover { outline-color: var(--color-accent-border); }
 .book-card--selected { border-color: var(--color-accent-border); box-shadow: 0 0 0 2px var(--color-accent-soft); }
 .book-card--download-candidate { --thumbnail-loaded-opacity: .82; border-color: #bb84f5; box-shadow: 0 0 0 1px #c995ffcc, 0 0 9px #9d45e6a6, 0 0 24px #7126b875, inset 0 1px 0 #dfbbff66; }
 .book-card--download-candidate:hover { border-color: #d0a1ff; box-shadow: 0 0 0 1px #d9b2fff0, 0 0 11px #ae5bffbd, 0 0 30px #812ecc8f, inset 0 1px 0 #edd3ff80; }

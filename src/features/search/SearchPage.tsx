@@ -14,7 +14,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { BookGrid } from '../../components/BookGrid'
 import { createPortal } from 'react-dom'
 
 import type { ApiBookCardModel } from '../../api'
@@ -72,8 +73,10 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
           <X size={16} aria-hidden="true" />
         </IconButton>
       )}
-      <IconButton className="search-submit" size="compact" type="submit" aria-label="検索を実行">
-        <Search size={16} aria-hidden="true" />
+      <IconButton className="search-submit" size="compact" type="submit" aria-label="検索を実行" aria-busy={controller.searchState === 'loading'}>
+        {controller.searchState === 'loading'
+          ? <LoaderCircle className="results-spinner" size={16} aria-hidden="true" />
+          : <Search size={16} aria-hidden="true" />}
       </IconButton>
       <span className="quick-search__divider" aria-hidden="true" />
       <IconButton
@@ -375,12 +378,13 @@ export function SearchPage({ controller }: SearchPageProps) {
               </IconButton>
             )}
             <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button" aria-label="結果を更新" disabled={isSearchLoading} onClick={refresh}>
-              <RefreshCw size={17} aria-hidden="true" />
+              <RefreshCw className={isSearchLoading ? 'results-spinner' : undefined} size={17} aria-hidden="true" />
             </IconButton>
           </div>
         </div>
 
-        {isWebSearch && selectMode && (
+        {isWebSearch && (
+          <div className="selection-toolbar-reveal" data-open={selectMode} inert={!selectMode ? true : undefined} aria-hidden={!selectMode}>
           <div className="selection-toolbar" role="group" aria-label="Web検索結果の一括操作">
             <IconButton
               className="toolbar-icon"
@@ -407,9 +411,11 @@ export function SearchPage({ controller }: SearchPageProps) {
               <RefreshCw size={17} aria-hidden="true" />
             </IconButton>
           </div>
+          </div>
         )}
 
-        {!isWebSearch && selectMode && (
+        {!isWebSearch && (
+          <div className="selection-toolbar-reveal" data-open={selectMode} inert={!selectMode ? true : undefined} aria-hidden={!selectMode}>
           <div className="selection-toolbar" role="group">
             <IconButton
               className="toolbar-icon"
@@ -435,6 +441,7 @@ export function SearchPage({ controller }: SearchPageProps) {
             >
               <Trash2 size={17} aria-hidden="true" />
             </IconButton>
+          </div>
           </div>
         )}
 
@@ -485,10 +492,8 @@ export function SearchPage({ controller }: SearchPageProps) {
                 />
               )
             ) : (
-              <div
-                key={searchResultGeneration}
-                className="book-grid"
-                style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}
+              <BookGrid
+                settings={displaySettings}
                 aria-busy={isSearchLoading}
                 inert={isSearchLoading ? true : undefined}
               >
@@ -523,7 +528,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                     />
                   )
                 })}
-              </div>
+              </BookGrid>
             )}
             {showSearchLoader && (
               <div className="results-loading-overlay" aria-hidden="true">

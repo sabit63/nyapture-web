@@ -55,12 +55,12 @@ test('color theme round-trips and invalid values fall back to default', () => {
       api: DEFAULT_API_SETTINGS,
       display: { thumbnailColumns: 4, colorTheme: 'amethyst' },
     })
-    assert.deepEqual(loadAppSettings().display, { thumbnailColumns: 4, colorTheme: 'amethyst' })
+    assert.deepEqual(loadAppSettings().display, { autoThumbnailColumns: false, thumbnailColumns: 4, colorTheme: 'amethyst' })
 
     const persisted = JSON.parse(values.get(APP_SETTINGS_STORAGE_KEY) ?? '{}')
     persisted.display.colorTheme = 'unknown'
     values.set(APP_SETTINGS_STORAGE_KEY, JSON.stringify(persisted))
-    assert.deepEqual(loadAppSettings().display, { thumbnailColumns: 4, colorTheme: 'default' })
+    assert.deepEqual(loadAppSettings().display, { autoThumbnailColumns: false, thumbnailColumns: 4, colorTheme: 'default' })
   } finally {
     if (previous) Object.defineProperty(globalThis, 'localStorage', previous)
     else Reflect.deleteProperty(globalThis, 'localStorage')

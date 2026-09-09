@@ -1,6 +1,7 @@
 import { Save, X } from 'lucide-react'
 
 import type { DisplaySettings } from '../../api'
+import { MIN_THUMBNAIL_COLUMNS, MAX_THUMBNAIL_COLUMNS } from '../../api'
 import {
   Dialog,
   DialogBody,
@@ -107,8 +108,20 @@ export function DisplaySettingsDialog({ controller }: DisplaySettingsDialogProps
               <h3 id="display-settings-section-title">検索結果</h3>
               <section className="advanced-dialog__field">
                 <label htmlFor="display-settings-thumbnail-columns">サムネイル列数</label>
+                <div className="display-settings-columns-row">
+                <button type="button" role="switch" className="display-settings-auto-columns"
+                  aria-checked={displaySettingsDraft.autoThumbnailColumns === true}
+                  aria-controls="display-settings-thumbnail-columns"
+                    onClick={() => {
+                      setDisplaySettingsSaveError('')
+                      setDisplaySettingsDraft((current) => ({ ...current, autoThumbnailColumns: !current.autoThumbnailColumns }))
+                    }}>
+                  <span className="display-settings-auto-columns__track" aria-hidden="true" />
+                  <span>自動</span>
+                </button>
                 <select
                   id="display-settings-thumbnail-columns"
+                  disabled={displaySettingsDraft.autoThumbnailColumns === true}
                   value={displaySettingsDraft.thumbnailColumns}
                   onChange={(event) => {
                     setDisplaySettingsSaveError('')
@@ -118,12 +131,12 @@ export function DisplaySettingsDialog({ controller }: DisplaySettingsDialogProps
                     }))
                   }}
                 >
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
+                  {Array.from({ length: MAX_THUMBNAIL_COLUMNS - MIN_THUMBNAIL_COLUMNS + 1 }, (_, index) => {
+                    const columns = MIN_THUMBNAIL_COLUMNS + index
+                    return <option key={columns} value={columns}>{columns}</option>
+                  })}
                 </select>
+                </div>
               </section>
             </section>
 

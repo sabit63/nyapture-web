@@ -13,7 +13,8 @@
   transition:
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
-    color var(--duration-fast) ease;
+    color var(--duration-fast) ease,
+    scale 120ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .icon-button:hover {
@@ -42,12 +43,18 @@
   transition:
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
-    color var(--duration-fast) ease;
+    color var(--duration-fast) ease,
+    scale 120ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .button:disabled {
   opacity: .45;
   cursor: not-allowed;
+}
+
+:is(.button, .icon-button):active:not(:disabled):not([aria-disabled='true']) {
+  scale: .96;
+  transition-duration: 60ms;
 }
 
 /* Standard control API. */
@@ -280,6 +287,34 @@
 
 .ui-dialog[open] {
   animation: ui-dialog-in var(--duration-fast) ease-out;
+}
+
+/* Keep the native close/focus lifecycle; the browser retains the top layer
+   only for the visual exit. Older browsers keep the entry animation above. */
+@supports (transition-behavior: allow-discrete) {
+  .ui-dialog {
+    opacity: 0;
+    transform: translateY(6px) scale(.985);
+    transition: opacity 120ms ease, transform 120ms ease,
+      display 120ms allow-discrete, overlay 120ms allow-discrete;
+  }
+  .ui-dialog[open] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition-duration: 180ms;
+    transition-timing-function: cubic-bezier(.2, .8, .2, 1);
+  }
+  .ui-dialog::backdrop {
+    opacity: 0;
+    transition: opacity 120ms ease, display 120ms allow-discrete,
+      overlay 120ms allow-discrete;
+  }
+  .ui-dialog[open]::backdrop { opacity: 1; }
+  @starting-style {
+    .ui-dialog[open] { opacity: 0; transform: translateY(6px) scale(.985); }
+    .ui-dialog[open]::backdrop { opacity: 0; }
+  }
 }
 
 .ui-dialog__header {

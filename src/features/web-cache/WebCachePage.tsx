@@ -1,5 +1,6 @@
 import { ExternalLink, RefreshCw, Search, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { BookGrid } from '../../components/BookGrid'
 import { getDownloadStatuses, getErrorMessage, mapWebCacheBookToCard, type ApiBookCardModel, type DisplaySettings } from '../../api'
 import { ApiError } from '../../api/client'
 import { deleteCacheBook, enqueueCacheBook, getCacheBook, getCacheConfig, searchCache } from '../../api/web-cache'
@@ -369,9 +370,9 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
       <div className="web-cache__toolbar"><p role="status">{loading ? '検索中…' : error ? '検索に失敗しました' : `${totalCount.toLocaleString()}件 · ${applied.page} / ${totalPages}ページ`}</p><div><IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" aria-label="検索結果を更新" disabled={loading} onClick={() => setRevision((value) => value + 1)}><RefreshCw size={17} /></IconButton></div></div>
       {error && <StatePanel title="検索できませんでした" description={error} action={<Button onClick={() => setRevision((value) => value + 1)}>再試行</Button>} />}
       {loading ? <StatePanel title="候補を検索しています…" /> : !error && books.length === 0 ? <StatePanel title="該当する候補がありません" description="検索条件を変更するか、管理画面で同期状態を確認してください。" /> : !error && (
-        <div className="book-grid" style={{ '--thumbnail-columns': displaySettings.thumbnailColumns } as CSSProperties}>
+        <BookGrid settings={displaySettings}>
           {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} card={bookCards[index] ?? mapCacheResultBook(book)} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
-        </div>
+        </BookGrid>
       )}
       {!loading && !error && totalPages > 1 && <nav className="pagination" aria-label="Web Cacheのページ">{getPaginationItems(applied.page, totalPages, 5).map((page, index) => page === 'ellipsis' ? <span key={`gap-${index}`}>…</span> : page === applied.page ? <span key={page} className="pagination__current" aria-current="page">{page}</span> : <Button key={page} onClick={() => navigate(`/web-cache${serializeCacheSearch({ ...applied, page })}`)} aria-label={`${page}ページへ`}>{page}</Button>)}</nav>}
       <Dialog open={selected !== null} onRequestClose={() => { setSelected(null); return true }} aria-labelledby="cache-detail-title" className="cache-detail">

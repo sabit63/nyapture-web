@@ -42,6 +42,8 @@ button.tag-chip {
   user-select: none;
 }
 
+button.tag-chip { transition: background 140ms ease, border-color 140ms ease, scale 120ms ease; }
+button.tag-chip:active:not(:disabled) { scale: .97; transition-duration: 60ms; }
 button.tag-chip:hover {
   border-color: color-mix(in srgb, var(--tag-accent, #626271) 84%, #fff 16%);
   background: color-mix(in srgb, var(--tag-accent, #626271) 88%, #fff 12%);

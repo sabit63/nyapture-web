@@ -101,7 +101,7 @@ export function BookCard({
   const isWebBook = book.status === 'WebBook' || book.status === 'WebBookInPage'
   const canRefresh = !isDownloading && !isDownloaded && typeof onRefresh === 'function'
   const canDownload = !isDownloading && !isDownloaded && typeof onDownload === 'function'
-  const canDelete = (allowWebDelete || !isWebBook) && typeof onDelete === 'function'
+  const canDelete = !isDownloaded && (allowWebDelete || !isWebBook) && typeof onDelete === 'function'
   const hasActions = canRefresh || canDownload || canDelete || (extraActions !== undefined && extraActions !== null)
   const coverOpen = onCoverOpen ?? onOpen
   const tagsDialogTitleId = `tags-dialog-title-${tagsId}`

@@ -1,21 +1,23 @@
 export const DISPLAY_SETTINGS_STORAGE_KEY = 'nyapture.display-settings.v1'
 export const DEFAULT_THUMBNAIL_COLUMNS = 5
 export const MIN_THUMBNAIL_COLUMNS = 1
-export const MAX_THUMBNAIL_COLUMNS = 5
+export const MAX_THUMBNAIL_COLUMNS = 10
 export const DEFAULT_COLOR_THEME = 'default'
 
 export type ColorTheme = 'default' | 'amethyst'
 
 const DISPLAY_SETTINGS_STORAGE_VERSION = 1
 
-export type ThumbnailColumnCount = 1 | 2 | 3 | 4 | 5
+export type ThumbnailColumnCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 
 export type DisplaySettings = {
+  autoThumbnailColumns?: boolean
   thumbnailColumns: ThumbnailColumnCount
   colorTheme: ColorTheme
 }
 
 type PersistedDisplaySettings = {
+  autoThumbnailColumns?: boolean
   version: typeof DISPLAY_SETTINGS_STORAGE_VERSION
   thumbnailColumns: ThumbnailColumnCount
   colorTheme?: ColorTheme
@@ -30,6 +32,7 @@ export class DisplaySettingsStorageError extends Error {
 }
 
 const defaultDisplaySettings = (): DisplaySettings => ({
+  autoThumbnailColumns: true,
   thumbnailColumns: DEFAULT_THUMBNAIL_COLUMNS,
   colorTheme: DEFAULT_COLOR_THEME,
 })
@@ -67,7 +70,8 @@ export const normalizeColorTheme = (value: unknown): ColorTheme => (
   isColorTheme(value) ? value : DEFAULT_COLOR_THEME
 )
 
-export const normalizeDisplaySettings = (settings: Partial<DisplaySettings> = {}): DisplaySettings => ({
+export const normalizeDisplaySettings = (settings: Partial<DisplaySettings> = { autoThumbnailColumns: true }): DisplaySettings => ({
+  autoThumbnailColumns: settings.autoThumbnailColumns === true,
   thumbnailColumns: normalizeThumbnailColumnCount(settings.thumbnailColumns),
   colorTheme: normalizeColorTheme(settings.colorTheme),
 })
