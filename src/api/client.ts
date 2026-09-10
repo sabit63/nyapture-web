@@ -278,7 +278,8 @@ export class ApiError extends Error {
   }
 
   toUserMessage() {
-    return ERROR_MESSAGES[this.category]
+    const message = ERROR_MESSAGES[this.category]
+    return this.status === undefined ? message : `${message} (StatusCode: ${this.status})`
   }
 }
 

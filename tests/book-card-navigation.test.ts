@@ -67,7 +67,7 @@ it('removes every thumbnail action during shredding and restores actions after c
   }
 })
 
-it('keeps disabled status actions visible but removes all overlay buttons in selection mode', async () => {
+it('keeps disabled status actions visible and replaces them with selection in selection mode', async () => {
   const { BookCard } = await import('../src/components/BookCard')
   const dom = installHookDom('http://localhost/search')
   const container = document.createElement('div')
@@ -84,7 +84,7 @@ it('keeps disabled status actions visible but removes all overlay buttons in sel
     await act(async () => { root.render(createElement(BookCard, { ...props, onDownload: () => {}, downloadDisabled: true })) })
     assert.equal(container.querySelector<HTMLButtonElement>(downloadSelector)?.disabled, true)
     await act(async () => { root.render(createElement(BookCard, { ...props, onDownload: () => {}, selectMode: true })) })
-    assert.equal(container.querySelector('.book-cover button'), null)
+    assert.ok(container.querySelector('.card-select'))
     assert.equal(container.querySelector('.card-actions'), null)
   } finally {
     await act(async () => { root.unmount() })
@@ -93,7 +93,7 @@ it('keeps disabled status actions visible but removes all overlay buttons in sel
   }
 })
 
-it('uses the status action matrix in normal mode and no overlay buttons in selection mode', async () => {
+it('uses the status action matrix and shows selection except during shredding', async () => {
   const { BookCard } = await import('../src/components/BookCard')
   const dom = installHookDom('http://localhost/search')
   const container = document.createElement('div')
@@ -128,7 +128,9 @@ it('uses the status action matrix in normal mode and no overlay buttons in selec
           assert.equal(container.querySelector('.book-cover [data-book-status]')?.textContent, `状態: ${statusLabels[status]}`)
           const labels = [...container.querySelectorAll('.card-action')].map((button) => button.getAttribute('aria-label'))
           assert.deepEqual(labels, selectMode ? [] : expected.map((label) => `Fixture bookを${label}`), `${status}, select=${selectMode}`)
-          if (selectMode) assert.equal(container.querySelector('.book-cover button'), null)
+          const selection = container.querySelector<HTMLButtonElement>('.card-select')
+          assert.equal(Boolean(selection), selectMode && status !== 'Shredding')
+          if (selection) assert.equal(selection.disabled, status === 'Downloading')
         }
       }
     }
@@ -205,7 +207,25 @@ it('thumbnail selection and card actions do not follow the viewer link', async (
     await act(async () => { link.click() })
     assert.equal(toggled, 1)
     assert.equal(dom.window.location.pathname, '/search')
+    const selection = container.querySelector<HTMLButtonElement>('.card-select')!
+    assert.equal(selection.querySelector('svg'), null)
+    assert.equal(selection.getAttribute('aria-pressed'), 'false')
+    await act(async () => { selection.click() })
+    assert.equal(toggled, 2)
+    await act(async () => { root.render(createElement(BookCard, { ...props, selected: true })) })
+    assert.equal(selection.getAttribute('aria-pressed'), 'true')
+    assert.ok(selection.querySelector('svg'))
+    assert.equal(selection.getAttribute('aria-label'), 'Fixture bookを選択解除')
+    await act(async () => { selection.click() })
+    assert.equal(toggled, 3)
+    for (const disabled of [{ actionsDisabled: true }, { openDisabled: true }]) {
+      await act(async () => { root.render(createElement(BookCard, { ...props, ...disabled })) })
+      assert.equal(selection.disabled, true)
+      await act(async () => { selection.click() })
+      assert.equal(toggled, 3)
+    }
     await act(async () => { root.render(createElement(BookCard, { ...props, selectMode: false })) })
+    assert.equal(container.querySelector('.card-select'), null)
     const download = container.querySelector<HTMLButtonElement>('[aria-label="Fixture bookをダウンロード"]')!
     assert.ok(download)
     assert.equal(download.closest('a'), null)

@@ -52,6 +52,8 @@ const makeStatus = (overrides: Partial<BookDownloadStatus> = {}): BookDownloadSt
 type ExecutionProps = {
   apiRevision: number
   isWebSearch?: boolean
+  isMissingTagSearch?: boolean
+  isStatusSearch?: boolean
   criteria?: SearchCriteria
 }
 
@@ -63,7 +65,8 @@ const mountExecution = (initialProps: ExecutionProps) => renderHook((props: Exec
   const execution = useSearchExecution({
     isWebSearch: props.isWebSearch ?? false,
     isLibrarySearch: !props.isWebSearch,
-    isMissingTagSearch: false,
+    isMissingTagSearch: props.isMissingTagSearch ?? false,
+    isStatusSearch: props.isStatusSearch ?? false,
     apiRevision: props.apiRevision,
     criteria: props.criteria ?? EMPTY_CRITERIA,
     hitomiAppend: 'Normal',
@@ -76,6 +79,36 @@ const mountExecution = (initialProps: ExecutionProps) => renderHook((props: Exec
   })
   return { ...execution, libraryBooks, webBooks }
 }, initialProps)
+
+test('search treats HTTP 200 with no results as success and retains other error statuses', async () => {
+  const dom = installHookDom('http://localhost/search')
+  const originalFetch = globalThis.fetch
+  try {
+    for (const mode of [
+      {},
+      { isWebSearch: true },
+      { isMissingTagSearch: true, criteria: { ...EMPTY_CRITERIA, missingTagTypes: ['Artists'] as const } },
+      { isStatusSearch: true, criteria: { ...EMPTY_CRITERIA, statuses: ['Downloading'] as const } },
+    ]) {
+      for (const status of [200, 202, 500]) {
+        globalThis.fetch = async () => new Response(JSON.stringify({ success: false, message: 'private details' }), { status })
+        const mounted = await mountExecution({ apiRevision: 1, ...mode } as ExecutionProps)
+        try {
+          await act(flushPromises)
+          assert.equal(mounted.current.searchState, status === 200 ? 'success' : 'error')
+          assert.equal(mounted.current.searchError, status === 200 ? '' : `APIサーバーでエラーが発生しました。 (StatusCode: ${status})`)
+          assert.deepEqual(mounted.current.libraryBooks, [])
+          assert.deepEqual(mounted.current.webBooks, [])
+        } finally {
+          await mounted.unmount()
+        }
+      }
+    }
+  } finally {
+    globalThis.fetch = originalFetch
+    dom.cleanup()
+  }
+})
 
 test('execution aborts the prior request on API revision change and ignores its stale response', async () => {
   const dom = installHookDom('http://localhost/search')

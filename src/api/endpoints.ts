@@ -14,7 +14,7 @@ import type {
   TagAdditionalNameUpsertRequest,
   TagAdditionalNameUpsertResponse,
 } from '../models'
-import { requestBlob, requestJson, requestJsonResponse } from './client'
+import { ApiError, requestBlob, requestJson, requestJsonResponse } from './client'
 import type {
   WebBookCacheBookDto,
   WebBookCacheSearchRequest,
@@ -30,8 +30,15 @@ type EndpointApiEnvelope<T> = NyaApiResponse & { data?: T }
 
 const segment = (value: string) => encodeURIComponent(value)
 
+/** All search screens treat HTTP 200 as success, including empty search responses. */
+const requestSearch = async <T extends { success?: boolean; message?: string }>(path: string, query: unknown, signal?: AbortSignal): Promise<T> => {
+  const { body, status } = await requestJsonResponse<T>(path, { method: 'POST', body: query, signal })
+  if (status !== 200 && body.success === false) throw new ApiError(body.message ?? '検索に失敗しました。', { category: 'server', status })
+  return body
+}
+
 export const searchBooks = (filter: BookSearchFilter, signal?: AbortSignal) => (
-  requestJson<EBookResponse>('/api/book/search', { method: 'POST', body: filter, signal })
+  requestSearch<EBookResponse>('/api/book/search', filter, signal)
 )
 
 export const getBook = (groupId: string, bookId: string, signal?: AbortSignal) => (
@@ -142,7 +149,7 @@ export const upsertTagAdditionalNames = (
 )
 
 export const searchWebBookCache = (filter: WebBookCacheSearchRequest, signal?: AbortSignal) => (
-  requestJson<WebBookCacheSearchResponse>('/api/web-cache/search', { method: 'POST', body: filter, signal })
+  requestSearch<WebBookCacheSearchResponse>('/api/web-cache/search', filter, signal)
 )
 
 export const getWebBookCacheBook = (groupId: string, bookId: string, signal?: AbortSignal) => (
@@ -162,7 +169,7 @@ export const getWebBookContent = (url: string, signal?: AbortSignal) => (
 )
 
 export const getWebPageContent = (url: string, signal?: AbortSignal) => (
-  requestJson<OnlineBookPageResponse>('/api/web/page', { method: 'POST', body: url, signal })
+  requestSearch<OnlineBookPageResponse>('/api/web/page', url, signal)
 )
 
 export const getDownloadStatuses = (signal?: AbortSignal) => (

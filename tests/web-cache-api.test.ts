@@ -163,16 +163,14 @@ describe('Web Book Cache candidate API', () => {
     assert.deepEqual(requests[4]?.body, { groupId: null, force: true })
   })
 
-  it('treats direct, envelope, and nested application failures as errors', async () => {
+  it('accepts HTTP 200 search responses while retaining nested mutation errors', async () => {
     setFetch(async (input) => {
       const pathname = new URL(String(input)).pathname
       if (pathname.endsWith('/search')) return jsonResponse({ success: false, message: 'search failed' })
       return jsonResponse({ success: true, data: { success: false, message: 'site failed' } })
     })
 
-    await assert.rejects(searchCache({}), (error: unknown) => (
-      error instanceof ApiError && error.message === 'search failed'
-    ))
+    assert.deepEqual(await searchCache({}), { success: false, message: 'search failed' })
     await assert.rejects(testCacheSite('group/1'), (error: unknown) => (
       error instanceof ApiError && error.message === 'site failed'
     ))

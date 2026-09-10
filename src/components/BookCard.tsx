@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Check,
   Download,
   RefreshCw,
   Trash2,
@@ -184,6 +185,20 @@ export function BookCard({
         {book.totalPage > 0 && <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>}
         <BookStatusBadge status={book.status} />
         {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
+        {!isShredding && selectMode && (
+          <IconButton
+            className="card-select card-select--control"
+            variant="outline"
+            tone="neutral"
+            size="compact"
+            aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`}
+            aria-pressed={selected}
+            disabled={isDownloading || actionsDisabled || openDisabled}
+            onClick={onToggle}
+          >
+            {selected && <Check size={18} aria-hidden="true" />}
+          </IconButton>
+        )}
         {!isShredding && !selectMode && hasActions && (
           <div className="card-actions" aria-label={`${book.title}の操作`}>
             {canRefresh && (

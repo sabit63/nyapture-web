@@ -145,7 +145,7 @@ it('cache search stays direct and nested site failures keep their distinct fallb
   respond({ books: [], totalPage: 1 })
   assert.deepEqual(await cache.searchCache({}), { books: [], totalPage: 1 })
   respond({ success: false, message: '  search failed  ' })
-  await assert.rejects(cache.searchCache({}), (error: unknown) => error instanceof ApiError && error.message === 'search failed')
+  assert.deepEqual(await cache.searchCache({}), { success: false, message: '  search failed  ' })
   respond({ data: { success: false, message: ' ' } })
   await assert.rejects(cache.testCacheSite('g'), (error: unknown) => (
     error instanceof ApiError && error.message === 'Web Book Cacheサイト接続試験に失敗しました。'

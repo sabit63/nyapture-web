@@ -248,9 +248,6 @@ export function useSearchExecution({
         buildHitomiSearchUrl(criteria, hitomiAppend, resultPage),
         signal,
       )
-      if (response.success === false) {
-        throw new ApiError(response.message ?? 'Hitomi検索に失敗しました。', { category: 'server' })
-      }
       const tags = response.tags ?? []
       const mapped = mapHitomiSearchResponse({ ...response, tags })
       return {
@@ -264,7 +261,6 @@ export function useSearchExecution({
       buildBookSearchFilter(criteria, sortType, sortDirection, resultPage, searchLimit),
       signal,
     )
-    if (response.success === false) throw new ApiError(response.message ?? '検索に失敗しました。', { category: 'server' })
     const entities = response.tags ?? []
     return {
       books: (response.books ?? []).map((book) => mapEBookToCard(book, { context: 'library', entities })),

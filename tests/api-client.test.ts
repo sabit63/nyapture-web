@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
-import { ApiClient, ApiError, requestJsonResponse } from '../src/api/client'
+import { ApiClient, ApiError, getErrorMessage, requestJsonResponse } from '../src/api/client'
 import { getBookPageBlob } from '../src/api/endpoints'
 
 type FetchInput = Parameters<typeof fetch>[1]
@@ -22,6 +22,23 @@ const waitFor = async (predicate: () => boolean) => {
 }
 
 const abortLike = () => ({ name: 'AbortError', message: 'aborted' })
+
+it('includes the HTTP status in user messages only when available', async () => {
+  const client = new ApiClient({ apiUrl: 'http://localhost:5270' })
+  for (const [status, message] of [
+    [500, 'APIサーバーでエラーが発生しました。'],
+    [401, 'APIキーが正しくありません。'],
+    [504, 'APIへの接続がタイムアウトしました。'],
+  ] as const) {
+    setFetch(async () => new Response('private server details', { status }))
+    await assert.rejects(client.requestJson('/api/book/search'), (error: unknown) => {
+      assert.equal(getErrorMessage(error), `${message} (StatusCode: ${status})`)
+      return true
+    })
+  }
+  assert.equal(getErrorMessage(new ApiError('details', { category: 'server' })), 'APIサーバーでエラーが発生しました。')
+  assert.equal(getErrorMessage(new ApiError('details', { category: 'offline' })), 'APIに接続できません。ネットワークを確認してください。')
+})
 
 describe('ApiClient body lifecycle', () => {
   it('rejects an already-aborted caller without starting fetch', async () => {

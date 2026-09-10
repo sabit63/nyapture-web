@@ -8,8 +8,6 @@ import type {
   WebBookCacheBookDto,
   WebBookCacheConfigDto,
   WebBookCacheConfigResponse,
-  WebBookCacheSearchRequest,
-  WebBookCacheSearchResponse,
   WebBookCacheSiteTestResponse,
   WebBookCacheStatusResponse,
   WebBookCacheSyncRequest,
@@ -22,14 +20,7 @@ const segment = (value: string) => encodeURIComponent(value)
 const { assertSuccess, unwrapData } = createEnvelopePolicy('Web Book Cache APIの応答に失敗しました。')
 
 /** Search responses are returned directly by the Web Book Cache endpoint. */
-export const searchCache = async (
-  request: WebBookCacheSearchRequest,
-  signal?: AbortSignal,
-): Promise<WebBookCacheSearchResponse> => {
-  const response = await searchWebBookCache(request, signal)
-  assertSuccess(response)
-  return response
-}
+export const searchCache = searchWebBookCache
 
 export const getCacheBook = async (
   groupId: string,
