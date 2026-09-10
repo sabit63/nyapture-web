@@ -21,7 +21,6 @@ export type SearchUrlSyncOptions = {
 
 export type SearchRouteStateBindings = {
   setDraftStatuses?: Dispatch<SetStateAction<NyaBookStatus[]>>
-  setStatusesError?: Dispatch<SetStateAction<string>>
   setCriteria: Dispatch<SetStateAction<SearchCriteria>>
   setQuery: Dispatch<SetStateAction<string>>
   setDraftMissingTagTypes: Dispatch<SetStateAction<NyaTagType[]>>
@@ -143,7 +142,6 @@ export function useSearchUrlSync({
     bindings.setCriteria(cloneCriteria(routeCriteria))
     bindings.setQuery(routeCriteria.text)
     bindings.setDraftStatuses?.([...(routeCriteria.statuses ?? [])])
-    bindings.setStatusesError?.(validateCriteria(routeCriteria, false, isStatusSearch).statuses ?? '')
     bindings.setDraftMissingTagTypes([...(routeCriteria.missingTagTypes ?? [])])
     bindings.setMissingTagsError(validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
     bindings.setDraftCriteria(cloneCriteria(routeCriteria))
@@ -153,7 +151,7 @@ export function useSearchUrlSync({
     bindings.setAdvancedErrors({})
     bindings.setSelected([])
     return true
-  }, [isStatusSearch, isLibrarySearch, isMissingTagSearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage])
+  }, [isLibrarySearch, isMissingTagSearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage])
 
   useEffect(() => {
     const bindings = routeBindingsRef?.current

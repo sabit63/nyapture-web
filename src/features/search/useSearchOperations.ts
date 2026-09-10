@@ -12,7 +12,9 @@ import {
 } from '../../api'
 import type { ApiBookCardModel } from '../../api'
 import { findSearchBookIndex } from './search-book-download'
-import type { BookCardModel } from '../../models'
+import type { BookCardModel, BookDownloadStatus } from '../../models'
+import { bookDownloadHubClient } from '../../realtime/book-download-hub'
+import { applySearchBookDownloadStatus, normalizeSearchBookDownloadStatus } from '../../realtime/search-book-status'
 import { deleteBooksWithConcurrency, getBookIdentityKey } from '../library/book-deletion'
 import type { CloseReason, NativeDialogControls } from '../../components/ui'
 
@@ -59,6 +61,7 @@ export function useSearchOperations({
   const bulkDownloadRef = useRef<AbortController | null>(null)
   useEffect(() => {
     setBulkDownloadPending(false)
+    downloadRequestsRef.current = new Set()
     return () => {
       bulkDownloadRef.current?.abort()
       bulkDownloadRef.current = null
@@ -70,6 +73,7 @@ export function useSearchOperations({
   const [deleteDialogError, setDeleteDialogError] = useState('')
   const [pendingDeletionKeys, setPendingDeletionKeys] = useState<Set<string>>(() => new Set())
   const [webDetailBook, setWebDetailBook] = useState<ApiBookCardModel>()
+  const downloadRequestsRef = useRef(new Set<string>())
   const [webDetailDialogOpen, setWebDetailDialogOpen] = useState(false)
   const [webDetailLoading, setWebDetailLoading] = useState(false)
   const [webDetailError, setWebDetailError] = useState('')
@@ -82,6 +86,35 @@ export function useSearchOperations({
   const webDetailDialogRef = useRef<HTMLDialogElement>(null)
   const webDetailTriggerRef = useRef<HTMLElement | null>(null)
   const webDetailRequestRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (!webDetailDialogOpen) return
+    const versions = new Map<string, number>()
+    const applyStatus = (status: BookDownloadStatus) => {
+      setWebDetailBook((current) => current
+        ? applySearchBookDownloadStatus([current], status, versions).books[0]
+        : current)
+    }
+    const applyCollection = (statuses: BookDownloadStatus[]) => statuses.forEach(applyStatus)
+    return bookDownloadHubClient.subscribe({
+      onStatus: (kind, status) => applyStatus(normalizeSearchBookDownloadStatus(status, kind === 'completed')),
+      onRunningDownloads: applyCollection,
+      onQueuedDownloads: applyCollection,
+      onAllDownloadStatuses: (statuses) => applyCollection(Object.values(statuses)),
+      onBookDownloadStatus: applyStatus,
+    })
+  }, [apiRevision, routeKey, webDetailDialogOpen])
+
+  const requestDownload = useCallback(async (url: string, signal?: AbortSignal) => {
+    const requests = downloadRequestsRef.current
+    if (requests.has(url)) return false
+    requests.add(url)
+    try {
+      await startBookDownload({ url, requestedBy: 'nyapture-web' }, signal)
+      return true
+    } finally {
+      requests.delete(url)
+    }
+  }, [])
   const abortDeleteOperations = useCallback(() => {
     deleteOperationControllersRef.current.forEach((controller) => controller.abort())
     deleteOperationControllersRef.current.clear()
@@ -188,7 +221,6 @@ export function useSearchOperations({
     return trigger
   }, [])
 
-  const updateResultBooks = isWebSearch ? updateWebSearchResultBooks : setLibrarySearchBooks
   const replaceResultBook = useCallback((book: BookCardModel, refreshed: ApiBookCardModel) => {
     if (isWebSearch) {
       replaceWebSearchBook(book, refreshed)
@@ -243,7 +275,7 @@ export function useSearchOperations({
   }, [fetchWebBook, notify, replaceWebSearchBooks, selected, setSelected, setSelectMode, webSearchResultBooks])
 
   const downloadWebBook = useCallback(async (book: BookCardModel) => {
-    if (book.status === 'Downloaded' || book.status === 'Downloading' || book.status === 'Shredding') return
+    if (['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(book.status)) return
 
     const originalUrl = book.url?.trim()
     let targetBook = book as ApiBookCardModel
@@ -258,7 +290,7 @@ export function useSearchOperations({
         const currentBooks = isWebSearch ? searchResultsRef.current.webSearchResultBooks : searchResultsRef.current.librarySearchBooks
         const currentIndex = findSearchBookIndex(currentBooks, book, targetBook)
         const currentBook = currentIndex >= 0 ? currentBooks[currentIndex] : undefined
-        const status = currentBook?.status === 'Downloaded' || currentBook?.status === 'Downloading'
+        const status = currentBook && ['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(currentBook.status)
           ? currentBook.status
           : targetBook.status
         targetBook = status === targetBook.status ? targetBook : { ...targetBook, status }
@@ -279,9 +311,9 @@ export function useSearchOperations({
     const currentBooks = isWebSearch ? searchResultsRef.current.webSearchResultBooks : searchResultsRef.current.librarySearchBooks
     const currentIndex = findSearchBookIndex(currentBooks, book, targetBook)
     const currentStatus = currentIndex >= 0 ? currentBooks[currentIndex].status : undefined
-    const discoveredStatus = currentStatus === 'Downloaded' || currentStatus === 'Downloading'
+    const discoveredStatus = currentStatus && ['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(currentStatus)
       ? currentStatus
-      : targetBook.status === 'Downloaded' || targetBook.status === 'Downloading'
+      : ['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(targetBook.status)
         ? targetBook.status
         : undefined
     if (discoveredStatus === 'Downloaded') {
@@ -292,30 +324,19 @@ export function useSearchOperations({
       notify(`「${targetBook.title || book.title}」はダウンロード中です`, 'warning')
       return
     }
+    if (discoveredStatus === 'Standby' || discoveredStatus === 'Shredding') return
 
     try {
-      await startBookDownload({ url: targetUrl, requestedBy: 'nyapture-web' })
-      updateResultBooks((current) => {
-        const index = findSearchBookIndex(current, book, targetBook)
-        if (index < 0) return current
-        const currentBook = current[index]
-        if (currentBook.status === 'Downloaded') return current
-        const next = [...current]
-        next[index] = { ...currentBook, status: 'Downloading' }
-        return next
-      })
-      setWebDetailBook((current) => current && current.url === targetUrl
-        ? { ...current, status: 'Downloading' }
-        : current)
+      if (!await requestDownload(targetUrl)) return
       notify(`「${targetBook.title || book.title}」のダウンロードを開始しました`)
     } catch (error) {
       notify(`ダウンロードを開始できませんでした: ${getErrorMessage(error)}`, 'error')
     }
-  }, [fetchWebBook, isWebSearch, notify, replaceResultBook, searchResultsRef, updateResultBooks])
+  }, [fetchWebBook, isWebSearch, notify, replaceResultBook, requestDownload, searchResultsRef])
 
-  const canDownloadLibraryBook = (book: ApiBookCardModel) => Boolean(book.url?.trim())
+  const canDownloadLibraryBook = useCallback((book: ApiBookCardModel) => Boolean(book.url?.trim())
     && !['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(book.status)
-    && !pendingDeletionKeysRef.current.has(getBookIdentityKey(book))
+    && !pendingDeletionKeysRef.current.has(getBookIdentityKey(book)), [])
   const downloadableSelectedCount = librarySearchBooks.filter((book) => selected.includes(getBookIdentityKey(book)) && canDownloadLibraryBook(book)).length
 
   const downloadSelectedLibraryBooks = useCallback(async () => {
@@ -334,16 +355,17 @@ export function useSearchOperations({
         if (controller.signal.aborted) return
         const key = getBookIdentityKey(book)
         const current = searchResultsRef.current.librarySearchBooks.find((candidate) => getBookIdentityKey(candidate) === key)
-        if (!current || !current.url?.trim() || ['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(current.status) || pendingDeletionKeysRef.current.has(key)) {
+        if (!current || !canDownloadLibraryBook(current)) {
           skipped++
           continue
         }
         try {
-          await startBookDownload({ url: current.url.trim(), requestedBy: 'nyapture-web' }, controller.signal)
+          if (!await requestDownload(current.url.trim(), controller.signal)) {
+            skipped++
+            continue
+          }
           if (controller.signal.aborted) return
           succeeded++
-          setLibrarySearchBooks((books) => books.map((candidate) => getBookIdentityKey(candidate) === key && candidate.status !== 'Downloaded'
-            ? { ...candidate, status: 'Downloading' } : candidate))
           setSelected((keys) => keys.filter((value) => value !== key))
         } catch {
           if (controller.signal.aborted) return
@@ -358,7 +380,7 @@ export function useSearchOperations({
         setBulkDownloadPending(false)
       }
     }
-  }, [notify, searchResultsRef, selected, setLibrarySearchBooks, setSelected])
+  }, [canDownloadLibraryBook, notify, requestDownload, searchResultsRef, selected, setSelected])
 
   const openDeleteDialog = useCallback((books: ApiBookCardModel[], trigger: HTMLElement | null, bulk = false) => {
     if (!books.length || deleteDialogPendingRef.current) return

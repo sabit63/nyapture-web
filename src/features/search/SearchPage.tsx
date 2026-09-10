@@ -250,10 +250,7 @@ export function SearchPage({ controller }: SearchPageProps) {
       {controller.isStatusSearch && (
         <form className="missing-search-panel" onSubmit={controller.submitSearch}>
           <BookStatusFields id="book-status" value={controller.draftStatuses} error={controller.statusesError}
-            onChange={(statuses) => {
-              controller.setDraftStatuses(statuses)
-              controller.setStatusesError(statuses.length ? '' : '1種類以上選択してください。')
-            }} />
+            onChange={controller.setDraftStatuses} />
           <div className="missing-search-actions">
             <span role="status">{controller.draftStatuses.length !== (criteria.statuses?.length ?? 0) || controller.draftStatuses.some((status) => !criteria.statuses?.includes(status)) || controller.query !== criteria.text ? '条件の変更はまだ検索結果に反映されていません' : ''}</span>
             <Button type="submit" variant="solid" tone="accent">検索</Button>

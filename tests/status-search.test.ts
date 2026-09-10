@@ -67,11 +67,15 @@ it('commits status selections, preserves them in pagination and advanced search,
     assert.equal(requests.at(-1)?.page, 1)
     assert.deepEqual(hook.current.draftStatuses, ['DownloadError'])
     await act(async () => { hook.current.setDraftStatuses([]) })
+    assert.ok(hook.current.statusesError)
     const count = requests.length
     await act(async () => { hook.current.submitSearch(submit) })
     assert.ok(hook.current.statusesError)
     assert.equal(requests.length, count)
     assert.deepEqual(new URL(hook.current.getTagSearchHref({ type: 'Artists', name: 'artist' })).searchParams.getAll('status'), ['DownloadError'])
+    await act(async () => { hook.current.setDraftStatuses(['Cancel']) })
+    assert.equal(hook.current.statusesError, '')
+    assert.equal(requests.length, count)
   } finally {
     await hook.unmount()
     dom.cleanup()
@@ -118,7 +122,7 @@ it('bulk download skips ineligible books, prevents duplicate runs, preserves fai
     await act(async () => { first.resolve(response({ success: true })); await run })
     assert.deepEqual(started, ['https://example.test/0', 'https://example.test/1'])
     assert.equal(hook.current.bulkDownloadPending, false)
-    assert.equal(hook.current.visibleBooks[0].status, 'Downloading')
+    assert.equal(hook.current.visibleBooks[0].status, 'Cancel')
     assert.equal(hook.current.selected.includes('g\u00000'), false)
     assert.equal(hook.current.selected.includes('g\u00001'), true)
     assert.match(messages.at(-1)!, /1件のダウンロード.*1件は失敗/)
@@ -171,4 +175,34 @@ it('renders the status checkboxes and enables both bulk actions in selection mod
     if (previousReact) Object.defineProperty(globalThis, 'React', previousReact)
     else Reflect.deleteProperty(globalThis, 'React')
   }
+})
+
+it('rechecks the latest book status before each bulk download request', async () => {
+  const dom = installHookDom('http://localhost/search/status')
+  const books = ['0', '1'].map((bookId) => ({
+    groupId: 'g', bookId, title: bookId, status: 'Cancel', totalPage: 1, url: `https://example.test/${bookId}`,
+  }))
+  const first = deferred<Response>()
+  const started: string[] = []
+  globalThis.fetch = async (url, init) => {
+    const path = new URL(String(url)).pathname
+    if (path === '/api/download/start') {
+      started.push((JSON.parse(String(init?.body)) as { url: string }).url)
+      return first.promise
+    }
+    return response({ success: true, books: path === '/api/book/g/1' ? [{ ...books[1], status: 'Downloaded' }] : books, totalPage: 1 })
+  }
+  const hook = await renderHook(() => useSearchController(options), undefined)
+  try {
+    await act(async () => { hook.current.toggleSelectMode(); hook.current.selectAllVisibleBooks() })
+    assert.equal(hook.current.downloadableSelectedCount, 2)
+    let run!: Promise<void>
+    await act(async () => { run = hook.current.downloadSelectedLibraryBooks() })
+    await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[1]) })
+    assert.equal(hook.current.downloadableSelectedCount, 1)
+    await act(async () => { first.resolve(response({ success: true })); await run })
+    assert.deepEqual(started, ['https://example.test/0'])
+    assert.equal(hook.current.visibleBooks[1].status, 'Downloaded')
+    assert.equal(hook.current.bulkDownloadPending, false)
+  } finally { await hook.unmount(); dom.cleanup() }
 })

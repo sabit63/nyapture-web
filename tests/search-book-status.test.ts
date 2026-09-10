@@ -58,6 +58,17 @@ test('completion normalizes stale embedded Downloading state and reloads the thu
   assert.equal(result.books[0].thumbnailReloadKey, `downloaded:${updatedAt}`)
 })
 
+test('queued and running notifications override stale embedded book status', () => {
+  const versions = new Map<string, number>()
+  const queued = applySearchBookDownloadStatus([makeCard()], makeStatus({ executionState: 'Queued' }), versions)
+  assert.equal(queued.books[0].status, 'Standby')
+  const running = applySearchBookDownloadStatus(queued.books, makeStatus({
+    book: { ...makeStatus().book, status: 'Standby' },
+    lastUpdated: '2026-09-05T00:00:01.000Z',
+  }), versions)
+  assert.equal(running.books[0].status, 'Downloading')
+})
+
 test('a completed hub event is normalized even when executionState is missing or stale', () => {
   const stale = makeStatus({ executionState: 'Running' })
   const normalized = normalizeSearchBookDownloadStatus(stale, true)

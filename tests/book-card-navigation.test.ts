@@ -120,6 +120,12 @@ it('uses the status action matrix in normal mode and no overlay buttons in selec
             onToggle: () => {}, onTagSearch: () => {},
             onRefresh: handler, onDownload: handler, onDelete: handler,
           })) })
+          const statusLabels = {
+            Unknown: '状態不明', Standby: '待機中', Downloaded: 'ダウンロード済み', Downloading: 'DL',
+            Cancel: 'キャンセル', DownloadError: '取得失敗', SaveError: '保存失敗', ShortPage: 'ページ不足',
+            Shredding: '削除中', Deleted: '削除済み', WebBook: '未保存', WebBookInPage: '検索候補',
+          }
+          assert.equal(container.querySelector('.book-cover [data-book-status]')?.textContent, `状態: ${statusLabels[status]}`)
           const labels = [...container.querySelectorAll('.card-action')].map((button) => button.getAttribute('aria-label'))
           assert.deepEqual(labels, selectMode ? [] : expected.map((label) => `Fixture bookを${label}`), `${status}, select=${selectMode}`)
           if (selectMode) assert.equal(container.querySelector('.book-cover button'), null)

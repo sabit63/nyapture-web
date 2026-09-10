@@ -109,7 +109,7 @@ export function useSearchController({
   const continuousStart = parseSearchStartIdentity(routeSearchParams, isLibrarySearch)
   const [criteria, setCriteria] = useState<SearchCriteria>(() => cloneCriteria(routeCriteria))
   const [draftStatuses, setDraftStatuses] = useState<NyaBookStatus[]>(() => [...(routeCriteria.statuses ?? [])])
-  const [statusesError, setStatusesError] = useState(() => validateCriteria(routeCriteria, false, isStatusSearch).statuses ?? '')
+  const statusesError = validateCriteria({ ...criteria, statuses: draftStatuses }, false, isStatusSearch).statuses ?? ''
   const [draftMissingTagTypes, setDraftMissingTagTypes] = useState<NyaTagType[]>(() => [...(routeCriteria.missingTagTypes ?? [])])
   const [missingTagsError, setMissingTagsError] = useState(() => validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(routeSearchParams).text)
@@ -142,7 +142,6 @@ export function useSearchController({
     setCriteria,
     setQuery,
     setDraftStatuses,
-    setStatusesError,
     setDraftMissingTagTypes,
     setMissingTagsError,
     setDraftCriteria,
@@ -412,7 +411,6 @@ export function useSearchController({
     }
     const errors = validateCriteria(nextCriteria, isMissingTagSearch, isStatusSearch)
     setMissingTagsError(errors.missingTags ?? '')
-    setStatusesError(errors.statuses ?? '')
     if (errors.missingTags || errors.statuses) return
     if (isMissingTagSearch || isStatusSearch) setQuery(nextCriteria.text)
     const url = createSearchUrlForDestination(nextCriteria, {
@@ -558,7 +556,6 @@ export function useSearchController({
     if (isStatusSearch) {
       setQuery(nextCriteria.text)
       setDraftStatuses([...(nextCriteria.statuses ?? [])])
-      setStatusesError('')
     }
     if (isMissingTagSearch) {
       setQuery(nextCriteria.text)
@@ -606,7 +603,6 @@ export function useSearchController({
     statusesError,
     draftMissingTagTypes,
     setDraftStatuses,
-    setStatusesError,
     setDraftMissingTagTypes,
     missingTagsError,
     setMissingTagsError,

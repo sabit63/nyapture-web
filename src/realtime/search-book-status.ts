@@ -15,24 +15,25 @@ export type SearchBookStatusApplyResult = {
 }
 
 /**
- * Completion notifications are authoritative even when their embedded book
- * snapshot was captured before the final status was persisted. Keep the
- * event's identity and metadata while exposing the terminal book state to
- * search cards.
+ * Execution state is authoritative for queued, running and completed jobs,
+ * even when the embedded book snapshot predates the state change.
  */
 export const normalizeSearchBookDownloadStatus = (
   status: BookDownloadStatus,
   isCompletionEvent = false,
 ) => {
   const isCompleted = isCompletionEvent || status.executionState === 'Completed'
-  if (!isCompleted || !status.book) return status
+  const bookStatus: NyaBookStatus | undefined = isCompleted ? 'Downloaded'
+    : status.executionState === 'Queued' ? 'Standby'
+      : status.executionState === 'Running' ? 'Downloading' : undefined
+  if (!bookStatus || !status.book) return status
 
   return {
     ...status,
-    executionState: 'Completed' as const,
+    executionState: isCompleted ? 'Completed' as const : status.executionState,
     book: {
       ...status.book,
-      status: 'Downloaded' as const,
+      status: bookStatus,
     },
   }
 }

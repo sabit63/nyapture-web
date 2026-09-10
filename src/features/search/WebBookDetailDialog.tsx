@@ -40,6 +40,8 @@ export function WebBookDetailDialog({ controller }: WebBookDetailDialogProps) {
   const canDownload = Boolean(book)
     && book?.status !== 'Downloaded'
     && book?.status !== 'Downloading'
+    && book?.status !== 'Standby'
+    && book?.status !== 'Shredding'
     && !controller.webDetailLoading
   const tagsByType = TAG_TYPE_ORDER.map((type) => ({
     type,
@@ -154,7 +156,7 @@ export function WebBookDetailDialog({ controller }: WebBookDetailDialogProps) {
               onClick={() => { if (book) void controller.downloadWebBook(book) }}
             >
               <Download size={16} aria-hidden="true" />
-              {book.status === 'Downloading' ? 'ダウンロード中…' : book.status === 'Downloaded' ? 'ダウンロード済み' : 'ダウンロード'}
+              {book.status === 'Standby' ? '待機中' : book.status === 'Downloading' ? 'ダウンロード中…' : book.status === 'Downloaded' ? 'ダウンロード済み' : 'ダウンロード'}
             </Button>
           </DialogFooter>
         </div>

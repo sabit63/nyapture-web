@@ -11,14 +11,13 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { NyaBookStatus } from '../models'
+import { BOOK_STATUS_LABELS, type NyaBookStatus } from '../models'
 import './book-status-badge.css'
 
 type StatusTone = 'info' | 'candidate' | 'accent' | 'neutral' | 'danger' | 'warning' | 'destructive' | 'muted'
 type StatusEffect = 'none' | 'candidate' | 'error' | 'short-page' | 'shredding' | 'deleted'
 
 type Presentation = {
-  label: string
   tone: StatusTone
   effect: StatusEffect
   icon: LucideIcon | null
@@ -27,84 +26,72 @@ type Presentation = {
 
 const STATUS_PRESENTATIONS: Record<NyaBookStatus, Presentation> = {
   Unknown: {
-    label: '状態不明',
     tone: 'neutral',
     effect: 'none',
     icon: CircleHelp,
     animated: false,
   },
   Standby: {
-    label: '待機中',
     tone: 'accent',
     effect: 'none',
     icon: Clock3,
     animated: false,
   },
   Downloaded: {
-    label: 'ダウンロード済み',
     tone: 'muted',
     effect: 'none',
     icon: CheckCircle2,
     animated: false,
   },
   Downloading: {
-    label: 'DL',
     tone: 'info',
     effect: 'none',
     icon: null,
     animated: true,
   },
   Cancel: {
-    label: 'キャンセル',
     tone: 'warning',
     effect: 'none',
     icon: CircleSlash2,
     animated: false,
   },
   DownloadError: {
-    label: '取得失敗',
     tone: 'danger',
     effect: 'error',
     icon: TriangleAlert,
     animated: false,
   },
   SaveError: {
-    label: '保存失敗',
     tone: 'danger',
     effect: 'error',
     icon: Save,
     animated: false,
   },
   ShortPage: {
-    label: 'ページ不足',
     tone: 'danger',
     effect: 'short-page',
     icon: FileWarning,
     animated: false,
   },
   Shredding: {
-    label: '削除中',
     tone: 'destructive',
     effect: 'shredding',
     icon: null,
     animated: true,
   },
   Deleted: {
-    label: '削除済み',
     tone: 'muted',
     effect: 'deleted',
     icon: Trash2,
     animated: false,
   },
   WebBook: {
-    label: '未保存',
     tone: 'info',
     effect: 'none',
     icon: Cloud,
     animated: false,
   },
   WebBookInPage: {
-    label: '検索候補',
     tone: 'candidate',
     effect: 'candidate',
     icon: Search,
@@ -124,9 +111,10 @@ export type BookStatusBadgeProps = {
 export function BookStatusBadge({ status, variant = 'card' }: BookStatusBadgeProps) {
   const resolvedStatus: NyaBookStatus = isNyaBookStatus(status) ? status : 'Unknown'
   const presentation = STATUS_PRESENTATIONS[resolvedStatus]
+  const label = resolvedStatus === 'Downloading' ? 'DL' : BOOK_STATUS_LABELS[resolvedStatus]
 
   if (resolvedStatus === 'Downloaded' && variant === 'card') {
-    return <span className="sr-only" data-book-status={resolvedStatus}>状態: {presentation.label}</span>
+    return <span className="sr-only" data-book-status={resolvedStatus}>状態: {label}</span>
   }
 
   const Icon = presentation.icon
@@ -142,11 +130,11 @@ export function BookStatusBadge({ status, variant = 'card' }: BookStatusBadgePro
       <span className={badgeClassName} data-book-status={resolvedStatus}>
         <span className="book-status-badge__dot" aria-hidden="true" />
         {resolvedStatus === 'Downloaded' ? (
-          <span className="sr-only">状態: {presentation.label}</span>
+          <span className="sr-only">状態: {label}</span>
         ) : (
           <>
             <span className="sr-only">状態: </span>
-            <span>{presentation.label}</span>
+            <span>{label}</span>
           </>
         )}
       </span>
@@ -168,7 +156,7 @@ export function BookStatusBadge({ status, variant = 'card' }: BookStatusBadgePro
           Icon && <Icon size={13} strokeWidth={2.2} aria-hidden="true" />
         )}
         <span className="sr-only">状態: </span>
-        <span>{presentation.label}</span>
+        <span>{label}</span>
       </span>
     </>
   )

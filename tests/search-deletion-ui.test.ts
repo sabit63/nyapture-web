@@ -5,7 +5,8 @@ import { useRef, useState } from 'react'
 import type { ApiBookCardModel } from '../src/api'
 import { useSearchController } from '../src/features/search/useSearchController'
 import { useSearchOperations } from '../src/features/search/useSearchOperations'
-import { act, installHookDom, renderHook } from './helpers/react-hook'
+import { bookDownloadHubClient, type BookDownloadHubListener } from '../src/realtime/book-download-hub'
+import { act, deferred, installHookDom, renderHook } from './helpers/react-hook'
 
 const book: ApiBookCardModel = {
   groupId: 'group-1',
@@ -23,6 +24,96 @@ const book: ApiBookCardModel = {
   tags: [],
   cover: 'violet',
 }
+
+for (const bulk of [false, true]) {
+  it(`${bulk ? 'bulk' : 'single'} start responses preserve queued notifications and block duplicate requests`, async (t) => {
+    const dom = installHookDom('http://localhost/search')
+    const listeners = new Set<BookDownloadHubListener>()
+    t.mock.method(bookDownloadHubClient, 'subscribe', (listener: BookDownloadHubListener) => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    })
+    const started = deferred<Response>()
+    let requests = 0
+    globalThis.fetch = async (input) => {
+      if (new URL(String(input)).pathname === '/api/download/start') {
+        requests++
+        return started.promise
+      }
+      return Response.json({ success: true, books: [{ ...book, status: 'Cancel' }], totalPage: 1 })
+    }
+    const hook = await renderHook(() => useSearchController({
+      isWebSearch: false, isLibrarySearch: true, isMissingTagSearch: false, isBookViewer: false,
+      apiRevision: 0, displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
+      hubConnectionState: 'idle', notify: () => {},
+    }), undefined)
+    try {
+      await act(async () => { hook.current.selectAllVisibleBooks() })
+      const download = () => bulk ? hook.current.downloadSelectedLibraryBooks()
+        : hook.current.downloadWebBook(hook.current.visibleBooks[0])
+      let run!: Promise<void>
+      await act(async () => { run = download() })
+      await act(async () => { await download() })
+      assert.equal(requests, 1)
+      assert.equal(hook.current.visibleBooks[0].status, 'Cancel')
+      await act(async () => {
+        for (const listener of listeners) listener.onStatus?.('statusUpdate', {
+          book: { ...book, status: 'Downloading' }, executionState: 'Queued',
+          lastUpdated: '2026-09-10T00:00:00Z',
+        })
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+      })
+      assert.equal(hook.current.visibleBooks[0].status, 'Standby')
+      await act(async () => { started.resolve(Response.json({ success: true })); await run })
+      assert.equal(hook.current.visibleBooks[0].status, 'Standby')
+      await act(async () => { await download() })
+      assert.equal(requests, 1)
+    } finally {
+      await hook.unmount()
+      assert.equal(listeners.size, 0)
+      dom.cleanup()
+    }
+  })
+}
+
+it('web detail status follows hub notifications instead of the start response', async (t) => {
+  const dom = installHookDom()
+  const listeners = new Set<BookDownloadHubListener>()
+  t.mock.method(bookDownloadHubClient, 'subscribe', (listener: BookDownloadHubListener) => {
+    listeners.add(listener)
+    return () => { listeners.delete(listener) }
+  })
+  const started = deferred<Response>()
+  globalThis.fetch = async (input) => new URL(String(input)).pathname === '/api/download/start'
+    ? started.promise : Response.json({ success: true, book: { ...book, status: 'WebBook' } })
+  const candidate = { ...book, apiGroupId: undefined, apiBookId: undefined, status: 'WebBook' as const }
+  const hook = await renderHook(() => useSearchOperations({
+    isWebSearch: true, apiRevision: 0, routeKey: '/web', librarySearchBooks: [], webSearchResultBooks: [], selected: [],
+    searchResultsRef: { current: { librarySearchBooks: [], webSearchResultBooks: [], selected: [] } },
+    setLibrarySearchBooks: () => {}, setSelected: () => {}, setSelectMode: () => {},
+    updateWebSearchResultBooks: () => {}, replaceWebSearchBook: () => {}, replaceWebSearchBooks: () => {}, notify: () => {},
+  }), undefined)
+  try {
+    await act(async () => { hook.current.openWebBookDetail(candidate) })
+    assert.equal(hook.current.webDetailBook?.status, 'WebBook')
+    let run!: Promise<void>
+    await act(async () => { run = hook.current.downloadWebBook(hook.current.webDetailBook!) })
+    await act(async () => {
+      for (const listener of listeners) listener.onQueuedDownloads?.([{
+        book: { ...book, status: 'Downloading' }, executionState: 'Queued', lastUpdated: '2026-09-10T00:00:00Z',
+      }])
+    })
+    assert.equal(hook.current.webDetailBook?.status, 'Standby')
+    await act(async () => { started.resolve(Response.json({ success: true })); await run })
+    assert.equal(hook.current.webDetailBook?.status, 'Standby')
+    await act(async () => {
+      for (const listener of listeners) listener.onStatus?.('started', {
+        book: { ...book, status: 'Standby' }, executionState: 'Running', lastUpdated: '2026-09-10T00:00:01Z',
+      })
+    })
+    assert.equal(hook.current.webDetailBook?.status, 'Downloading')
+  } finally { await hook.unmount(); dom.cleanup() }
+})
 
 it('refreshes and downloads a cancelled library book through the card operations', async () => {
   const dom = installHookDom('http://localhost/search')
@@ -44,7 +135,7 @@ it('refreshes and downloads a cancelled library book through the card operations
     await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[0]) })
     assert.equal(hook.current.visibleBooks[0]?.title, 'Refreshed book')
     await act(async () => { await hook.current.downloadWebBook(hook.current.visibleBooks[0]) })
-    assert.equal(hook.current.visibleBooks[0]?.status, 'Downloading')
+    assert.equal(hook.current.visibleBooks[0]?.status, 'Cancel')
     assert.ok(paths.includes('/api/book/group-1/book-1'))
     assert.ok(paths.includes('/api/download/start'))
   } finally {
