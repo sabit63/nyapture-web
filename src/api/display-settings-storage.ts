@@ -32,14 +32,6 @@ type PersistedDisplaySettings = {
   colorTheme?: ColorTheme
 }
 
-/** A storage operation failed without exposing unrelated persisted data. */
-export class DisplaySettingsStorageError extends Error {
-  constructor(message = '表示設定を保存できませんでした。') {
-    super(message)
-    this.name = 'DisplaySettingsStorageError'
-  }
-}
-
 const defaultDisplaySettings = (): DisplaySettings => ({
   searchLimit: 50,
   recommendationLimit: 20,
@@ -133,22 +125,4 @@ export const loadPersistedDisplaySettings = (): DisplaySettings => {
   }
 
   return normalizeDisplaySettings(parsed)
-}
-
-/** Persist display settings under their own versioned storage key. */
-export const savePersistedDisplaySettings = (settings: DisplaySettings): void => {
-  const normalized = normalizeDisplaySettings(settings)
-  const storage = getLocalStorage()
-  if (!storage) throw new DisplaySettingsStorageError()
-
-  const persisted: PersistedDisplaySettings = {
-    version: DISPLAY_SETTINGS_STORAGE_VERSION,
-    ...normalized,
-  }
-
-  try {
-    storage.setItem(DISPLAY_SETTINGS_STORAGE_KEY, JSON.stringify(persisted))
-  } catch {
-    throw new DisplaySettingsStorageError()
-  }
 }

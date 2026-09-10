@@ -55,6 +55,17 @@ describe('Web Book Cache search state', () => {
     })
   })
 
+  it('keeps null date bounds and opaque ID order when building requests', () => {
+    const request = buildCacheSearchRequest({
+      ...state, from: '', to: '2024-02-30',
+      groupIds: ['', ' a ', 'b', ' a ', 'a'], bookIds: ['x', '', 'x', 'y'],
+    })
+    assert.equal(request.lowerUploadedTime, null)
+    assert.equal(request.upperUploadedTime, null)
+    assert.deepEqual(request.groupIds, [' a ', 'b', 'a'])
+    assert.deepEqual(request.bookIds, ['x', 'y'])
+  })
+
   it('resets malformed URL values to defaults', () => {
     const parsed = parseCacheSearch('?from=2024-02-30&to=nope&maxPages=0&page=-2&asc=1&groupId=&groupId=group%2Cwith%2Ccommas&bookId=a%20b&bookId=b')
 

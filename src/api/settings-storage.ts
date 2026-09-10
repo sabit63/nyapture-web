@@ -1,7 +1,6 @@
 import {
   DEFAULT_API_SETTINGS,
   isApiProxyProtocol,
-  normalizeApiSettings,
   validateApiSettings,
 } from './client'
 import type { ApiProxySettings, ApiSettings } from './client'
@@ -28,14 +27,6 @@ type PersistedApiSettingsV2 = PersistedApiSettingsBase & {
 type PersistedApiSettings = PersistedApiSettingsBase & {
   version: typeof API_SETTINGS_STORAGE_VERSION
   proxy: ApiProxySettings
-}
-
-/** A storage operation failed without exposing any API credentials. */
-export class ApiSettingsStorageError extends Error {
-  constructor(message = 'API設定を保存できませんでした。') {
-    super(message)
-    this.name = 'ApiSettingsStorageError'
-  }
 }
 
 const defaultApiSettings = (): ApiSettings => ({
@@ -154,40 +145,4 @@ export const loadPersistedApiSettings = (): ApiSettings => {
   }
 
   return result.normalized
-}
-
-/**
- * Persist validated settings. A missing or unavailable localStorage is a
- * visible failure so callers can leave the active client unchanged.
- */
-export const savePersistedApiSettings = (settings: ApiSettings): void => {
-  const normalized = normalizeApiSettings(settings)
-  const storage = getLocalStorage()
-  if (!storage) throw new ApiSettingsStorageError()
-
-  const persisted: PersistedApiSettings = {
-    version: API_SETTINGS_STORAGE_VERSION,
-    ...normalized,
-  }
-
-  try {
-    storage.setItem(API_SETTINGS_STORAGE_KEY, JSON.stringify(persisted))
-  } catch {
-    throw new ApiSettingsStorageError()
-  }
-}
-
-/** Remove persisted settings. Missing browser storage is treated as empty. */
-export const clearPersistedApiSettings = (): void => {
-  const storage = getLocalStorage()
-  if (!storage) {
-    if (typeof window !== 'undefined') throw new ApiSettingsStorageError('API設定を削除できませんでした。')
-    return
-  }
-
-  try {
-    storage.removeItem(API_SETTINGS_STORAGE_KEY)
-  } catch {
-    throw new ApiSettingsStorageError('API設定を削除できませんでした。')
-  }
 }
