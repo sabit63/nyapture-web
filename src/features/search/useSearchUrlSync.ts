@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from 'react'
 
 import { navigate, useRouterLocation, type RouterLocation } from '../../app/client-router'
-import type { HitomiAppend, NyaTagType, SearchCriteria } from '../../models'
+import type { HitomiAppend, NyaBookStatus, NyaTagType, SearchCriteria } from '../../models'
 import {
   cloneCriteria,
   parseCriteriaForRoute,
@@ -14,11 +14,14 @@ import {
 export type SearchUrlSyncOptions = {
   isWebSearch: boolean
   isLibrarySearch: boolean
+  isStatusSearch?: boolean
   isMissingTagSearch: boolean
   routeBindingsRef?: { current: SearchRouteStateBindings | null }
 }
 
 export type SearchRouteStateBindings = {
+  setDraftStatuses?: Dispatch<SetStateAction<NyaBookStatus[]>>
+  setStatusesError?: Dispatch<SetStateAction<string>>
   setCriteria: Dispatch<SetStateAction<SearchCriteria>>
   setQuery: Dispatch<SetStateAction<string>>
   setDraftMissingTagTypes: Dispatch<SetStateAction<NyaTagType[]>>
@@ -60,6 +63,7 @@ export const searchCriteriaRouteKey = (
   tags: criteria.tags.map((tag) => ({ type: tag.type, name: tag.name })),
   tagMode: criteria.tagMode,
   missingTagTypes: criteria.missingTagTypes,
+  statuses: criteria.statuses,
   dateFrom: criteria.dateFrom,
   dateTo: criteria.dateTo,
   pagesMin: criteria.pagesMin,
@@ -95,13 +99,14 @@ export function useSearchUrlSync({
   isWebSearch,
   isLibrarySearch,
   isMissingTagSearch,
+  isStatusSearch = false,
   routeBindingsRef,
 }: SearchUrlSyncOptions) {
   const routerLocation = useRouterLocation()
   const routeSearchParams = useMemo(() => new URLSearchParams(routerLocation.search), [routerLocation.search])
   const routeCriteria = useMemo(
-    () => parseCriteriaForRoute(routeSearchParams, isWebSearch, isMissingTagSearch),
-    [isMissingTagSearch, isWebSearch, routeSearchParams],
+    () => parseCriteriaForRoute(routeSearchParams, isWebSearch, isMissingTagSearch, isStatusSearch),
+    [isStatusSearch, isMissingTagSearch, isWebSearch, routeSearchParams],
   )
   const routeHitomiAppend = isWebSearch ? parseHitomiAppend(routeSearchParams) : 'Normal'
   const routeResultPage = parsePageParam(routeSearchParams.get('page'))
@@ -137,6 +142,8 @@ export function useSearchUrlSync({
     if (!isLibrarySearch && !isWebSearch) return false
     bindings.setCriteria(cloneCriteria(routeCriteria))
     bindings.setQuery(routeCriteria.text)
+    bindings.setDraftStatuses?.([...(routeCriteria.statuses ?? [])])
+    bindings.setStatusesError?.(validateCriteria(routeCriteria, false, isStatusSearch).statuses ?? '')
     bindings.setDraftMissingTagTypes([...(routeCriteria.missingTagTypes ?? [])])
     bindings.setMissingTagsError(validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
     bindings.setDraftCriteria(cloneCriteria(routeCriteria))
@@ -146,7 +153,7 @@ export function useSearchUrlSync({
     bindings.setAdvancedErrors({})
     bindings.setSelected([])
     return true
-  }, [isLibrarySearch, isMissingTagSearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage])
+  }, [isStatusSearch, isLibrarySearch, isMissingTagSearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage])
 
   useEffect(() => {
     const bindings = routeBindingsRef?.current

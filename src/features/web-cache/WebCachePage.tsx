@@ -53,12 +53,13 @@ const mapCacheResultBook = (book: WebBookCacheBookDto): ApiBookCardModel => ({
   thumbnailReloadKey: `${identity(book)}:${book.lastSyncedAt ?? ''}`,
 })
 
-function CacheCard({ book, card, disabled, enqueued, onDetail, onEnqueue, onDelete, onTagSearch, onTagSearchDestinationRequest }: {
+function CacheCard({ book, card, disabled, enqueued, onDetail, onRefresh, onEnqueue, onDelete, onTagSearch, onTagSearchDestinationRequest }: {
   book: WebBookCacheBookDto
   card: ApiBookCardModel
   disabled: boolean
   enqueued: boolean
   onDetail: () => void
+  onRefresh: () => void
   onEnqueue: () => void
   onDelete: () => void
   onTagSearch: (tag: BookTag) => void
@@ -79,8 +80,8 @@ function CacheCard({ book, card, disabled, enqueued, onDetail, onEnqueue, onDele
       downloadDisabled={enqueued}
       downloadLabel={disabled ? '処理中…' : enqueued ? '投入済み' : `${card.title}をダウンロード`}
       onDownload={onEnqueue}
+      onRefresh={onRefresh}
       onDelete={onDelete}
-      allowWebDelete
       onTagSearch={onTagSearch}
       onTagSearchDestinationRequest={onTagSearchDestinationRequest}
       extraActions={source && <a className={iconButtonClassName({ variant: 'outline', tone: 'neutral', size: 'compact' }, 'card-action card-action--control')} href={source} target="_blank" rel="noopener noreferrer" aria-label="配信元を別タブで開く"><ExternalLink size={16} aria-hidden="true" /></a>}
@@ -310,7 +311,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
     else navigate(`/web-cache${query}`)
   }
 
-  async function mutate(book: WebBookCacheBookDto, action: 'enqueue' | 'delete') {
+  async function mutate(book: WebBookCacheBookDto, action: 'enqueue' | 'delete' | 'refresh') {
     const key = identity(book)
     if (!hasIdentity(book) || operations.current.has(key) || action === 'enqueue' && enqueued.has(key)) return
     const controller = new AbortController()
@@ -318,6 +319,16 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
     setPending(new Set(operations.current.keys()))
     setDeleteError('')
     try {
+      if (action === 'refresh') {
+        const refreshed = await getCacheBook(book.groupId!, book.bookId!, controller.signal)
+        if (controller.signal.aborted) return
+        setBooks((current) => current.map((item) => identity(item) === key ? refreshed : item))
+        setBookCards((current) => current.map((card) => card.apiGroupId === book.groupId && card.apiBookId === book.bookId
+          ? { ...mapCacheResultBook(refreshed), status: card.status, thumbnailRequest: card.thumbnailRequest, thumbnailReloadKey: `refresh:${Date.now()}` }
+          : card))
+        notify('書籍情報を再取得しました。')
+        return
+      }
       if (action === 'enqueue') await enqueueCacheBook(book.groupId!, book.bookId!, controller.signal)
       else await deleteCacheBook(book.groupId!, book.bookId!, controller.signal)
       if (controller.signal.aborted) return
@@ -371,7 +382,7 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
       {error && <StatePanel title="検索できませんでした" description={error} action={<Button onClick={() => setRevision((value) => value + 1)}>再試行</Button>} />}
       {loading ? <StatePanel title="候補を検索しています…" /> : !error && books.length === 0 ? <StatePanel title="該当する候補がありません" description="検索条件を変更するか、管理画面で同期状態を確認してください。" /> : !error && (
         <BookGrid settings={displaySettings}>
-          {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} card={bookCards[index] ?? mapCacheResultBook(book)} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
+          {books.map((book, index) => <CacheCard key={`${identity(book)}:${index}`} book={book} card={bookCards[index] ?? mapCacheResultBook(book)} onTagSearch={searchByTag} onTagSearchDestinationRequest={onTagSearchDestinationRequest} disabled={pending.has(identity(book))} enqueued={enqueued.has(identity(book))} onDetail={() => setSelected(book)} onRefresh={() => { void mutate(book, 'refresh') }} onEnqueue={() => { void mutate(book, 'enqueue') }} onDelete={() => { setDeleteError(''); setDeleteTarget(book) }} />)}
         </BookGrid>
       )}
       {!loading && !error && totalPages > 1 && <nav className="pagination" aria-label="Web Cacheのページ">{getPaginationItems(applied.page, totalPages, 5).map((page, index) => page === 'ellipsis' ? <span key={`gap-${index}`}>…</span> : page === applied.page ? <span key={page} className="pagination__current" aria-current="page">{page}</span> : <Button key={page} onClick={() => navigate(`/web-cache${serializeCacheSearch({ ...applied, page })}`)} aria-label={`${page}ページへ`}>{page}</Button>)}</nav>}

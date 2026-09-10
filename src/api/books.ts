@@ -195,6 +195,7 @@ export const buildBookSearchFilter = (
   return {
     tagSet: criteria.tags.length ? tagSet : undefined,
     missingTagTypes: criteria.missingTagTypes?.length ? [...criteria.missingTagTypes] : undefined,
+    status: criteria.statuses?.length ? [...criteria.statuses] : undefined,
     texts: criteria.text.trim() ? [criteria.text.trim()] : undefined,
     lowerUploadedTime: asDateTime(criteria.dateFrom),
     upperUploadedTime: asDateTime(criteria.dateTo, true),

@@ -24,6 +24,35 @@ const book: ApiBookCardModel = {
   cover: 'violet',
 }
 
+it('refreshes and downloads a cancelled library book through the card operations', async () => {
+  const dom = installHookDom('http://localhost/search')
+  const paths: string[] = []
+  globalThis.fetch = async (input) => {
+    const path = new URL(String(input)).pathname
+    paths.push(path)
+    return new Response(JSON.stringify(path === '/api/download/start' ? { success: true } : {
+      success: true, books: [{ ...book, status: 'Cancel', title: path === '/api/book/group-1/book-1' ? 'Refreshed book' : book.title }], totalPage: 1,
+    }), { headers: { 'Content-Type': 'application/json' } })
+  }
+  const hook = await renderHook(() => useSearchController({
+    isWebSearch: false, isLibrarySearch: true, isMissingTagSearch: false, isBookViewer: false,
+    apiRevision: 0, displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
+    hubConnectionState: 'idle', notify: () => {},
+  }), undefined)
+  try {
+    assert.equal(hook.current.visibleBooks[0]?.status, 'Cancel')
+    await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[0]) })
+    assert.equal(hook.current.visibleBooks[0]?.title, 'Refreshed book')
+    await act(async () => { await hook.current.downloadWebBook(hook.current.visibleBooks[0]) })
+    assert.equal(hook.current.visibleBooks[0]?.status, 'Downloading')
+    assert.ok(paths.includes('/api/book/group-1/book-1'))
+    assert.ok(paths.includes('/api/download/start'))
+  } finally {
+    await hook.unmount()
+    dom.cleanup()
+  }
+})
+
 type HarnessProps = {
   apiRevision: number
   routeKey: string

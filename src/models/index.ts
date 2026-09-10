@@ -28,6 +28,13 @@ export const NYA_BOOK_STATUSES = [
 
 export type NyaBookStatus = (typeof NYA_BOOK_STATUSES)[number]
 
+export const BOOK_STATUS_LABELS: Record<NyaBookStatus, string> = {
+  Unknown: '状態不明', Standby: '待機中', Downloaded: 'ダウンロード済み',
+  Downloading: 'ダウンロード中', Cancel: 'キャンセル', DownloadError: '取得失敗',
+  SaveError: '保存失敗', ShortPage: 'ページ不足', Shredding: '削除中',
+  Deleted: '削除済み', WebBook: '未保存', WebBookInPage: '検索候補',
+}
+
 export const HITOMI_APPENDS = ['Normal', 'Male', 'Female'] as const
 
 export type HitomiAppend = (typeof HITOMI_APPENDS)[number]
@@ -364,6 +371,7 @@ export type SearchCriteria = {
   tags: BookTag[]
   tagMode: TagMode
   missingTagTypes?: NyaTagType[]
+  statuses?: NyaBookStatus[]
   dateFrom: string
   dateTo: string
   pagesMin: string

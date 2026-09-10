@@ -35,6 +35,104 @@ const book: ApiBookCardModel = {
   cover: 'violet',
 }
 
+it('removes every thumbnail action during shredding and restores actions after cancellation', async () => {
+  const { BookCard } = await import('../src/components/BookCard')
+  const dom = installHookDom('http://localhost/search')
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  let downloads = 0
+  const props = {
+    book: { ...book, thumbnailUrl: 'https://example.invalid/cover.jpg', status: 'Shredding' as const },
+    selectMode: false, selected: false, onToggle: () => {}, onTagSearch: () => {},
+    onOpen: () => {}, onRefresh: () => {}, onDelete: () => {},
+    onDownload: () => { downloads++ },
+    extraActions: createElement('a', { href: 'https://example.invalid/source' }, '配信元'),
+  }
+  try {
+    for (const selectMode of [false, true]) {
+      await act(async () => { root.render(createElement(BookCard, { ...props, selectMode })) })
+      assert.equal(container.querySelector('.book-cover button, .book-cover a'), null)
+      assert.equal(container.querySelector('.card-actions'), null)
+    }
+    await act(async () => { root.render(createElement(BookCard, { ...props, book: { ...book, status: 'Cancel' } })) })
+    const download = container.querySelector<HTMLButtonElement>('[aria-label="Fixture bookをダウンロード"]')
+    assert.ok(download)
+    await act(async () => { download.click() })
+    assert.equal(downloads, 1)
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    dom.cleanup()
+  }
+})
+
+it('keeps disabled status actions visible but removes all overlay buttons in selection mode', async () => {
+  const { BookCard } = await import('../src/components/BookCard')
+  const dom = installHookDom('http://localhost/search')
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  const props = {
+    book: { ...book, status: 'Cancel' as const },
+    selectMode: false, selected: false, onToggle: () => {}, onTagSearch: () => {},
+  }
+  const downloadSelector = '[aria-label="Fixture bookをダウンロード"]'
+  try {
+    await act(async () => { root.render(createElement(BookCard, props)) })
+    assert.equal(container.querySelector<HTMLButtonElement>(downloadSelector)?.disabled, true)
+    await act(async () => { root.render(createElement(BookCard, { ...props, onDownload: () => {}, downloadDisabled: true })) })
+    assert.equal(container.querySelector<HTMLButtonElement>(downloadSelector)?.disabled, true)
+    await act(async () => { root.render(createElement(BookCard, { ...props, onDownload: () => {}, selectMode: true })) })
+    assert.equal(container.querySelector('.book-cover button'), null)
+    assert.equal(container.querySelector('.card-actions'), null)
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    dom.cleanup()
+  }
+})
+
+it('uses the status action matrix in normal mode and no overlay buttons in selection mode', async () => {
+  const { BookCard } = await import('../src/components/BookCard')
+  const dom = installHookDom('http://localhost/search')
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  const cases = [
+    ['Unknown', ['再読み込み', 'ダウンロード', '削除']],
+    ['Standby', ['再読み込み', 'ダウンロード', '削除']],
+    ['Cancel', ['再読み込み', 'ダウンロード', '削除']],
+    ['DownloadError', ['再読み込み', 'ダウンロード', '削除']],
+    ['SaveError', ['再読み込み', 'ダウンロード', '削除']],
+    ['ShortPage', ['再読み込み', 'ダウンロード', '削除']],
+    ['Deleted', ['再読み込み', 'ダウンロード', '削除']],
+    ['WebBook', ['再読み込み', 'ダウンロード']],
+    ['WebBookInPage', ['再読み込み', 'ダウンロード']],
+    ['Downloading', ['削除']], ['Downloaded', []], ['Shredding', []],
+  ] as const
+  try {
+    for (const [status, expected] of cases) {
+      for (const selectMode of [false, true]) {
+        for (const handler of [undefined, () => {}]) {
+          await act(async () => { root.render(createElement(BookCard, {
+            book: { ...book, status }, selectMode, selected: false,
+            onToggle: () => {}, onTagSearch: () => {},
+            onRefresh: handler, onDownload: handler, onDelete: handler,
+          })) })
+          const labels = [...container.querySelectorAll('.card-action')].map((button) => button.getAttribute('aria-label'))
+          assert.deepEqual(labels, selectMode ? [] : expected.map((label) => `Fixture bookを${label}`), `${status}, select=${selectMode}`)
+          if (selectMode) assert.equal(container.querySelector('.book-cover button'), null)
+        }
+      }
+    }
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    dom.cleanup()
+  }
+})
+
 it('uses the cover callback without replacing the title viewer link', async () => {
   const { BookCard } = await import('../src/components/BookCard')
   const dom = installHookDom('http://localhost/search?q=fixture')
@@ -133,6 +231,9 @@ it('Web Cache changes persisted results to viewer links while retaining candidat
       standby: { book: { groupId: 'g', bookId: 'standby', totalPage: 3, status: 'Standby' } },
     }))
     if (path.includes('config')) return new Response(JSON.stringify({ config: { sites: [] } }))
+    if (path === '/api/web-cache/g/standby') return new Response(JSON.stringify({
+      success: true, data: { groupId: 'g', bookId: 'standby', title: 'refreshed standby', totalPage: 3 },
+    }))
     const response = new Response(null)
     response.blob = async () => new Blob(['fixture'], { type: 'image/png' })
     return response
@@ -155,6 +256,14 @@ it('Web Cache changes persisted results to viewer links while retaining candidat
     const candidate = container.querySelector('[data-book-id="candidate"]')!
     assert.ok(candidate.querySelector('button.book-cover__open-button'))
     assert.equal(candidate.querySelector('a.book-cover__link'), null)
+    assert.ok(candidate.querySelector('[aria-label="candidateを再読み込み"]'))
+    assert.equal(candidate.querySelector('[aria-label="candidateを削除"]'), null)
+    const refresh = container.querySelector<HTMLButtonElement>('[aria-label="standbyを再読み込み"]')!
+    assert.ok(refresh)
+    await act(async () => { refresh.click() })
+    const refreshed = container.querySelector('[data-book-id="standby"]')!
+    assert.equal(refreshed.getAttribute('data-book-status'), 'Standby')
+    assert.ok(refreshed.textContent?.includes('refreshed standby'))
   } finally {
     await act(async () => { root.unmount() })
     container.remove()

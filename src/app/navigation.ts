@@ -18,6 +18,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { label: '検索', icon: Search, href: '/search' },
       { label: '未タグ検索', icon: ListFilter, href: '/search/missing-tags' },
+      { label: 'ステータス検索', icon: ListFilter, href: '/search/status' },
     ],
   },
   {

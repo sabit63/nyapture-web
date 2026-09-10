@@ -154,6 +154,11 @@
   position: relative;
 }
 
+.book-card[data-book-status='Unknown'],
+.book-card[data-book-status='Standby'] {
+  --book-status-border-color: #aab3c1;
+}
+
 .book-card[data-book-status='DownloadError'],
 .book-card[data-book-status='SaveError'],
 .book-card[data-book-status='ShortPage'],
@@ -173,6 +178,8 @@
   --book-status-border-color: #f5c451;
 }
 
+.book-card[data-book-status='Unknown']::after,
+.book-card[data-book-status='Standby']::after,
 .book-card[data-book-status='DownloadError']::after,
 .book-card[data-book-status='SaveError']::after,
 .book-card[data-book-status='ShortPage']::after,

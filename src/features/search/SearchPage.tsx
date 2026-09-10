@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   FileText,
+  Download,
   ListChecks,
   Scroll,
   LayoutGrid,
@@ -23,11 +24,12 @@ import { retryPendingScrollRestoration } from '../../app/client-router'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { TagChip } from '../../components/TagChip'
 import { Button, IconButton, StatePanel } from '../../components/ui'
-import { HITOMI_APPENDS, TAG_TYPE_LABELS } from '../../models'
+import { HITOMI_APPENDS, TAG_TYPE_LABELS, BOOK_STATUS_LABELS } from '../../models'
 import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
 import { applyTagEntityMetadata } from './tag-display-name'
+import { BookStatusFields } from './BookStatusFields'
 import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
@@ -55,7 +57,7 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
 
   return (
     <form className="quick-search" role="search" onSubmit={submitSearch}>
-      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</label>
+      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : controller.isStatusSearch ? 'ステータス検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</label>
       <input
         id="header-search"
         type="search"
@@ -229,6 +231,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     isWebSearch,
     isLibrarySearch: controller.isLibrarySearch,
     isMissingTagSearch: controller.isMissingTagSearch,
+    isStatusSearch: controller.isStatusSearch,
     criteria,
     hitomiAppend,
     resultPage,
@@ -239,10 +242,24 @@ export function SearchPage({ controller }: SearchPageProps) {
     <>
       <h1
         id="page-title"
-        className={isWebSearch ? 'hitomi-search-title' : controller.isMissingTagSearch ? 'missing-search-title' : 'sr-only'}
+        className={isWebSearch ? 'hitomi-search-title' : (controller.isMissingTagSearch || controller.isStatusSearch) ? 'missing-search-title' : 'sr-only'}
       >
-        {isWebSearch ? 'Hitomi' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}
+        {isWebSearch ? 'Hitomi' : controller.isStatusSearch ? 'ステータス検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}
       </h1>
+
+      {controller.isStatusSearch && (
+        <form className="missing-search-panel" onSubmit={controller.submitSearch}>
+          <BookStatusFields id="book-status" value={controller.draftStatuses} error={controller.statusesError}
+            onChange={(statuses) => {
+              controller.setDraftStatuses(statuses)
+              controller.setStatusesError(statuses.length ? '' : '1種類以上選択してください。')
+            }} />
+          <div className="missing-search-actions">
+            <span role="status">{controller.draftStatuses.length !== (criteria.statuses?.length ?? 0) || controller.draftStatuses.some((status) => !criteria.statuses?.includes(status)) || controller.query !== criteria.text ? '条件の変更はまだ検索結果に反映されていません' : ''}</span>
+            <Button type="submit" variant="solid" tone="accent">検索</Button>
+          </div>
+        </form>
+      )}
 
       {controller.isMissingTagSearch && (
         <form className="missing-search-panel" onSubmit={controller.submitSearch}>
@@ -264,6 +281,9 @@ export function SearchPage({ controller }: SearchPageProps) {
 
       <section className="filter-panel" aria-label="検索条件" hidden={!hasCriteria}>
         <div className="filter-values">
+          {controller.isStatusSearch && Boolean(criteria.statuses?.length) && (
+            <span className="filter-value">ステータス: {criteria.statuses?.map((status) => BOOK_STATUS_LABELS[status]).join('・')}</span>
+          )}
           {controller.isMissingTagSearch && Boolean(criteria.missingTagTypes?.length) && (
             <span className="filter-value">すべて未設定: {criteria.missingTagTypes?.map((type) => TAG_TYPE_LABELS[type]).join('・')}</span>
           )}
@@ -433,6 +453,14 @@ export function SearchPage({ controller }: SearchPageProps) {
             >
               <ListChecks size={17} aria-hidden="true" />
             </IconButton>
+            {controller.isStatusSearch && (
+              <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button"
+                aria-label="選択をダウンロード" aria-busy={controller.bulkDownloadPending}
+                disabled={isSearchLoading || controller.bulkDownloadPending || controller.downloadableSelectedCount === 0}
+                onClick={controller.downloadSelectedLibraryBooks}>
+                <Download size={17} aria-hidden="true" />
+              </IconButton>
+            )}
             <IconButton
               className="toolbar-icon selection-toolbar__delete"
               variant="ghost"
@@ -440,7 +468,7 @@ export function SearchPage({ controller }: SearchPageProps) {
               size="compact"
               type="button"
               aria-label="選択を削除"
-              disabled={isSearchLoading || selected.length === 0}
+              disabled={isSearchLoading || controller.bulkDownloadPending || selected.length === 0}
               onClick={(event) => deleteSelectedLibraryBooks(event.currentTarget)}
             >
               <Trash2 size={17} aria-hidden="true" />

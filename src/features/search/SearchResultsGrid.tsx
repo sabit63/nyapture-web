@@ -76,8 +76,8 @@ export const SearchResultsGrid = memo(function SearchResultsGrid({
             coverHref={canStartContinuous ? getContinuousViewHref(book) : undefined}
             coverOpenAriaLabel={canStartContinuous ? `${book.title}から連続閲覧` : undefined}
             onDelete={(trigger) => deleteLibraryBook(book, trigger)}
-            onRefresh={isWebSearch ? () => refreshWebBook(book) : undefined}
-            onDownload={isWebSearch ? () => downloadWebBook(book) : undefined}
+            onRefresh={() => refreshWebBook(book)}
+            onDownload={() => downloadWebBook(book)}
           />
         )
       })}

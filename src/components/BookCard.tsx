@@ -1,6 +1,5 @@
 import {
   CalendarDays,
-  Check,
   Download,
   RefreshCw,
   Trash2,
@@ -48,7 +47,6 @@ export type BookCardProps = {
   actionsDisabled?: boolean
   downloadDisabled?: boolean
   downloadLabel?: string
-  allowWebDelete?: boolean
   extraActions?: ReactNode
   footer?: ReactNode
 }
@@ -73,7 +71,6 @@ export function BookCard({
   actionsDisabled = false,
   downloadDisabled = false,
   downloadLabel,
-  allowWebDelete = false,
   extraActions,
   footer,
 }: BookCardProps) {
@@ -101,13 +98,16 @@ export function BookCard({
     : undefined
   const isDownloading = book.status === 'Downloading'
   const isDownloaded = book.status === 'Downloaded'
+  const isShredding = book.status === 'Shredding'
   const isWebBook = book.status === 'WebBook' || book.status === 'WebBookInPage'
-  const canRefresh = !isDownloading && !isDownloaded && typeof onRefresh === 'function'
-  const canDownload = !isDownloading && !isDownloaded && typeof onDownload === 'function'
-  const canDelete = !isDownloaded && (allowWebDelete || !isWebBook) && typeof onDelete === 'function'
+  const canRefresh = !isDownloading && !isDownloaded && !isShredding
+  const canDownload = canRefresh
+  const canDelete = !isDownloaded && !isShredding && !isWebBook
   const hasActions = canRefresh || canDownload || canDelete || (extraActions !== undefined && extraActions !== null)
   const coverOpen = onCoverOpen ?? onOpen
-  const coverLink = openDisabled ? undefined : coverHref ?? (coverOpen ? undefined : viewerUrl)
+  const coverLink = openDisabled || isShredding || (selectMode && (isDownloading || actionsDisabled))
+    ? undefined
+    : selectMode ? coverHref ?? viewerUrl ?? '#' : coverHref ?? (coverOpen ? undefined : viewerUrl)
   const tagsDialogTitleId = `tags-dialog-title-${tagsId}`
 
   const handleThumbnailClick = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -166,13 +166,13 @@ export function BookCard({
         alt={`${book.title}の表紙`}
         linkHref={coverLink ? toPublicPath(coverLink) : undefined}
         linkAriaLabel={selectMode ? `${book.title}を${selected ? '選択解除' : '選択'}` : coverOpenAriaLabel ?? `${book.title}を閲覧`}
-        linkTabIndex={selectMode ? -1 : undefined}
         linkOnClick={handleThumbnailClick}
         fallbackText={book.thumbnailUrl || thumbnailRequest ? '画像を読み込めませんでした' : 'サムネイルはありません'}
         fallbackAriaLabel={`${book.title}のサムネイルを表示できません`}
+        retryOnError={!isShredding && !selectMode}
         variant={book.cover}
       >
-        {coverOpen && !coverLink && (
+        {!isShredding && !selectMode && coverOpen && !coverLink && (
           <button
             type="button"
             className="book-cover__open-button"
@@ -184,20 +184,7 @@ export function BookCard({
         {book.totalPage > 0 && <span className="book-card__page-count" aria-label={`${book.totalPage}ページ`}>P{book.totalPage}</span>}
         <BookStatusBadge status={book.status} />
         {sourceLabel && <span className="source-badge">{sourceLabel}</span>}
-        {selectMode && !isDownloading ? (
-          <IconButton
-            className="card-select card-select--control"
-            variant="outline"
-            tone="neutral"
-            size="compact"
-            aria-label={`${book.title}を${selected ? '選択解除' : '選択'}`}
-            aria-pressed={selected}
-            disabled={actionsDisabled}
-            onClick={onToggle}
-          >
-            {selected && <Check size={15} />}
-          </IconButton>
-        ) : hasActions ? (
+        {!isShredding && !selectMode && hasActions && (
           <div className="card-actions" aria-label={`${book.title}の操作`}>
             {canRefresh && (
               <IconButton
@@ -206,7 +193,7 @@ export function BookCard({
                 tone="neutral"
                 size="compact"
                 aria-label={`${book.title}を再読み込み`}
-                disabled={actionsDisabled}
+                disabled={actionsDisabled || !onRefresh}
                 onClick={() => onRefresh?.()}
               >
                 <RefreshCw size={16} aria-hidden="true" />
@@ -219,7 +206,7 @@ export function BookCard({
                 tone="neutral"
                 size="compact"
                 aria-label={downloadLabel ?? `${book.title}をダウンロード`}
-                disabled={actionsDisabled || downloadDisabled}
+                disabled={actionsDisabled || downloadDisabled || !onDownload}
                 onClick={() => onDownload?.()}
               >
                 <Download size={16} aria-hidden="true" />
@@ -232,7 +219,7 @@ export function BookCard({
                 tone="danger"
                 size="compact"
                 aria-label={`${book.title}を削除`}
-                disabled={actionsDisabled}
+                disabled={actionsDisabled || !onDelete}
                 onClick={(event) => onDelete?.(event.currentTarget)}
               >
                 <Trash2 size={17} aria-hidden="true" />
@@ -240,7 +227,7 @@ export function BookCard({
             )}
             {extraActions}
           </div>
-        ) : null}
+        )}
       </Thumbnail>
       <div className="book-card__body">
         <div className="book-card__title-row">

@@ -58,6 +58,7 @@ type ActiveSearchRequest = {
 export type SearchExecutionOptions = {
   isWebSearch: boolean
   isLibrarySearch: boolean
+  isStatusSearch?: boolean
   isMissingTagSearch: boolean
   apiRevision: number
   searchLimit?: number
@@ -130,6 +131,7 @@ export function useSearchExecution({
   isWebSearch,
   isLibrarySearch,
   isMissingTagSearch,
+  isStatusSearch = false,
   apiRevision,
   searchLimit = 50,
   criteria,
@@ -236,8 +238,8 @@ export function useSearchExecution({
 
   const fetchSearchResults = useCallback(async (signal: AbortSignal): Promise<SearchResultSnapshot> => {
     if (!isWebSearch) {
-      const validation = validateCriteria(criteria, isMissingTagSearch)
-      const validationMessage = validation.date ?? validation.pages ?? validation.missingTags
+      const validation = validateCriteria(criteria, isMissingTagSearch, isStatusSearch)
+      const validationMessage = validation.date ?? validation.pages ?? validation.missingTags ?? validation.statuses
       if (validationMessage) throw new ApiError(validationMessage, { category: 'validation' })
     }
 
@@ -269,7 +271,7 @@ export function useSearchExecution({
       tags: entities,
       totalPages: Math.max(1, response.totalPage ?? 1),
     }
-  }, [criteria, hitomiAppend, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
+  }, [criteria, hitomiAppend, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
 
   const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
     tagEnrichmentRef.current?.abort()
@@ -383,12 +385,12 @@ export function useSearchExecution({
   }, [createSearchRequest, runSearchRequest])
 
   const requestBackgroundSearch = useCallback(() => {
-    if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized || (isMissingTagSearch && !criteria.missingTagTypes?.length)) return
+    if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized || (isMissingTagSearch && !criteria.missingTagTypes?.length) || (isStatusSearch && !criteria.statuses?.length)) return
     // Connection/resync events never restart a foreground search or own its loader.
     const result = requestBackgroundSearchRequest(searchRequestLifecycleRef.current)
     searchRequestLifecycleRef.current = result.state
     if (result.token) startSearchRequest(result.token)
-  }, [criteria.missingTagTypes, isLibrarySearch, isMissingTagSearch, isWebSearch, routeStateSynchronized, startSearchRequest])
+  }, [criteria.statuses, isStatusSearch, criteria.missingTagTypes, isLibrarySearch, isMissingTagSearch, isWebSearch, routeStateSynchronized, startSearchRequest])
 
   useEffect(() => {
     requestBackgroundSearchRef.current = requestBackgroundSearch
@@ -399,7 +401,7 @@ export function useSearchExecution({
 
   useEffect(() => {
     if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized) return
-    if (isMissingTagSearch && !criteria.missingTagTypes?.length) {
+    if ((isMissingTagSearch && !criteria.missingTagTypes?.length) || (isStatusSearch && !criteria.statuses?.length)) {
       activeSearchRequestRef.current?.controller.abort()
       activeSearchRequestRef.current = null
       searchRequestLifecycleRef.current = resetSearchRequestLifecycle(searchRequestLifecycleRef.current)
@@ -434,7 +436,7 @@ export function useSearchExecution({
         setSearchLoaderVisible(false)
       }
     }
-  }, [apiRevision, criteria, hitomiAppend, isActiveSearchRequest, isLibrarySearch, isMissingTagSearch, isWebSearch, resultPage, routeStateSynchronized, runSearchRequest, searchRevision, setLibrarySearchBooks, sortDirection, sortType, startSearchRequest])
+  }, [isStatusSearch, apiRevision, criteria, hitomiAppend, isActiveSearchRequest, isLibrarySearch, isMissingTagSearch, isWebSearch, resultPage, routeStateSynchronized, runSearchRequest, searchRevision, setLibrarySearchBooks, sortDirection, sortType, startSearchRequest])
 
   useEffect(() => {
     if (!isLibrarySearch && !isWebSearch) return

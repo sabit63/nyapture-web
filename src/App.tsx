@@ -39,7 +39,8 @@ function App() {
   const isWebSearch = currentPath === '/hitomila/search'
   const isWebCache = currentPath === '/web-cache'
   const isMissingTagSearch = currentPath === '/search/missing-tags'
-  const isLibrarySearch = currentPath === '/search' || isMissingTagSearch
+  const isStatusSearch = currentPath === '/search/status'
+  const isLibrarySearch = currentPath === '/search' || isMissingTagSearch || isStatusSearch
   const isBookViewer = currentPath === '/book/viewer'
   const isDownloadManager = currentPath === '/download/book'
   const isDashboard = currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')
@@ -69,6 +70,7 @@ function App() {
     isWebSearch,
     isLibrarySearch,
     isMissingTagSearch,
+    isStatusSearch,
     isBookViewer,
     apiRevision: apiSettingsController.apiRevision,
     displaySettings: apiSettingsController.displaySettings,

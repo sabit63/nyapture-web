@@ -140,6 +140,7 @@ export function DownloadCard({
           className="download-card__thumbnail"
           variant={download.cover}
           fallbackText="表紙なし"
+          retryOnError={false}
           fallbackAriaLabel={`${download.title}の表紙を表示できません`}
         />
         <span className="download-card__cover-status" aria-label={`状態: ${presentation.label}`}>
@@ -265,4 +266,3 @@ export function DownloadCard({
     </article>
   )
 }
-

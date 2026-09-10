@@ -1,5 +1,5 @@
-import { HITOMI_APPENDS, isValidLocalDate, TAG_TYPE_ORDER } from '../../models'
-import type { BookTag, HitomiAppend, NyaTagType, SearchCriteria } from '../../models'
+import { HITOMI_APPENDS, NYA_BOOK_STATUSES, isValidLocalDate, TAG_TYPE_ORDER } from '../../models'
+import type { BookTag, HitomiAppend, NyaBookStatus, NyaTagType, SearchCriteria } from '../../models'
 import { toPublicPath } from '../../app/app-base-path'
 
 export { isValidLocalDate }
@@ -28,6 +28,7 @@ export const emptyCriteria = (): SearchCriteria => ({
 
 export const cloneCriteria = (criteria: SearchCriteria): SearchCriteria => ({
   ...criteria,
+  ...(criteria.statuses ? { statuses: [...criteria.statuses] } : {}),
   tags: criteria.tags.map((tag) => ({ ...tag })),
   ...(criteria.missingTagTypes ? { missingTagTypes: [...criteria.missingTagTypes] } : {}),
 })
@@ -36,11 +37,15 @@ export const normalizeCriteriaForRoute = (
   criteria: SearchCriteria,
   isWebSearch: boolean,
   isMissingTagSearch = false,
+  isStatusSearch = false,
 ): SearchCriteria => {
   const normalized = isWebSearch ? { ...criteria, tagMode: 'and' as const } : criteria
-  if (isMissingTagSearch && !isWebSearch) return normalized
-  const { missingTagTypes: _missingTagTypes, ...withoutMissingTagTypes } = normalized
-  return withoutMissingTagTypes
+  const { missingTagTypes, statuses, ...common } = normalized
+  return {
+    ...common,
+    ...(isMissingTagSearch && !isWebSearch && missingTagTypes !== undefined ? { missingTagTypes } : {}),
+    ...(isStatusSearch && !isWebSearch && statuses !== undefined ? { statuses } : {}),
+  }
 }
 
 const JAPANESE_LANGUAGE_TAG: BookTag = { type: 'Languages', name: 'japanese' }
@@ -85,8 +90,16 @@ export const parseCriteriaForRoute = (
   params: URLSearchParams,
   isWebSearch: boolean,
   isMissingTagSearch = false,
+  isStatusSearch = false,
 ): SearchCriteria => {
-  const criteria = normalizeCriteriaForRoute(parseCriteriaFromUrl(params), isWebSearch, isMissingTagSearch)
+  const criteria = normalizeCriteriaForRoute(parseCriteriaFromUrl(params), isWebSearch, isMissingTagSearch, isStatusSearch)
+  if (isStatusSearch && !isWebSearch) {
+    const values = params.getAll('status')
+    const statuses = values.length === 0 ? NYA_BOOK_STATUSES.filter((status) => status !== 'Downloaded') : values
+      .filter((value): value is NyaBookStatus => NYA_BOOK_STATUSES.includes(value as NyaBookStatus))
+      .filter((value, index, all) => all.indexOf(value) === index)
+    return { ...criteria, statuses }
+  }
   if (isMissingTagSearch && !isWebSearch) {
     return { ...criteria, missingTagTypes: parseMissingTagTypes(params) }
   }
@@ -98,6 +111,7 @@ export const parseCriteriaForRoute = (
 export const criteriaHasValues = (criteria: SearchCriteria) => Boolean(
   criteria.text.trim()
   || criteria.tags.length
+  || criteria.statuses?.length
   || criteria.missingTagTypes?.length
   || criteria.dateFrom
   || criteria.dateTo
@@ -105,7 +119,7 @@ export const criteriaHasValues = (criteria: SearchCriteria) => Boolean(
   || criteria.pagesMax,
 )
 
-export type SearchDestination = 'library' | 'hitomi' | 'missing-tags'
+export type SearchDestination = 'library' | 'hitomi' | 'missing-tags' | 'status'
 
 export const createSearchUrlForDestination = (
   criteria: SearchCriteria,
@@ -113,7 +127,8 @@ export const createSearchUrlForDestination = (
 ): URL => {
   const isHitomiSearch = options.destination === 'hitomi'
   const isMissingTagSearch = options.destination === 'missing-tags'
-  const pathname = isHitomiSearch ? '/hitomila/search' : isMissingTagSearch ? '/search/missing-tags' : '/search'
+  const isStatusSearch = options.destination === 'status'
+  const pathname = isStatusSearch ? '/search/status' : isHitomiSearch ? '/hitomila/search' : isMissingTagSearch ? '/search/missing-tags' : '/search'
   const url = new URL(toPublicPath(pathname), options.origin ?? window.location.origin)
   const text = criteria.text.trim()
   const tags = isHitomiSearch
@@ -133,6 +148,10 @@ export const createSearchUrlForDestination = (
     } else {
       criteria.missingTagTypes.forEach((type) => url.searchParams.append('missingTagType', type))
     }
+  }
+  if (isStatusSearch && criteria.statuses !== undefined) {
+    if (criteria.statuses.length === 0) url.searchParams.set('status', '')
+    else criteria.statuses.forEach((status) => url.searchParams.append('status', status))
   }
   if (isHitomiSearch) url.searchParams.set('append', options.hitomiAppend ?? 'Normal')
   url.searchParams.set('page', '1')
@@ -205,10 +224,11 @@ export const getPaginationItems = (currentPage: number, totalPages: number, page
   return items
 }
 
-export type SearchValidationErrors = { date?: string; pages?: string; missingTags?: string }
+export type SearchValidationErrors = { date?: string; pages?: string; missingTags?: string; statuses?: string }
 
-export const validateCriteria = (criteria: SearchCriteria, isMissingTagSearch = false): SearchValidationErrors => {
+export const validateCriteria = (criteria: SearchCriteria, isMissingTagSearch = false, isStatusSearch = false): SearchValidationErrors => {
   const errors: SearchValidationErrors = {}
+  if (isStatusSearch && !criteria.statuses?.length) errors.statuses = '1種類以上選択してください。'
   if (isMissingTagSearch && !criteria.missingTagTypes?.length) {
     errors.missingTags = '1種類以上選択してください。'
   }

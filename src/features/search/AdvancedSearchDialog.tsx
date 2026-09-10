@@ -3,6 +3,7 @@ import { ChevronDown, Search, X } from 'lucide-react'
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER, HITOMI_APPENDS, getTagLabel } from '../../models'
 import { TagChip } from '../../components/TagChip'
 import { Button, Dialog, DialogBody, DialogFooter, DialogHeader, IconButton } from '../../components/ui'
+import { BookStatusFields } from './BookStatusFields'
 import { MissingTagFields } from './MissingTagFields'
 import type { SearchController } from './useSearchController'
 import { formatTagCount } from './search-utils'
@@ -98,6 +99,13 @@ export function AdvancedSearchDialog({ controller }: AdvancedSearchDialogProps) 
           </DialogHeader>
 
           <DialogBody className="advanced-dialog__body">
+            {controller.isStatusSearch && (
+              <BookStatusFields id="advanced-book-status" value={draftCriteria.statuses ?? []} error={advancedErrors.statuses}
+                onChange={(statuses) => {
+                  setDraftCriteria((current) => ({ ...current, statuses }))
+                  setAdvancedErrors((current) => ({ ...current, statuses: statuses.length ? undefined : '1種類以上選択してください。' }))
+                }} />
+            )}
             {controller.isMissingTagSearch && (
               <MissingTagFields
                 id="advanced-missing-tags"

@@ -27,9 +27,9 @@
 .book-card .book-status-effect--candidate { display: none; }
 .book-card:where([data-book-status='WebBook']):not(.book-card--download-candidate) { --thumbnail-loaded-opacity: .74; }
 .book-card:where([data-book-status='WebBookInPage']):not(.book-card--download-candidate) { --thumbnail-loaded-opacity: .70; }
-.book-card[data-book-status='WebBookInPage']:not(.book-card--download-candidate) { border-color: #555b64; border-style: dashed; }
-.book-card[data-book-status='WebBookInPage']:not(.book-card--download-candidate):hover { border-color: #696f79; }
-.book-card[data-book-status='WebBookInPage'].book-card--selected { border-color: var(--color-accent-border); border-style: solid; }
+.book-card:is([data-book-status='WebBook'], [data-book-status='WebBookInPage']):not(.book-card--download-candidate) { border-color: #555b64; border-style: dashed; }
+.book-card:is([data-book-status='WebBook'], [data-book-status='WebBookInPage']):not(.book-card--download-candidate):hover { border-color: #696f79; }
+.book-card:is([data-book-status='WebBook'], [data-book-status='WebBookInPage']).book-card--selected { border-color: var(--color-accent-border); border-style: solid; }
 .book-card[data-book-status='WebBookInPage']:not(.book-card--download-candidate) .book-card__body { background: linear-gradient(180deg, #303039 0%, #292932 100%); }
 .book-card:hover,
 .book-card:focus-within,
