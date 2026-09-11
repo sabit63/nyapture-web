@@ -47,7 +47,7 @@
 .download-manager__system-activity {
   @apply tw:flex tw:items-center tw:flex-wrap tw:gap-(--space-2);
   margin: var(--space-2) 0 0;
-  @apply tw:text-(--color-text-muted) tw:text-[.73rem];
+  @apply tw:text-(--color-text-muted) tw:text-(length:--font-size-body-md);
   font-variant-numeric: tabular-nums;
 }
 
@@ -88,7 +88,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  @apply tw:text-(--color-text) tw:text-[.79rem];
+  @apply tw:text-(--color-text) tw:text-(length:--font-size-body-md);
 }
 
 .download-manager__search-field input::placeholder { @apply tw:text-(--color-text-placeholder); }
@@ -104,7 +104,7 @@
   border: 1px solid var(--color-border-control);
   @apply tw:rounded-(--radius-control);
   background: var(--color-surface-input);
-  @apply tw:text-(--color-text-muted) tw:text-[.68rem];
+  @apply tw:text-(--color-text-muted) tw:text-(length:--font-size-body-sm);
 }
 
 .download-manager__sort-field select {
@@ -112,13 +112,13 @@
   border: 0;
   outline: 0;
   background: var(--color-surface-input);
-  @apply tw:text-(--color-text) tw:text-[.73rem] tw:cursor-pointer;
+  @apply tw:text-(--color-text) tw:text-(length:--font-size-body-md) tw:cursor-pointer;
 }
 
 .download-manager__list-header {
   @apply tw:min-h-10.5 tw:flex tw:items-center tw:justify-between tw:gap-(--layout-grid-gap);
   padding: var(--space-2) var(--layout-tight-gap);
-  @apply tw:text-(--color-text-muted) tw:text-[.72rem];
+  @apply tw:text-(--color-text-muted) tw:text-(length:--font-size-body-sm);
 }
 
 .download-manager__list-header p { @apply tw:flex tw:items-center tw:gap-(--layout-control-gap) tw:m-0; }
@@ -173,25 +173,25 @@
   @apply tw:rounded-[5px];
   background: #111119dc;
   color: #f1f1f5;
-  @apply tw:text-[.58rem];
+  @apply tw:text-(length:--font-size-label-md);
   font-weight: 700;
   backdrop-filter: blur(5px);
 }
 
 .download-card__body { @apply tw:min-w-0 tw:flex tw:flex-col tw:justify-center; }
 .download-card__title-row { @apply tw:block tw:items-start tw:justify-between tw:gap-(--space-3); }
-.download-card__title-row h2 { @apply tw:m-0 tw:overflow-hidden tw:text-(--color-text) tw:text-[.94rem] tw:leading-[1.35] tw:text-ellipsis tw:whitespace-nowrap; }
+.download-card__title-row h2 { @apply tw:m-0 tw:overflow-hidden tw:text-(--color-text) tw:text-(length:--font-size-heading-sm) tw:leading-[1.35] tw:text-ellipsis tw:whitespace-nowrap; }
 
 .download-card__artist {
   @apply tw:flex tw:items-center tw:gap-(--space-2);
   margin: var(--layout-tight-gap) 0 0;
-  @apply tw:text-(--color-text-muted) tw:text-[.7rem];
+  @apply tw:text-(--color-text-muted) tw:text-(length:--font-size-body-md);
 }
 
 .download-card__artist > span {
   @apply tw:p-(--layout-tight-gap) tw:rounded-[4px];
   background: #ffffff0a;
-  @apply tw:text-(--color-text-dim) tw:text-[.55rem];
+  @apply tw:text-(--color-text-dim) tw:text-(length:--font-size-label-md);
 }
 
 .download-card__priority-badge {
@@ -201,7 +201,7 @@
   @apply tw:rounded-[999px];
   background: #d75a2918;
   color: #ee916e;
-  @apply tw:text-[.59rem];
+  @apply tw:text-(length:--font-size-label-md);
   font-weight: 800;
 }
 
@@ -221,14 +221,14 @@
 .download-card__progress--warning > span { background: var(--color-warning-fill); }
 .download-card__progress--danger > span { background: var(--color-danger-fill); }
 .download-card__progress-meta {
-  @apply tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-(--space-3) tw:text-(--color-text-muted) tw:text-[.66rem];
+  @apply tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-(--space-3) tw:text-(--color-text-muted) tw:text-(length:--font-size-body-md);
   font-variant-numeric: tabular-nums;
 }
-.download-card__progress-meta > strong { color: #dcdce4; @apply tw:text-[.7rem]; }
+.download-card__progress-meta > strong { color: #dcdce4; @apply tw:text-(length:--font-size-body-md); }
 
 .download-card__details,
 .download-card__status-row {
-  @apply tw:flex tw:flex-wrap tw:flex-col tw:items-start tw:gap-(--space-2) tw:mt-(--space-2) tw:text-(--color-text-muted) tw:text-[.66rem];
+  @apply tw:flex tw:flex-wrap tw:flex-col tw:items-start tw:gap-(--space-2) tw:mt-(--space-2) tw:text-(--color-text-muted) tw:text-(length:--font-size-body-md);
   font-variant-numeric: tabular-nums;
 }
 
@@ -243,7 +243,7 @@
   @apply tw:flex tw:items-start tw:gap-(--layout-control-gap);
   margin: var(--space-2) 0 0;
   color: #ff9aa4;
-  @apply tw:text-[.65rem] tw:leading-[1.45];
+  @apply tw:text-(length:--font-size-body-sm) tw:leading-[1.45];
 }
 
 .download-card__error svg { @apply tw:flex-none tw:mt-0; transform: translateY(1px); }
@@ -262,7 +262,7 @@
   border: 1px solid transparent;
   @apply tw:rounded-[6px];
   background: transparent;
-  @apply tw:text-(--color-text-muted) tw:text-[.65rem] tw:whitespace-nowrap tw:cursor-pointer;
+  @apply tw:text-(--color-text-muted) tw:text-(length:--font-size-body-sm) tw:whitespace-nowrap tw:cursor-pointer;
 }
 
 .download-card__action span { @apply tw:hidden; }
@@ -287,7 +287,7 @@
   border: 1px solid color-mix(in srgb, var(--color-danger-border) 34%, transparent);
   @apply tw:rounded-(--radius-surface);
   background: var(--color-danger-soft);
-  @apply tw:text-(--color-danger-text) tw:text-[.72rem];
+  @apply tw:text-(--color-danger-text) tw:text-(length:--font-size-body-sm);
 }
 
 .download-manager__error svg { @apply tw:flex-none; }

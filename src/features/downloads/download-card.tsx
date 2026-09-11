@@ -146,7 +146,7 @@ export function DownloadCard({
           fallbackAriaLabel={`${download.title}の表紙を表示できません`}
         />
         <span className="download-card__cover-status" aria-label={`状態: ${presentation.label}`}>
-          <StatusIcon size={12} aria-hidden="true" />
+          <StatusIcon size={13} aria-hidden="true" />
           <span>{presentation.label}</span>
         </span>
       </div>

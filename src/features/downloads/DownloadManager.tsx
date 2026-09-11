@@ -131,7 +131,7 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
 
       <section className="download-manager__filters" aria-label="ダウンロードの検索と並び順">
         <div className="download-manager__search-field">
-          <Search size={17} aria-hidden="true" />
+          <Search size={18} aria-hidden="true" />
           <label className="sr-only" htmlFor="download-manager-search">
             タイトルまたは作者で検索
           </label>
