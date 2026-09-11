@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', 'VITE_')
@@ -10,7 +11,7 @@ export default defineConfig(({ mode }) => {
     // Nginx configuration rewrites that base for trusted reverse-proxy
     // prefixes while direct access keeps using `/`.
     base: './',
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     server: {
       proxy: {
         '/alive': {

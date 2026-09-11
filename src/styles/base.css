@@ -1,24 +1,24 @@
+@reference "./tailwind.css";
+
 :root {
   font-family: var(--font-family-sans);
   /* Scale rem-based typography across every screen, including component overrides. */
-  font-size: 87.5%;
-  color: var(--color-text);
+  @apply tw:text-[87.5%] tw:text-(--color-text);
   background: var(--color-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
-* { box-sizing: border-box; }
+* { @apply tw:box-border; }
 
 html {
   scroll-padding-top: calc(var(--topbar-height) + var(--space-4));
-  overflow-y: scroll;
+  @apply tw:overflow-y-scroll;
   scrollbar-gutter: stable;
 }
 
 body {
-  margin: 0;
-  min-width: 320px;
+  @apply tw:m-0 tw:min-w-80;
   min-height: 100vh;
   background: var(--color-background);
 }
@@ -34,14 +34,9 @@ a { color: inherit; }
 }
 
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
+  @apply tw:absolute tw:w-0.25 tw:h-0.25 tw:p-0 tw:m-[-1px] tw:overflow-hidden;
   clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  @apply tw:whitespace-nowrap;
   border: 0;
 }
 

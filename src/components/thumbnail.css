@@ -1,9 +1,11 @@
+@reference "../styles/tailwind.css";
+
 .book-cover {
-  position: relative;
+  @apply tw:relative;
   aspect-ratio: 5 / 7;
-  overflow: hidden;
+  @apply tw:overflow-hidden;
   background: #30303c;
-  isolation: isolate;
+  @apply tw:isolate;
 }
 
 .book-cover--violet { background: #4b3f6b; }
@@ -16,17 +18,14 @@
 .book-cover--orange { background: #74503d; }
 
 .book-cover__link {
-  position: absolute;
+  @apply tw:absolute;
   inset: 0;
-  display: block;
+  @apply tw:block;
   background: inherit;
 }
 
 .book-cover__image {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
+  @apply tw:w-full tw:h-full tw:block tw:object-cover;
   object-position: center top;
   opacity: 0;
   transition: opacity .16s ease;
@@ -35,15 +34,15 @@
 .book-cover.is-loaded .book-cover__image { opacity: var(--thumbnail-loaded-opacity, 1); }
 
 .book-cover__skeleton {
-  position: absolute;
+  @apply tw:absolute;
   inset: 0;
-  overflow: hidden;
+  @apply tw:overflow-hidden;
   background: #343441;
 }
 
 .book-cover__skeleton::after {
   content: '';
-  position: absolute;
+  @apply tw:absolute;
   inset: 0;
   background: linear-gradient(105deg, transparent 30%, #ffffff0a 45%, #ffffff13 50%, transparent 65%);
   animation: thumbnail-shimmer 1.4s linear infinite;
@@ -51,36 +50,25 @@
 }
 
 .book-cover__fallback {
-  position: absolute;
+  @apply tw:absolute;
   z-index: 1;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--layout-control-gap);
-  padding: var(--space-6);
+  @apply tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-(--layout-control-gap) tw:p-(--space-6);
   background: var(--color-surface-fallback);
   color: #b5b5c2;
-  text-align: center;
-  font-size: .7rem;
+  @apply tw:text-center tw:text-[.7rem];
 }
 
 .book-cover__fallback svg { color: #858596; }
 
 .book-cover__fallback button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--layout-control-gap);
-  padding: var(--space-2);
+  @apply tw:inline-flex tw:items-center tw:gap-(--layout-control-gap) tw:p-(--space-2);
   border: 1px solid #505061;
-  border-radius: var(--radius-control);
+  @apply tw:rounded-(--radius-control);
   background: var(--color-surface-control);
-  color: var(--color-text);
-  font-size: .68rem;
-  cursor: pointer;
+  @apply tw:text-(--color-text) tw:text-[.68rem] tw:cursor-pointer;
 }
 
-.book-cover__fallback button:hover { border-color: var(--color-border-strong); background: var(--color-surface-hover-strong); }
+.book-cover__fallback button:hover { @apply tw:border-(--color-border-strong); background: var(--color-surface-hover-strong); }
 
 @keyframes thumbnail-shimmer { to { transform: translateX(100%); } }

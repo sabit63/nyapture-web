@@ -1,0 +1,11 @@
+/* Shared Tailwind entry. Existing base.css owns resets and accessibility. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(tw);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(tw);
+
+@theme inline {
+  --spacing: 4px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 880px;
+  --breakpoint-lg: 1200px;
+}

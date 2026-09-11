@@ -1,41 +1,43 @@
+@reference "../../styles/tailwind.css";
+
 .web-cache {
-  min-width: 0;
+  @apply tw:min-w-0;
   --font-size-label-md: var(--search-control-font-size);
   --font-size-body-sm: var(--search-control-font-size);
   --control-font-size-default: var(--search-control-font-size);
   --control-font-size-compact: var(--search-control-font-size);
   --control-icon-size-compact: var(--search-control-icon-size);
 }
-.web-cache__heading, .web-cache__toolbar, .web-cache__toolbar > div { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.web-cache__heading { margin-bottom: var(--search-heading-gap); flex-wrap: wrap; }
-.web-cache h1 { font-size: var(--font-size-search-title); margin: 0; }
-.web-cache__heading p, .web-cache__toolbar p { color: var(--color-text-muted); margin: 0; font-size: var(--font-size-body-sm); }
-.web-cache__heading a, .web-cache__toolbar a { color: var(--color-text-muted); }
-.web-cache__heading a:hover, .web-cache__toolbar a:hover { color: var(--color-text); }
+.web-cache__heading, .web-cache__toolbar, .web-cache__toolbar > div { @apply tw:flex tw:items-center tw:justify-between tw:gap-(--space-4); }
+.web-cache__heading { @apply tw:mb-(--search-heading-gap) tw:flex-wrap; }
+.web-cache h1 { @apply tw:text-(length:--font-size-search-title) tw:m-0; }
+.web-cache__heading p, .web-cache__toolbar p { @apply tw:text-(--color-text-muted) tw:m-0 tw:text-(length:--font-size-body-sm); }
+.web-cache__heading a, .web-cache__toolbar a { @apply tw:text-(--color-text-muted); }
+.web-cache__heading a:hover, .web-cache__toolbar a:hover { @apply tw:text-(--color-text); }
 .web-cache__management-link { text-decoration: none; }
-.cache-search { padding: var(--space-4); background: var(--color-surface); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-md); }
-.cache-search__basic, .cache-search__advanced { display: grid; grid-template-columns: 1fr; align-items: end; gap: var(--space-3); }
-.cache-search label { display: grid; gap: var(--space-2); font-size: var(--font-size-label-md); color: var(--color-text-muted); min-width: 0; }
-.cache-search input, .cache-search select { width: 100%; min-width: 0; min-height: var(--control-height-default); padding: var(--space-2) var(--space-3); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-background-deep); font: inherit; color-scheme: dark; }
-.cache-search details { margin-top: var(--space-3); }
-.cache-search summary { cursor: pointer; color: var(--color-text-muted); font-size: var(--font-size-body-sm); padding: var(--space-2) 0; }
-.cache-search__advanced { grid-template-columns: 1fr; margin-top: var(--space-2); }
+.cache-search { @apply tw:p-(--space-4); background: var(--color-surface); border: 1px solid var(--color-border-subtle); @apply tw:rounded-(--radius-md); }
+.cache-search__basic, .cache-search__advanced { @apply tw:grid; grid-template-columns: 1fr; align-items: end; @apply tw:gap-(--space-3); }
+.cache-search label { @apply tw:grid tw:gap-(--space-2) tw:text-(length:--font-size-label-md) tw:text-(--color-text-muted) tw:min-w-0; }
+.cache-search input, .cache-search select { @apply tw:w-full tw:min-w-0 tw:min-h-(--control-height-default); padding: var(--space-2) var(--space-3); @apply tw:text-(--color-text); border: 1px solid var(--color-border); @apply tw:rounded-(--radius-sm); background: var(--color-background-deep); font: inherit; color-scheme: dark; }
+.cache-search details { @apply tw:mt-(--space-3); }
+.cache-search summary { @apply tw:cursor-pointer tw:text-(--color-text-muted) tw:text-(length:--font-size-body-sm); padding: var(--space-2) 0; }
+.cache-search__advanced { grid-template-columns: 1fr; @apply tw:mt-(--space-2); }
 .web-cache__toolbar { margin: var(--space-5) 0; }
-.cache-card-metadata { margin-top: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-label-sm); overflow-wrap: anywhere; }
+.cache-card-metadata { @apply tw:mt-(--space-2) tw:text-(--color-text-muted) tw:text-(length:--font-size-label-sm); overflow-wrap: anywhere; }
 .cache-card-metadata p { margin: var(--space-1) 0 0; }
-.cache-tags { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--tag-gap-default); }
-.cache-tags .tag-chip { max-width: 100%; }
+.cache-tags { @apply tw:flex tw:flex-wrap tw:items-start tw:gap-(--tag-gap-default); }
+.cache-tags .tag-chip { @apply tw:max-w-full; }
 .cache-error { color: var(--color-danger-text, #ef6b73); overflow-wrap: anywhere; }
 .cache-detail { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
-.cache-detail[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.cache-detail[open] { @apply tw:grid; grid-template-rows: auto minmax(0, 1fr) auto; }
 .cache-detail .ui-dialog__body { overscroll-behavior: contain; overflow-wrap: anywhere; }
-.cache-detail .ui-dialog__header { justify-content: space-between; }
-.cache-detail__fields > div { display: grid; grid-template-columns: minmax(100px, 1fr) 3fr; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border-subtle); }
-.cache-detail dt { color: var(--color-text-muted); }
-.cache-detail dd { margin: 0; overflow-wrap: anywhere; }
-.cache-detail ul { padding-left: var(--space-5); overflow-wrap: anywhere; }
+.cache-detail .ui-dialog__header { @apply tw:justify-between; }
+.cache-detail__fields > div { @apply tw:grid; grid-template-columns: minmax(100px, 1fr) 3fr; @apply tw:gap-(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border-subtle); }
+.cache-detail dt { @apply tw:text-(--color-text-muted); }
+.cache-detail dd { @apply tw:m-0; overflow-wrap: anywhere; }
+.cache-detail ul { @apply tw:pl-(--space-5); overflow-wrap: anywhere; }
 
-.web-cache__toolbar { gap: var(--space-2); flex-wrap: wrap; }
+.web-cache__toolbar { @apply tw:gap-(--space-2) tw:flex-wrap; }
 @media (min-width: 640px) {
   .cache-search__basic, .cache-search__advanced { grid-template-columns: 1fr 1fr; }
   .cache-search__basic label:first-child, .cache-search__advanced label:first-child { grid-column: 1 / -1; }

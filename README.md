@@ -29,6 +29,25 @@ requests to the real backend. It does not implement SignalR or a complete API.
 
 Review decisions and implementation evidence are in [docs/review](docs/review/README.md).
 
+## Styling
+
+Tailwind CSS 4 is configured through `@tailwindcss/vite` and
+`src/styles/tailwind.css`. Use the `tw:` prefix for utility classes in JSX.
+Feature stylesheets use `@reference` to that entry and `@apply` for layout,
+spacing, sizing, and typography while keeping existing component selectors.
+Keep gradients, animations, complex selectors, and background/border shorthands
+in CSS when that is clearer or preserves their reset behavior.
+
+`src/styles/tokens.css` remains the source for both color themes and semantic
+dimensions. Reference its variables with utilities such as
+`tw:text-(--color-text)` and `tw:gap-(--layout-control-gap)`; do not copy theme
+colors into components. The spacing unit is 4px; `sm`, `md`, and `lg` are
+640px, 880px, and 1200px. Preflight is omitted because `base.css` owns the
+existing reset, focus styles, and reduced-motion support.
+
+Run `pnpm verify` after styling changes, then inspect desktop/mobile layouts
+and both color themes with the local UI fixture above.
+
 ## Docker deployment
 
 The default setup serves the production build with Nginx on

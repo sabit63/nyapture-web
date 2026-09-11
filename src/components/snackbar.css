@@ -1,38 +1,33 @@
+@reference "../styles/tailwind.css";
+
 .snackbar {
-  position: fixed;
+  @apply tw:fixed;
   z-index: 70;
-  right: var(--space-4);
-  bottom: var(--space-4);
+  @apply tw:right-(--space-4) tw:bottom-(--space-4);
   max-width: min(420px, calc(100vw - var(--space-8)));
-  min-height: 39px;
-  display: flex;
-  align-items: center;
-  gap: var(--layout-control-gap);
-  margin: 0;
+  @apply tw:min-h-9.75 tw:flex tw:items-center tw:gap-(--layout-control-gap) tw:m-0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid;
-  border-radius: var(--radius-surface);
+  @apply tw:rounded-(--radius-surface);
   box-shadow: 0 14px 36px #05050870;
-  font-size: .72rem;
-  line-height: 1.45;
-  pointer-events: none;
+  @apply tw:text-[.72rem] tw:leading-[1.45] tw:pointer-events-none;
   opacity: 1;
   transform: translateY(0);
   animation: snackbar-in .16s ease;
 }
 
-.snackbar__icon { flex: 0 0 auto; }
-.snackbar__message { min-width: 0; overflow-wrap: anywhere; }
-.snackbar--success { border-color: var(--color-success-border); background: var(--color-success-soft); color: var(--color-success-text); }
-.snackbar--warning { border-color: var(--color-warning-border); background: var(--color-warning-soft); color: var(--color-warning-text); }
-.snackbar--error { border-color: var(--color-danger-border); background: var(--color-danger-soft); color: var(--color-danger-text); }
+.snackbar__icon { @apply tw:flex-none; }
+.snackbar__message { @apply tw:min-w-0; overflow-wrap: anywhere; }
+.snackbar--success { @apply tw:border-(--color-success-border); background: var(--color-success-soft); @apply tw:text-(--color-success-text); }
+.snackbar--warning { @apply tw:border-(--color-warning-border); background: var(--color-warning-soft); @apply tw:text-(--color-warning-text); }
+.snackbar--error { @apply tw:border-(--color-danger-border); background: var(--color-danger-soft); @apply tw:text-(--color-danger-text); }
 
 @keyframes snackbar-in {
   from { opacity: 0; transform: translateY(8px); }
 }
 
 @media (min-width: 640px) {
-  .snackbar { right: var(--space-6); bottom: var(--space-6); }
+  .snackbar { @apply tw:right-(--space-6) tw:bottom-(--space-6); }
 }
 
 @media (prefers-reduced-motion: reduce) {

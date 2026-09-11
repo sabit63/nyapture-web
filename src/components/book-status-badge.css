@@ -1,9 +1,11 @@
+@reference "../styles/tailwind.css";
+
 .book-status-effect {
-  position: absolute;
+  @apply tw:absolute;
   z-index: 1;
   inset: 0;
   border-radius: var(--radius-surface) var(--radius-surface) 0 0;
-  pointer-events: none;
+  @apply tw:pointer-events-none;
 }
 
 .book-status-effect--error {
@@ -31,30 +33,23 @@
 }
 
 .book-status-badge {
-  position: absolute;
+  @apply tw:absolute;
   z-index: 3;
-  top: var(--space-2);
-  left: var(--space-2);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--layout-tight-gap);
+  @apply tw:top-(--space-2) tw:left-(--space-2) tw:inline-flex tw:items-center tw:gap-(--layout-tight-gap);
   max-width: calc(100% - 54px);
   padding: var(--space-1) var(--space-2);
-  overflow: hidden;
+  @apply tw:overflow-hidden;
   border: 1px solid #ffffff35;
-  border-radius: 6px;
+  @apply tw:rounded-[6px];
   box-shadow: 0 2px 6px #08081070;
   color: #f8f8fc;
-  font-size: .63rem;
+  @apply tw:text-[.63rem];
   font-weight: 700;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  pointer-events: none;
+  @apply tw:leading-[1.2] tw:text-ellipsis tw:whitespace-nowrap tw:pointer-events-none;
 }
 
 .book-status-badge > svg {
-  flex: 0 0 auto;
+  @apply tw:flex-none;
 }
 
 .book-status-badge--info {
@@ -109,31 +104,24 @@
 }
 
 .book-status-badge--inline {
-  position: static;
+  @apply tw:static;
   z-index: auto;
-  min-width: 0;
-  height: 24px;
-  max-width: 100%;
-  padding: 0;
-  overflow: visible;
+  @apply tw:min-w-0 tw:h-6 tw:max-w-full tw:p-0 tw:overflow-visible;
   border: 0;
-  border-radius: 0;
+  @apply tw:rounded-none;
   background: transparent;
   box-shadow: none;
-  color: var(--color-text);
-  font-size: .75rem;
+  @apply tw:text-(--color-text) tw:text-[.75rem];
   font-weight: 600;
-  line-height: 1.2;
+  @apply tw:leading-[1.2];
   text-overflow: clip;
-  white-space: nowrap;
-  pointer-events: auto;
+  @apply tw:whitespace-nowrap tw:pointer-events-auto;
 }
 
 .book-status-badge__dot {
-  width: 8px;
-  height: 8px;
+  @apply tw:w-2 tw:h-2;
   flex: 0 0 8px;
-  border-radius: 50%;
+  @apply tw:rounded-[50%];
   background: var(--book-status-dot-color, #aab3c1);
 }
 
@@ -151,7 +139,7 @@
 }
 
 .book-card {
-  position: relative;
+  @apply tw:relative;
 }
 
 .book-card[data-book-status='Unknown'],
@@ -187,21 +175,19 @@
 .book-card[data-book-status='Downloading']::after,
 .book-card[data-book-status='Cancel']::after {
   content: '';
-  position: absolute;
+  @apply tw:absolute;
   z-index: 4;
   inset: 0;
   border: 2px solid var(--book-status-border-color);
   border-radius: inherit;
-  pointer-events: none;
+  @apply tw:pointer-events-none;
 }
 
 .book-status-spinner {
-  width: 13px;
-  height: 13px;
-  flex: 0 0 auto;
+  @apply tw:w-3.25 tw:h-3.25 tw:flex-none;
   border: 2px solid currentColor;
   border-right-color: transparent;
-  border-radius: 50%;
+  @apply tw:rounded-[50%];
   animation: book-status-spinner-spin 1.35s linear infinite !important;
 }
 

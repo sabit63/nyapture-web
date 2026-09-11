@@ -1,3 +1,5 @@
+@reference "../styles/tailwind.css";
+
 [data-tag-type='Artists'] { --tag-color: #9ED0EA; --tag-accent: #236B8E; }
 [data-tag-type='Groups'] { --tag-color: #F0A3D7; --tag-accent: #A3307D; }
 [data-tag-type='Parodies'] { --tag-color: #F3BA72; --tag-accent: #94580E; }
@@ -8,37 +10,29 @@
 [data-tag-type='Unknown'] { --tag-color: #B5B5C2; --tag-accent: #626271; }
 
 .tag-chip {
-  min-width: 0;
-  max-width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--layout-tight-gap);
-  flex: 0 1 auto;
-  overflow: hidden;
+  @apply tw:min-w-0 tw:max-w-full tw:inline-flex tw:items-center tw:gap-(--layout-tight-gap) tw:flex-initial tw:overflow-hidden;
   border: 1px solid color-mix(in srgb, var(--tag-accent, #626271) 78%, #000 22%);
-  border-radius: 7px;
+  @apply tw:rounded-[7px];
   background: var(--tag-accent, #626271);
   color: #fff;
   font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
-  text-align: left;
+  @apply tw:leading-[1.4] tw:whitespace-nowrap tw:text-left;
 }
 
 .tag-chip--compact {
-  min-height: var(--tag-height-compact);
+  @apply tw:min-h-(--tag-height-compact);
   padding: var(--tag-padding-block) var(--tag-padding-inline);
-  font-size: var(--tag-font-size-compact);
+  @apply tw:text-(length:--tag-font-size-compact);
 }
 
 .tag-chip--default {
-  min-height: var(--tag-height-default);
+  @apply tw:min-h-(--tag-height-default);
   padding: var(--tag-padding-block) var(--tag-padding-inline);
-  font-size: var(--tag-font-size-default);
+  @apply tw:text-(length:--tag-font-size-default);
 }
 
 button.tag-chip {
-  cursor: pointer;
+  @apply tw:cursor-pointer;
   user-select: none;
 }
 
@@ -55,38 +49,32 @@ button.tag-chip--long-press-pending {
 }
 
 .tag-chip__hash {
-  flex: 0 0 auto;
+  @apply tw:flex-none;
   color: #fff;
   font-weight: 800;
 }
 
 .tag-chip__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply tw:min-w-0 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap;
 }
 
 .tag-chip__count {
-  flex: 0 0 auto;
+  @apply tw:flex-none;
   padding: 0 var(--space-1);
-  border-radius: 999px;
+  @apply tw:rounded-[999px];
   background: rgb(255 255 255 / 18%);
-  font-size: .9em;
-  line-height: 1.15;
+  @apply tw:text-[.9em] tw:leading-[1.15];
   font-variant-numeric: tabular-nums;
 }
 
 .tag-chip__remove {
-  width: 1em;
-  height: 1em;
-  flex: 0 0 auto;
+  @apply tw:w-[1em] tw:h-[1em] tw:flex-none;
   color: #fff;
 }
 
 /* Detail and editing surfaces expose the full name; cards keep a single line. */
 :is(.tags-dialog__chips, .book-viewer__tag-chips, .cache-tags, .web-book-detail-dialog__tag-group, .advanced-selected-tags) .tag-chip,
 :is(.tags-dialog__chips, .book-viewer__tag-chips, .cache-tags, .web-book-detail-dialog__tag-group, .advanced-selected-tags) .tag-chip__label {
-  white-space: normal;
+  @apply tw:whitespace-normal;
   overflow-wrap: anywhere;
 }

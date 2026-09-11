@@ -1,7 +1,9 @@
+@reference "../../styles/tailwind.css";
+
 .download-manager {
   width: min(100%, var(--container-wide));
   margin: 0 auto;
-  color: var(--color-text);
+  @apply tw:text-(--color-text);
 }
 
 .download-manager button,
@@ -13,64 +15,44 @@
 .download-manager__hero,
 .download-manager__filters {
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-surface);
+  @apply tw:rounded-(--radius-surface);
   background: linear-gradient(145deg, var(--color-surface-panel-raised), var(--color-surface-panel-deep));
   box-shadow: 0 12px 30px #09091022;
 }
 
 .download-manager__hero {
-  min-height: 108px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-direction: column;
-  gap: var(--space-4);
+  @apply tw:min-h-27 tw:flex tw:items-center tw:justify-between tw:flex-col tw:gap-(--space-4);
   padding: var(--space-5) var(--space-4);
 }
 
 .download-manager__heading {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+  @apply tw:min-w-0 tw:flex tw:items-start tw:gap-(--space-3);
 }
 
 .download-manager__heading-icon {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
+  @apply tw:w-9.5 tw:h-9.5 tw:grid tw:place-items-center tw:flex-none;
   border: 1px solid var(--color-accent-wash-border);
-  border-radius: var(--radius-surface);
+  @apply tw:rounded-(--radius-surface);
   background: var(--color-accent-soft);
-  color: var(--color-accent-highlight);
+  @apply tw:text-(--color-accent-highlight);
 }
 
 .download-manager__heading h1 {
-  margin: 0;
+  @apply tw:m-0;
   font-size: clamp(1.35rem, 2vw, 1.75rem);
-  line-height: 1.22;
+  @apply tw:leading-[1.22];
   letter-spacing: -.025em;
 }
 
 .download-manager__system-activity {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  @apply tw:flex tw:items-center tw:flex-wrap tw:gap-(--space-2);
   margin: var(--space-2) 0 0;
-  color: var(--color-text-muted);
-  font-size: .73rem;
+  @apply tw:text-(--color-text-muted) tw:text-[.73rem];
   font-variant-numeric: tabular-nums;
 }
 
 .download-manager__global-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: var(--layout-control-gap);
+  @apply tw:flex tw:items-center tw:justify-start tw:flex-wrap tw:gap-(--layout-control-gap);
 }
 
 .download-manager__global-action,
@@ -78,101 +60,77 @@
   transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease;
 }
 
-.download-manager__icon-button { color: var(--color-text-muted); }
-.download-manager__icon-button:hover:not(:disabled) { border-color: var(--color-neutral-border); color: var(--color-text); }
+.download-manager__icon-button { @apply tw:text-(--color-text-muted); }
+.download-manager__icon-button:hover:not(:disabled) { @apply tw:border-(--color-neutral-border) tw:text-(--color-text); }
 
 .download-manager__filters {
-  display: grid;
+  @apply tw:grid;
   grid-template-columns: 1fr;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--layout-section-gap);
-  padding: var(--space-3);
+  @apply tw:items-center tw:gap-(--space-3) tw:mt-(--layout-section-gap) tw:p-(--space-3);
 }
 
 .download-manager__search-field {
-  height: var(--control-height-default);
-  display: flex;
-  align-items: center;
-  gap: var(--layout-control-gap);
+  @apply tw:h-(--control-height-default) tw:flex tw:items-center tw:gap-(--layout-control-gap);
   padding: 0 var(--space-3);
   border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-control);
+  @apply tw:rounded-(--radius-control);
   background: var(--color-surface-input);
-  color: var(--color-text-muted);
+  @apply tw:text-(--color-text-muted);
 }
 
 .download-manager__search-field:focus-within {
-  border-color: var(--color-focus);
+  @apply tw:border-(--color-focus);
   box-shadow: 0 0 0 3px var(--color-info-soft);
 }
 
 .download-manager__search-field input {
-  min-width: 0;
-  flex: 1;
+  @apply tw:min-w-0 tw:flex-1;
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--color-text);
-  font-size: .79rem;
+  @apply tw:text-(--color-text) tw:text-[.79rem];
 }
 
-.download-manager__search-field input::placeholder { color: var(--color-text-placeholder); }
-.download-manager__search-field input::-webkit-search-cancel-button { display: none; }
+.download-manager__search-field input::placeholder { @apply tw:text-(--color-text-placeholder); }
+.download-manager__search-field input::-webkit-search-cancel-button { @apply tw:hidden; }
 
 .download-manager__search-clear { flex: 0 0 var(--control-height-compact); }
 
 .download-manager__sort-field {
-  min-width: 0;
-  height: var(--control-height-default);
-  display: grid;
+  @apply tw:min-w-0 tw:h-(--control-height-default) tw:grid;
   grid-template-columns: auto 16px minmax(0, 1fr);
-  align-items: center;
-  gap: var(--layout-control-gap);
+  @apply tw:items-center tw:gap-(--layout-control-gap);
   padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--color-border-control);
-  border-radius: var(--radius-control);
+  @apply tw:rounded-(--radius-control);
   background: var(--color-surface-input);
-  color: var(--color-text-muted);
-  font-size: .68rem;
+  @apply tw:text-(--color-text-muted) tw:text-[.68rem];
 }
 
 .download-manager__sort-field select {
-  min-width: 0;
-  width: 100%;
+  @apply tw:min-w-0 tw:w-full;
   border: 0;
   outline: 0;
   background: var(--color-surface-input);
-  color: var(--color-text);
-  font-size: .73rem;
-  cursor: pointer;
+  @apply tw:text-(--color-text) tw:text-[.73rem] tw:cursor-pointer;
 }
 
 .download-manager__list-header {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--layout-grid-gap);
+  @apply tw:min-h-10.5 tw:flex tw:items-center tw:justify-between tw:gap-(--layout-grid-gap);
   padding: var(--space-2) var(--layout-tight-gap);
-  color: var(--color-text-muted);
-  font-size: .72rem;
+  @apply tw:text-(--color-text-muted) tw:text-[.72rem];
 }
 
-.download-manager__list-header p { display: flex; align-items: center; gap: var(--layout-control-gap); margin: 0; }
+.download-manager__list-header p { @apply tw:flex tw:items-center tw:gap-(--layout-control-gap) tw:m-0; }
 
-.download-manager__list { display: grid; gap: var(--layout-grid-gap); }
+.download-manager__list { @apply tw:grid tw:gap-(--layout-grid-gap); }
 
 .download-card {
-  position: relative;
-  display: grid;
+  @apply tw:relative tw:grid;
   grid-template-columns: 74px minmax(0, 1fr);
-  gap: var(--space-3);
-  min-height: 128px;
-  padding: var(--space-3);
-  overflow: hidden;
+  @apply tw:gap-(--space-3) tw:min-h-32 tw:p-(--space-3) tw:overflow-hidden;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-surface);
+  @apply tw:rounded-(--radius-surface);
   background: linear-gradient(110deg, #272733, #23232e);
   box-shadow: 0 7px 18px #0909101f;
   transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
@@ -180,9 +138,9 @@
 
 .download-card::before {
   content: '';
-  position: absolute;
+  @apply tw:absolute;
   inset: 0 auto 0 0;
-  width: 3px;
+  @apply tw:w-0.75;
   background: var(--color-info-fill);
 }
 
@@ -196,205 +154,161 @@
 .download-card:hover { border-color: #484858; box-shadow: 0 10px 24px #0909102e; transform: translateY(-1px); }
 
 .download-card__cover-wrap {
-  position: relative;
-  width: 74px;
-  min-height: 96px;
+  @apply tw:relative tw:w-18.5 tw:min-h-24;
 }
 
 .download-card__thumbnail {
-  width: 74px;
-  height: 96px;
+  @apply tw:w-18.5 tw:h-24;
   border: 1px solid #ffffff12;
-  border-radius: 7px;
+  @apply tw:rounded-[7px];
   box-shadow: 0 8px 18px #05050845;
 }
 
 .download-card__cover-status {
-  position: absolute;
+  @apply tw:absolute;
   z-index: 2;
   inset: auto var(--layout-tight-gap) var(--layout-tight-gap);
-  min-height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--layout-tight-gap);
+  @apply tw:min-h-5.5 tw:flex tw:items-center tw:justify-center tw:gap-(--layout-tight-gap);
   border: 1px solid #ffffff20;
-  border-radius: 5px;
+  @apply tw:rounded-[5px];
   background: #111119dc;
   color: #f1f1f5;
-  font-size: .58rem;
+  @apply tw:text-[.58rem];
   font-weight: 700;
   backdrop-filter: blur(5px);
 }
 
-.download-card__body { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-.download-card__title-row { display: block; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.download-card__title-row h2 { margin: 0; overflow: hidden; color: var(--color-text); font-size: .94rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.download-card__body { @apply tw:min-w-0 tw:flex tw:flex-col tw:justify-center; }
+.download-card__title-row { @apply tw:block tw:items-start tw:justify-between tw:gap-(--space-3); }
+.download-card__title-row h2 { @apply tw:m-0 tw:overflow-hidden tw:text-(--color-text) tw:text-[.94rem] tw:leading-[1.35] tw:text-ellipsis tw:whitespace-nowrap; }
 
 .download-card__artist {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  @apply tw:flex tw:items-center tw:gap-(--space-2);
   margin: var(--layout-tight-gap) 0 0;
-  color: var(--color-text-muted);
-  font-size: .7rem;
+  @apply tw:text-(--color-text-muted) tw:text-[.7rem];
 }
 
 .download-card__artist > span {
-  padding: var(--layout-tight-gap);
-  border-radius: 4px;
+  @apply tw:p-(--layout-tight-gap) tw:rounded-[4px];
   background: #ffffff0a;
-  color: var(--color-text-dim);
-  font-size: .55rem;
+  @apply tw:text-(--color-text-dim) tw:text-[.55rem];
 }
 
 .download-card__priority-badge {
-  flex: 0 0 auto;
-  display: inline-flex;
-  margin-top: var(--space-2);
+  @apply tw:flex-none tw:inline-flex tw:mt-(--space-2);
   padding: var(--layout-tight-gap) var(--space-2);
   border: 1px solid #d75a2954;
-  border-radius: 999px;
+  @apply tw:rounded-[999px];
   background: #d75a2918;
   color: #ee916e;
-  font-size: .59rem;
+  @apply tw:text-[.59rem];
   font-weight: 800;
 }
 
 .download-card__progress-row {
-  display: grid;
+  @apply tw:grid;
   grid-template-columns: minmax(0, 1fr) 42px;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  @apply tw:items-center tw:gap-(--space-2) tw:mt-(--space-3);
 }
 
 .download-card__progress {
-  height: 7px;
-  overflow: hidden;
-  border-radius: 999px;
+  @apply tw:h-1.75 tw:overflow-hidden tw:rounded-[999px];
   background: var(--color-surface-progress);
 }
 
-.download-card__progress > span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent-fill); transition: width .25s ease; }
+.download-card__progress > span { @apply tw:block tw:h-full; border-radius: inherit; background: var(--color-accent-fill); transition: width .25s ease; }
 .download-card__progress--info > span { background: var(--color-info-fill); }
 .download-card__progress--warning > span { background: var(--color-warning-fill); }
 .download-card__progress--danger > span { background: var(--color-danger-fill); }
-.download-card__progress-row > strong { color: #dcdce4; text-align: right; font-size: .7rem; font-variant-numeric: tabular-nums; }
+.download-card__progress-row > strong { color: #dcdce4; @apply tw:text-right tw:text-[.7rem]; font-variant-numeric: tabular-nums; }
 
 .download-card__details,
 .download-card__status-row {
-  display: flex;
-  flex-wrap: wrap;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: .66rem;
+  @apply tw:flex tw:flex-wrap tw:flex-col tw:items-start tw:gap-(--space-2) tw:mt-(--space-2) tw:text-(--color-text-muted) tw:text-[.66rem];
   font-variant-numeric: tabular-nums;
 }
 
 .download-card__details > span,
-.download-card__status-row > span { display: inline-flex; align-items: center; gap: var(--layout-tight-gap); }
+.download-card__status-row > span { @apply tw:inline-flex tw:items-center tw:gap-(--layout-tight-gap); }
 .download-card__failed-pages { color: #ff8793; }
-.download-card__speed { margin-left: 0; }
+.download-card__speed { @apply tw:ml-0; }
 .download-card__priority-text,
-.download-card__queue-position { color: var(--color-text-dim); }
+.download-card__queue-position { @apply tw:text-(--color-text-dim); }
 
 .download-card__error {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--layout-control-gap);
+  @apply tw:flex tw:items-start tw:gap-(--layout-control-gap);
   margin: var(--space-2) 0 0;
   color: #ff9aa4;
-  font-size: .65rem;
-  line-height: 1.45;
+  @apply tw:text-[.65rem] tw:leading-[1.45];
 }
 
-.download-card__error svg { flex: 0 0 auto; margin-top: 0; transform: translateY(1px); }
+.download-card__error svg { @apply tw:flex-none tw:mt-0; transform: translateY(1px); }
 
 .download-card__actions {
-  width: auto;
+  @apply tw:w-auto;
   grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--layout-control-gap);
+  @apply tw:flex tw:items-center tw:justify-end tw:gap-(--layout-control-gap);
   padding: var(--space-3) 0 0;
   border-top: 1px solid var(--color-border-subtle);
 }
 
 .download-card__action {
-  min-height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--layout-control-gap);
+  @apply tw:min-h-7.5 tw:inline-flex tw:items-center tw:justify-start tw:gap-(--layout-control-gap);
   padding: var(--layout-tight-gap) var(--space-2);
   border: 1px solid transparent;
-  border-radius: 6px;
+  @apply tw:rounded-[6px];
   background: transparent;
-  color: var(--color-text-muted);
-  font-size: .65rem;
-  white-space: nowrap;
-  cursor: pointer;
+  @apply tw:text-(--color-text-muted) tw:text-[.65rem] tw:whitespace-nowrap tw:cursor-pointer;
 }
 
-.download-card__action span { display: none; }
-.download-card__action { min-width: 34px; justify-content: center; }
+.download-card__action span { @apply tw:hidden; }
+.download-card__action { @apply tw:min-w-8.5 tw:justify-center; }
 
-.download-card__action:hover { border-color: var(--color-border-strong); background: var(--color-neutral-soft); color: var(--color-text); }
-.download-card__action--pause { color: var(--color-warning-text); }
-.download-card__action--resume { color: var(--color-success-text); }
+.download-card__action:hover { @apply tw:border-(--color-border-strong); background: var(--color-neutral-soft); @apply tw:text-(--color-text); }
+.download-card__action--pause { @apply tw:text-(--color-warning-text); }
+.download-card__action--resume { @apply tw:text-(--color-success-text); }
 .download-card__action--retry { color: #8cc5ff; }
 .download-card__action--delete { color: #ff8f9a; }
-.download-card__action--icon-only { width: 32px; justify-content: center; align-self: center; padding-inline: 0; }
-.download-card__action:disabled { opacity: .42; cursor: wait; }
+.download-card__action--icon-only { @apply tw:w-8 tw:justify-center; align-self: center; @apply tw:px-0; }
+.download-card__action:disabled { opacity: .42; @apply tw:cursor-wait; }
 
-.download-manager__clear-button { margin-top: var(--space-2); padding: var(--layout-control-gap) var(--space-3); border-color: color-mix(in srgb, var(--color-accent-border) 38%, transparent); background: var(--color-accent-soft); color: var(--color-accent-text); }
+.download-manager__clear-button { @apply tw:mt-(--space-2); padding: var(--layout-control-gap) var(--space-3); border-color: color-mix(in srgb, var(--color-accent-border) 38%, transparent); background: var(--color-accent-soft); @apply tw:text-(--color-accent-text); }
 .download-manager__clear-button:hover { background: color-mix(in srgb, var(--color-accent-soft) 78%, var(--color-accent-fill)); }
-.download-manager__clear-button--pending { width: var(--control-height-compact); min-width: var(--control-height-compact); padding: 0; }
+.download-manager__clear-button--pending { @apply tw:w-(--control-height-compact) tw:min-w-(--control-height-compact) tw:p-0; }
 
 .download-manager__error {
-  display: flex;
-  align-items: center;
-  gap: var(--layout-control-gap);
+  @apply tw:flex tw:items-center tw:gap-(--layout-control-gap);
   margin: 0 0 var(--space-2);
   padding: var(--layout-control-gap) var(--space-3);
   border: 1px solid color-mix(in srgb, var(--color-danger-border) 34%, transparent);
-  border-radius: var(--radius-surface);
+  @apply tw:rounded-(--radius-surface);
   background: var(--color-danger-soft);
-  color: var(--color-danger-text);
-  font-size: .72rem;
+  @apply tw:text-(--color-danger-text) tw:text-[.72rem];
 }
 
-.download-manager__error svg { flex: 0 0 auto; }
-.download-manager__error span { flex: 1; min-width: 0; }
-.download-manager__error-retry { flex: 0 0 auto; }
+.download-manager__error svg { @apply tw:flex-none; }
+.download-manager__error span { @apply tw:flex-1 tw:min-w-0; }
+.download-manager__error-retry { @apply tw:flex-none; }
 
-.download-manager__loading { display: grid; gap: var(--layout-grid-gap); }
-.download-manager__list--loading { gap: var(--layout-grid-gap); }
-.download-card--skeleton { pointer-events: none; }
+.download-manager__loading { @apply tw:grid tw:gap-(--layout-grid-gap); }
+.download-manager__list--loading { @apply tw:gap-(--layout-grid-gap); }
+.download-card--skeleton { @apply tw:pointer-events-none; }
 .download-card--skeleton::before { background: #ffffff0d; }
-.download-card--skeleton .download-card__body { gap: 0; }
+.download-card--skeleton .download-card__body { @apply tw:gap-0; }
 .download-card__skeleton-cover {
-  width: 74px;
-  height: 96px;
-  display: block;
-  border-radius: 7px;
+  @apply tw:w-18.5 tw:h-24 tw:block tw:rounded-[7px];
 }
 .download-card__skeleton-copy { width: min(100%, 390px); }
-.download-card__skeleton-line { display: block; height: 12px; border-radius: 999px; }
+.download-card__skeleton-line { @apply tw:block tw:h-3 tw:rounded-[999px]; }
 .download-card__skeleton-line--title { width: min(100%, 290px); }
-.download-card__skeleton-line--artist { width: min(100%, 150px); margin-top: var(--space-2); height: 9px; }
-.download-card__skeleton-progress { display: block; height: 7px; border-radius: 999px; }
-.download-card__skeleton-percent { width: 31px; height: 11px; display: block; border-radius: 999px; }
-.download-card__skeleton-detail { width: 124px; height: 9px; display: block; border-radius: 999px; }
-.download-card__skeleton-detail--short { width: 88px; }
-.download-card__skeleton-status { width: 74px; height: 21px; display: block; border-radius: 999px; }
-.download-card__skeleton-priority { width: 90px; height: 9px; display: block; border-radius: 999px; }
-.download-card__skeleton-action { width: 32px; height: 30px; display: block; border-radius: 6px; }
+.download-card__skeleton-line--artist { width: min(100%, 150px); @apply tw:mt-(--space-2) tw:h-2.25; }
+.download-card__skeleton-progress { @apply tw:block tw:h-1.75 tw:rounded-[999px]; }
+.download-card__skeleton-percent { @apply tw:w-7.75 tw:h-2.75 tw:block tw:rounded-[999px]; }
+.download-card__skeleton-detail { @apply tw:w-31 tw:h-2.25 tw:block tw:rounded-[999px]; }
+.download-card__skeleton-detail--short { @apply tw:w-22; }
+.download-card__skeleton-status { @apply tw:w-18.5 tw:h-5.25 tw:block tw:rounded-[999px]; }
+.download-card__skeleton-priority { @apply tw:w-22.5 tw:h-2.25 tw:block tw:rounded-[999px]; }
+.download-card__skeleton-action { @apply tw:w-8 tw:h-7.5 tw:block tw:rounded-[6px]; }
 .download-manager__skeleton {
   background: linear-gradient(100deg, #ffffff0a 20%, #ffffff18 45%, #ffffff0a 70%);
   background-size: 220% 100%;
@@ -407,44 +321,39 @@
 @keyframes download-manager-shimmer { to { background-position: -220% 0; } }
 
 @media (min-width: 640px) {
-  .download-manager__heading-icon { width: 43px; height: 43px; }
-  .download-manager__filters { padding: var(--space-4); }
-  .download-card__title-row { display: flex; }
-  .download-card__priority-badge { margin-top: 0; }
+  .download-manager__heading-icon { @apply tw:w-10.75 tw:h-10.75; }
+  .download-manager__filters { @apply tw:p-(--space-4); }
+  .download-card__title-row { @apply tw:flex; }
+  .download-card__priority-badge { @apply tw:mt-0; }
   .download-card__details,
   .download-card__status-row {
-    flex-direction: row;
-    align-items: center;
+    @apply tw:flex-row tw:items-center;
     gap: var(--space-2) var(--space-4);
   }
-  .download-card__speed { margin-left: auto; }
+  .download-card__speed { @apply tw:ml-auto; }
   .download-card__action span { display: inline; }
-  .download-card__action { min-width: 0; justify-content: flex-start; }
+  .download-card__action { @apply tw:min-w-0 tw:justify-start; }
 }
 
 @media (min-width: 880px) {
   .download-manager__hero {
-    align-items: center;
-    flex-direction: row;
-    gap: var(--layout-section-gap);
-    padding: var(--space-6);
+    @apply tw:items-center tw:flex-row tw:gap-(--layout-section-gap) tw:p-(--space-6);
   }
-  .download-manager__global-actions { justify-content: flex-end; }
+  .download-manager__global-actions { @apply tw:justify-end; }
   .download-manager__filters {
     grid-template-columns: minmax(230px, 1fr) minmax(160px, .55fr);
   }
   .download-manager__sort-field { max-width: none; }
   .download-card {
     grid-template-columns: 88px minmax(0, 1fr) auto;
-    gap: var(--layout-grid-gap);
-    padding: var(--space-4);
+    @apply tw:gap-(--layout-grid-gap) tw:p-(--space-4);
   }
-  .download-card__cover-wrap { width: 88px; min-height: 112px; }
-  .download-card__thumbnail { width: 88px; height: 112px; }
-  .download-card__skeleton-cover { width: 88px; height: 112px; }
+  .download-card__cover-wrap { @apply tw:w-22 tw:min-h-28; }
+  .download-card__thumbnail { @apply tw:w-22 tw:h-28; }
+  .download-card__skeleton-cover { @apply tw:w-22 tw:h-28; }
   .download-card__actions {
     grid-column: auto;
-    flex-direction: row;
+    @apply tw:flex-row;
     padding: 0 0 0 var(--space-4);
     border-top: 0;
   border-left: 1px solid var(--color-border-subtle);
