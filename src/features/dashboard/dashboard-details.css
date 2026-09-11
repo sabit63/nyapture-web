@@ -360,7 +360,7 @@
   border: 2px solid var(--color-border-spinner);
   border-top-color: var(--color-accent-fill);
   @apply tw:rounded-[50%];
-  animation: dashboard-detail-spin .8s linear infinite;
+  @apply tw:animate-spin-fast;
 }
 
 .dashboard-detail__skeleton {
@@ -375,10 +375,10 @@
   @apply tw:rounded-(--radius-surface);
   background: linear-gradient(100deg, var(--color-surface-detail-skeleton-start) 20%, var(--color-surface-detail-skeleton-mid) 45%, var(--color-surface-detail-skeleton-start) 70%);
   background-size: 200% 100%;
-  animation: dashboard-detail-shimmer 1.45s ease-in-out infinite;
+  @apply tw:animate-shimmer-fast;
 }
 
-.dashboard-detail__spin { animation: dashboard-detail-spin .8s linear infinite; }
+.dashboard-detail__spin { @apply tw:animate-spin-fast; }
 
 .dashboard-detail__definition-grid {
   @apply tw:grid;
@@ -468,15 +468,6 @@
 .dashboard-detail details summary { @apply tw:cursor-pointer tw:text-(--color-accent-text) tw:text-[.68rem]; }
 .dashboard-detail code { @apply tw:text-(--color-neutral-on-fill) tw:text-[.68rem]; overflow-wrap: anywhere; }
 
-@keyframes dashboard-detail-spin {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes dashboard-detail-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
 @media (min-width: 640px) {
   .dashboard-detail__grid,
   .dashboard-detail__metrics,
@@ -506,5 +497,5 @@
 @media (prefers-reduced-motion: reduce) {
   .dashboard-detail__spinner,
   .dashboard-detail__spin,
-  .dashboard-detail__skeleton span { animation: none; }
+  .dashboard-detail__skeleton span { @apply tw:animate-none; }
 }

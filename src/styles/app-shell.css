@@ -115,7 +115,7 @@
   background: #0b0b11b8;
   opacity: 0;
   @apply tw:pointer-events-none;
-  transition: opacity 150ms ease-out;
+  @apply tw:transition-[opacity] tw:duration-150 tw:ease-[ease-out];
 }
 
 .drawer-open .drawer-scrim { opacity: 1; @apply tw:pointer-events-auto; }

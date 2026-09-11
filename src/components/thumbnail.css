@@ -28,7 +28,7 @@
   @apply tw:w-full tw:h-full tw:block tw:object-cover;
   object-position: center top;
   opacity: 0;
-  transition: opacity .16s ease;
+  @apply tw:transition-[opacity] tw:duration-160 tw:ease-[ease];
 }
 
 .book-cover.is-loaded .book-cover__image { opacity: var(--thumbnail-loaded-opacity, 1); }
@@ -45,7 +45,7 @@
   @apply tw:absolute;
   inset: 0;
   background: linear-gradient(105deg, transparent 30%, #ffffff0a 45%, #ffffff13 50%, transparent 65%);
-  animation: thumbnail-shimmer 1.4s linear infinite;
+  @apply tw:animate-shimmer-slide;
   transform: translateX(-100%);
 }
 
@@ -70,5 +70,3 @@
 }
 
 .book-cover__fallback button:hover { @apply tw:border-(--color-border-strong); background: var(--color-surface-hover-strong); }
-
-@keyframes thumbnail-shimmer { to { transform: translateX(100%); } }

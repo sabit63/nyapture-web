@@ -13,10 +13,7 @@
   @apply tw:rounded-(--radius-control);
   background: var(--color-surface);
   @apply tw:text-(--color-text-muted) tw:cursor-pointer;
-  transition:
-    border-color var(--duration-fast) ease,
-    background var(--duration-fast) ease,
-    color var(--duration-fast) ease;
+  @apply tw:transition-[border-color,background,color] tw:duration-(--duration-fast) tw:ease-[ease];
 }
 
 .display-settings-theme-card:hover {
@@ -104,13 +101,13 @@
   border: 1px solid var(--color-border-strong);
   @apply tw:rounded-[999px];
   background: var(--color-neutral-fill);
-  transition: background var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  @apply tw:transition-[background,border-color] tw:duration-(--duration-fast) tw:ease-[ease];
 }
 .display-settings-auto-columns__track::after {
   content: '';
   @apply tw:absolute tw:top-0.5 tw:left-0.5 tw:w-4 tw:h-4 tw:rounded-[50%];
   background: var(--color-text);
-  transition: transform var(--duration-fast) ease;
+  @apply tw:transition-[transform] tw:duration-(--duration-fast) tw:ease-[ease];
 }
 .display-settings-auto-columns[aria-checked='true'] .display-settings-auto-columns__track {
   background: var(--color-accent-fill);

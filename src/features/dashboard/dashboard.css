@@ -123,7 +123,7 @@
 }
 
 .dashboard__refresh-icon.is-spinning {
-  animation: dashboard-spin .85s linear infinite;
+  @apply tw:animate-spin;
 }
 
 .dashboard__loading-skeleton {
@@ -166,7 +166,7 @@
   @apply tw:block tw:flex-none tw:rounded-(--radius-control);
   background: linear-gradient(100deg, var(--color-surface-skeleton-start) 20%, var(--color-surface-skeleton-end) 45%, var(--color-surface-skeleton-start) 70%);
   background-size: 200% 100%;
-  animation: dashboard-skeleton-shimmer 1.55s ease-in-out infinite;
+  @apply tw:animate-shimmer;
 }
 
 .dashboard__skeleton--hero-icon {
@@ -255,11 +255,6 @@
   opacity: .72;
 }
 
-@keyframes dashboard-skeleton-shimmer {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
 .dashboard__error {
   @apply tw:flex tw:items-center;
   gap: var(--layout-control-gap, var(--space-2));
@@ -297,10 +292,6 @@
 .dashboard__retry-button:disabled {
   @apply tw:cursor-wait;
   opacity: .62;
-}
-
-@keyframes dashboard-spin {
-  to { transform: rotate(360deg); }
 }
 
 .dashboard__section {
@@ -482,7 +473,7 @@
   @apply tw:block tw:h-full tw:min-w-0;
   border-radius: inherit;
   background: linear-gradient(90deg, #d5883e, #e0b13b);
-  transition: width .25s ease;
+  @apply tw:transition-[width] tw:duration-250 tw:ease-[ease];
 }
 
 .dashboard__meter--primary > span {
@@ -786,7 +777,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dashboard__skeleton,
   .dashboard__summary-value-skeleton {
-    animation: none;
+    @apply tw:animate-none;
     background: var(--color-surface-skeleton-start);
   }
 
@@ -804,7 +795,7 @@
   @apply tw:relative tw:min-h-38 tw:flex tw:flex-col tw:p-(--space-4);
   color: inherit;
   text-decoration: none;
-  transition: border-color var(--duration-fast) ease, background var(--duration-fast) ease, transform var(--duration-fast) ease;
+  @apply tw:transition-[border-color,background,transform] tw:duration-(--duration-fast) tw:ease-[ease];
 }
 
 .dashboard__summary-card:hover,
@@ -831,7 +822,7 @@
   @apply tw:h-[1.32rem] tw:block tw:overflow-hidden tw:rounded-(--radius-control);
   background: linear-gradient(100deg, var(--color-surface-skeleton-start) 20%, var(--color-surface-skeleton-end) 45%, var(--color-surface-skeleton-start) 70%);
   background-size: 200% 100%;
-  animation: dashboard-skeleton-shimmer 1.55s ease-in-out infinite;
+  @apply tw:animate-shimmer;
 }
 .dashboard__summary-loading-label { @apply tw:text-(--color-text-dim); }
 .dashboard__summary-card-chevron { @apply tw:absolute tw:right-(--space-3) tw:bottom-(--space-3) tw:text-(--color-text-dim); }

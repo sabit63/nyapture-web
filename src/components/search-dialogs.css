@@ -47,7 +47,7 @@
 .advanced-range-section > summary { @apply tw:min-h-(--control-height-compact) tw:flex tw:items-center tw:gap-(--space-2); list-style: none; @apply tw:text-(--color-text) tw:text-(length:--font-size-body-sm); font-weight: 700; @apply tw:cursor-pointer; user-select: none; }
 .advanced-range-section > summary::-webkit-details-marker { @apply tw:hidden; }
 .advanced-range-section > summary::marker { content: ''; }
-.advanced-range-section > summary > svg { @apply tw:ml-auto tw:text-(--color-text-muted); transition: transform .14s ease; }
+.advanced-range-section > summary > svg { @apply tw:ml-auto tw:text-(--color-text-muted); @apply tw:transition-[transform] tw:duration-140 tw:ease-[ease]; }
 .advanced-range-section[open] > summary > svg { transform: rotate(180deg); }
 .advanced-range-section > summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; @apply tw:rounded-(--radius-control); }
 .advanced-range-section[open] > .advanced-range-field { @apply tw:mt-(--space-3); }
@@ -77,7 +77,7 @@
 .delete-dialog .icon-button.delete-dialog__action--confirm { @apply tw:border-(--color-danger-border); background: var(--color-danger-soft); @apply tw:text-(--color-danger-text); }
 .delete-dialog .icon-button.delete-dialog__action--confirm:hover:not(:disabled) { @apply tw:border-(--color-danger-text); background: var(--color-danger-soft); @apply tw:text-(--color-danger-text); }
 .delete-dialog__action:disabled { opacity: .45; @apply tw:cursor-not-allowed; }
-.delete-dialog__spinner { animation: ui-spin .85s linear infinite; }
+.delete-dialog__spinner { @apply tw:animate-spin; }
 
 .tag-search-destination-dialog { width: min(420px, calc(100vw - 32px)); }
 .tag-search-destination-dialog__panel { @apply tw:flex tw:flex-col; }
@@ -95,7 +95,7 @@
 .tag-display-name-section > summary { @apply tw:min-h-(--control-height-compact) tw:flex tw:items-center tw:gap-(--space-2); list-style: none; @apply tw:text-(--color-text) tw:text-(length:--font-size-body-sm); font-weight: 700; @apply tw:cursor-pointer; user-select: none; }
 .tag-display-name-section > summary::-webkit-details-marker { @apply tw:hidden; }
 .tag-display-name-section > summary::marker { content: ''; }
-.tag-display-name-section > summary > svg { @apply tw:ml-auto tw:text-(--color-text-muted); transition: transform .14s ease; }
+.tag-display-name-section > summary > svg { @apply tw:ml-auto tw:text-(--color-text-muted); @apply tw:transition-[transform] tw:duration-140 tw:ease-[ease]; }
 .tag-display-name-section[open] > summary > svg { transform: rotate(180deg); }
 .tag-display-name-section > summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; @apply tw:rounded-(--radius-control); }
 .tag-display-name-editor { @apply tw:grid tw:gap-(--space-3) tw:mt-(--space-3); }
@@ -114,7 +114,7 @@
 .tag-display-name-editor__status { @apply tw:text-(--color-text-dim); }
 .tag-display-name-editor__error { @apply tw:text-(--color-danger-text); }
 .tag-display-name-editor__success { @apply tw:text-(--color-success-text); }
-.tag-display-name-editor__spinner { animation: ui-spin .85s linear infinite; }
+.tag-display-name-editor__spinner { @apply tw:animate-spin; }
 
 .api-settings-dialog__footer { grid-template-columns: 1fr 1fr; }
 .display-settings-dialog__footer { @apply tw:flex tw:justify-end; }
@@ -129,7 +129,7 @@
 .api-settings-dialog__section--expandable > summary::-webkit-details-marker { @apply tw:hidden; }
 .api-settings-dialog__section--expandable > summary::marker { content: ''; }
 .api-settings-dialog__section--expandable > summary > span { @apply tw:text-(--color-text-muted) tw:text-(length:--font-size-body-sm); font-weight: 700; }
-.api-settings-dialog__section--expandable > summary > svg { @apply tw:ml-auto tw:text-(--color-text-muted); transition: transform .14s ease; }
+.api-settings-dialog__section--expandable > summary > svg { @apply tw:ml-auto tw:text-(--color-text-muted); @apply tw:transition-[transform] tw:duration-140 tw:ease-[ease]; }
 .api-settings-dialog__section--expandable[open] > summary > svg { transform: rotate(180deg); }
 .api-settings-dialog__section--expandable > summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; @apply tw:rounded-(--radius-control); }
 .api-settings__key-group { @apply tw:min-w-0 tw:flex tw:flex-col tw:gap-(--space-4) tw:m-0 tw:p-(--space-4); border: 1px solid var(--color-border-subtle); @apply tw:rounded-(--radius-control); background: var(--color-surface); }
@@ -145,7 +145,7 @@
 .api-settings-dialog .button.api-settings__connection-indicator { @apply tw:min-h-(--control-height-compact) tw:inline-flex tw:items-center tw:gap-(--layout-control-gap); padding: var(--space-1) var(--space-2); border: 1px solid var(--color-neutral-border); @apply tw:rounded-(--radius-full); background: var(--color-neutral-fill); @apply tw:text-(--color-neutral-text) tw:text-(length:--control-font-size-compact); font-weight: 600; @apply tw:leading-[1] tw:whitespace-nowrap tw:cursor-pointer; }
 .api-settings__connection-indicator-dot { @apply tw:w-1.75 tw:h-1.75 tw:flex-none tw:rounded-[50%]; background: currentColor; box-shadow: 0 0 0 3px #ffffff0a; }
 .api-settings-dialog .button.api-settings__connection-indicator--pending { @apply tw:border-(--color-warning-border); background: var(--color-warning-soft); @apply tw:text-(--color-warning-text); }
-.api-settings__connection-indicator--pending .api-settings__connection-indicator-dot { animation: api-settings-connection-pulse 1.15s ease-in-out infinite; }
+.api-settings__connection-indicator--pending .api-settings__connection-indicator-dot { @apply tw:animate-connection-pulse; }
 .api-settings-dialog .button.api-settings__connection-indicator--success { @apply tw:border-(--color-success-border); background: var(--color-success-soft); @apply tw:text-(--color-success-text); }
 .api-settings-dialog .button.api-settings__connection-indicator--error { @apply tw:border-(--color-danger-border); background: var(--color-danger-soft); @apply tw:text-(--color-danger-text); }
 .api-settings__connection-indicator:disabled { @apply tw:cursor-wait; }
@@ -154,13 +154,9 @@
 .api-settings__connection-status { margin: calc(0px - var(--space-2)) 0 0; @apply tw:text-(--color-success-text) tw:text-(length:--font-size-label-sm) tw:leading-[1.55]; }
 .api-settings-dialog .icon-button.api-settings-dialog__action { @apply tw:w-(--control-height-default) tw:min-w-(--control-height-default) tw:h-(--control-height-default) tw:min-h-(--control-height-default) tw:p-0 tw:gap-0; }
 .api-settings-dialog__action-icon { @apply tw:w-4.5 tw:h-4.5 tw:flex-none; }
-.api-settings-dialog__action-icon--spinning { animation: ui-spin .85s linear infinite; }
+.api-settings-dialog__action-icon--spinning { @apply tw:animate-spin; }
 .api-settings-dialog .button:disabled,
 .api-settings-dialog .icon-button:disabled { opacity: .45; @apply tw:cursor-not-allowed; }
-
-@keyframes api-settings-connection-pulse {
-  50% { opacity: .35; transform: scale(.72); }
-}
 
 @media (min-width: 640px) {
   .advanced-dialog { max-height: min(88vh, 760px); }

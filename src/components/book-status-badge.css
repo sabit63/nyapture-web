@@ -130,12 +130,7 @@
 }
 
 .book-status-badge--inline.book-status-badge--animated .book-status-badge__dot {
-  animation: book-status-dot-pulse 1.8s ease-in-out infinite;
-}
-
-@keyframes book-status-dot-pulse {
-  0%, 100% { opacity: .62; }
-  50% { opacity: 1; }
+  @apply tw:animate-status-pulse;
 }
 
 .book-card {
@@ -188,9 +183,5 @@
   border: 2px solid currentColor;
   border-right-color: transparent;
   @apply tw:rounded-[50%];
-  animation: book-status-spinner-spin 1.35s linear infinite !important;
-}
-
-@keyframes book-status-spinner-spin {
-  to { transform: rotate(360deg); }
+  @apply tw:animate-spin-slow;
 }

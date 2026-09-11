@@ -46,7 +46,7 @@
 .web-book-detail-dialog__error { @apply tw:flex tw:items-center tw:gap-(--layout-control-gap) tw:m-0 tw:text-[.72rem] tw:leading-[1.5]; }
 .web-book-detail-dialog__status { @apply tw:text-(--color-text-muted); }
 .web-book-detail-dialog__error { @apply tw:text-(--color-danger-text); }
-.web-book-detail-dialog__spinner { animation: ui-spin .85s linear infinite; }
+.web-book-detail-dialog__spinner { @apply tw:animate-spin; }
 
 .web-book-detail-dialog__tags { @apply tw:grid tw:gap-(--space-3); }
 .web-book-detail-dialog__tags h3 { @apply tw:m-0 tw:text-(--color-text-muted) tw:text-[.76rem]; }

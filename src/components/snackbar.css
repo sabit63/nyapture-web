@@ -13,7 +13,7 @@
   @apply tw:text-[.72rem] tw:leading-[1.45] tw:pointer-events-none;
   opacity: 1;
   transform: translateY(0);
-  animation: snackbar-in .16s ease;
+  @apply tw:animate-snackbar-in;
 }
 
 .snackbar__icon { @apply tw:flex-none; }
@@ -22,14 +22,10 @@
 .snackbar--warning { @apply tw:border-(--color-warning-border); background: var(--color-warning-soft); @apply tw:text-(--color-warning-text); }
 .snackbar--error { @apply tw:border-(--color-danger-border); background: var(--color-danger-soft); @apply tw:text-(--color-danger-text); }
 
-@keyframes snackbar-in {
-  from { opacity: 0; transform: translateY(8px); }
-}
-
 @media (min-width: 640px) {
   .snackbar { @apply tw:right-(--space-6) tw:bottom-(--space-6); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .snackbar { animation: none; }
+  .snackbar { @apply tw:animate-none; }
 }

@@ -9,3 +9,87 @@
   --breakpoint-md: 880px;
   --breakpoint-lg: 1200px;
 }
+
+/* Shared motion, emitted once even when feature CSS is lazy-loaded. */
+@theme static {
+  --animate-status-pulse: nya-status-pulse 1.8s ease-in-out infinite;
+  --animate-spin-slow: nya-spin 1.35s linear infinite;
+  --animate-spin: nya-spin .85s linear infinite;
+  --animate-connection-pulse: nya-connection-pulse 1.15s ease-in-out infinite;
+  --animate-results-settle: nya-results-settle 160ms ease-out;
+  --animate-snackbar-in: nya-snackbar-in .16s ease;
+  --animate-shimmer-slide: nya-shimmer-slide 1.4s linear infinite;
+  --animate-dialog-in: nya-dialog-in var(--duration-fast) ease-out;
+  --animate-spin-fast: nya-spin .8s linear infinite;
+  --animate-shimmer-fast: nya-shimmer 1.45s ease-in-out infinite;
+  --animate-shimmer: nya-shimmer 1.55s ease-in-out infinite;
+  --animate-shimmer-wide: nya-shimmer-wide 1.5s ease-in-out infinite;
+  --animate-recommendations-enter: nya-recommendations-enter .2s ease-out;
+  --animate-recommendations-skeleton: nya-recommendations-pulse 1.6s ease-in-out infinite;
+  --animate-recommendations-pulse: nya-recommendations-pulse 1.8s ease-in-out infinite;
+  --animate-recommendations-rise: nya-recommendations-rise .2s ease-out;
+  --animate-shimmer-wide-linear: nya-shimmer-wide 1.35s linear infinite;
+  --animate-viewer-in: nya-viewer-in .16s ease-out;
+  --animate-viewer-rise: nya-viewer-rise .16s ease-out;
+}
+
+/* Outside @theme so @reference does not duplicate keyframes in lazy chunks. */
+@keyframes nya-status-pulse {
+  0%, 100% { opacity: .62; }
+  50% { opacity: 1; }
+}
+
+@keyframes nya-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes nya-connection-pulse {
+  50% { opacity: .35; transform: scale(.72); }
+}
+
+@keyframes nya-results-settle {
+  from { opacity: .65; }
+  to { opacity: 1; }
+}
+
+@keyframes nya-snackbar-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes nya-shimmer-slide {
+  to { transform: translateX(100%); }
+}
+
+@keyframes nya-dialog-in {
+  from { opacity: 0; transform: translateY(var(--space-2)) scale(.985); }
+}
+
+@keyframes nya-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@keyframes nya-shimmer-wide {
+  to { background-position: -220% 0; }
+}
+
+@keyframes nya-recommendations-pulse {
+  50% { opacity: .4; }
+}
+
+@keyframes nya-recommendations-enter {
+  from { transform: translateX(40px); opacity: 0; }
+}
+
+@keyframes nya-recommendations-rise {
+  from { transform: translateY(40px); opacity: 0; }
+}
+
+@keyframes nya-viewer-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@keyframes nya-viewer-rise {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}

@@ -266,7 +266,7 @@
 }
 
 .ui-dialog[open] {
-  animation: ui-dialog-in var(--duration-fast) ease-out;
+  @apply tw:animate-dialog-in;
 }
 
 /* Keep the native close/focus lifecycle; the browser retains the top layer
@@ -279,7 +279,7 @@
       display 120ms allow-discrete, overlay 120ms allow-discrete;
   }
   .ui-dialog[open] {
-    animation: none;
+    @apply tw:animate-none;
     opacity: 1;
     transform: none;
     transition-duration: 180ms;
@@ -342,12 +342,4 @@
   .ui-dialog__footer {
     @apply tw:px-(--space-5);
   }
-}
-
-@keyframes ui-dialog-in {
-  from { opacity: 0; transform: translateY(var(--space-2)) scale(.985); }
-}
-
-@keyframes ui-spin {
-  to { transform: rotate(360deg); }
 }

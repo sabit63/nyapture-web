@@ -45,6 +45,14 @@ colors into components. The spacing unit is 4px; `sm`, `md`, and `lg` are
 640px, 880px, and 1200px. Preflight is omitted because `base.css` owns the
 existing reset, focus styles, and reduced-motion support.
 
+Motion tokens also live in `tailwind.css`: use `tw:animate-spin`,
+`tw:animate-shimmer`, or the named entry/pulse variants through `@apply`.
+Their keyframes stay outside `@theme` so lazy feature stylesheets reference
+one global definition. Simple transitions use Tailwind utilities; native
+dialog/drawer transitions retain their discrete lifecycle and per-property
+timing. Never make a running animation `!important`, which would override
+the shared reduced-motion rules.
+
 Run `pnpm verify` after styling changes, then inspect desktop/mobile layouts
 and both color themes with the local UI fixture above.
 

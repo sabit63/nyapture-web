@@ -138,7 +138,7 @@
 
 .web-cache-management__settings-chevron {
   @apply tw:text-(--color-text-dim);
-  transition: transform var(--duration-fast) ease;
+  @apply tw:transition-[transform] tw:duration-(--duration-fast) tw:ease-[ease];
 }
 
 .web-cache-management__settings[open] .web-cache-management__settings-chevron {
@@ -341,7 +341,6 @@
   accent-color: var(--color-accent-fill);
 }
 
-
 .web-cache-management__site-list {
   @apply tw:grid tw:gap-(--space-3);
 }
@@ -387,14 +386,8 @@
 }
 
 .web-cache-management .is-spinning {
-  animation: web-cache-spin .85s linear infinite;
+  @apply tw:animate-spin;
 }
-
-@keyframes web-cache-spin {
-  to { transform: rotate(360deg); }
-}
-
-
 
 .web-cache-management__section-heading,
 .web-cache-management__site-heading,

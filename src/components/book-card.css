@@ -10,7 +10,7 @@
   background: var(--color-surface);
   box-shadow: 0 1px 0 #ffffff05;
   --thumbnail-loaded-opacity: 1;
-  transition: border-color .16s ease, outline-color .16s ease, box-shadow .16s ease;
+  @apply tw:transition-[border-color,outline-color,box-shadow] tw:duration-160 tw:ease-[ease];
 }
 
 /* Keep the hover hit area fixed so a pointer at the edge cannot toggle it. */

@@ -69,7 +69,7 @@
   @apply tw:block tw:overflow-hidden;
   background: linear-gradient(110deg, var(--color-surface-viewer-skeleton-start) 18%, var(--color-surface-viewer-skeleton-mid) 43%, var(--color-surface-viewer-skeleton-start) 68%);
   background-size: 220% 100%;
-  animation: book-viewer-skeleton 1.35s linear infinite;
+  @apply tw:animate-shimmer-wide-linear;
 }
 
 .book-viewer__page-skeleton::before,
@@ -191,7 +191,7 @@
 }
 
 .book-viewer__details-dialog[open] {
-  animation: book-viewer-sheet-in .16s ease-out;
+  @apply tw:animate-viewer-in;
 }
 
 .book-viewer__details-panel {
@@ -283,7 +283,7 @@
 }
 
 .book-viewer__title-edit-spinner {
-  animation: ui-spin .85s linear infinite;
+  @apply tw:animate-spin;
 }
 
 .book-viewer__details-body {
@@ -382,14 +382,6 @@
   @apply tw:min-w-0 tw:flex tw:flex-wrap tw:items-start tw:gap-(--tag-gap-default);
 }
 
-@keyframes book-viewer-skeleton {
-  to { background-position: -220% 0; }
-}
-
-@keyframes book-viewer-sheet-in {
-  from { opacity: 0; transform: translateY(12px); }
-}
-
 @media (max-width: 639px) {
   .book-viewer__details-dialog {
     @apply tw:top-auto tw:w-full;
@@ -404,13 +396,8 @@
     padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
   }
   .book-viewer__details-dialog[open] {
-    animation-name: book-viewer-sheet-rise;
+    @apply tw:animate-viewer-rise;
   }
-}
-
-@keyframes book-viewer-sheet-rise {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
 }
 
 @media (min-width: 640px) {
@@ -429,7 +416,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .book-viewer__page-skeleton,
-  .book-viewer__details-dialog[open] { animation: none; }
+  .book-viewer__details-dialog[open] { @apply tw:animate-none; }
 }
 
 .book-viewer__tag-toolbar {
@@ -472,7 +459,6 @@
 }
 
 .book-viewer__tag-footer .book-viewer__tag-error { @apply tw:text-(--color-danger-text); }
-
 
 /* Shared reading controls with a lightly translucent background. */
 .book-viewer__control-panel {

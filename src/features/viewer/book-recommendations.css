@@ -3,7 +3,7 @@
 .recommendations__trigger { @apply tw:fixed tw:right-(--layout-page-gutter); bottom: calc(var(--space-4) + 3 * (var(--control-height-default) + var(--space-2)) + env(safe-area-inset-bottom)); z-index: 27; }
 .recommendations { @apply tw:fixed; inset: 0; @apply tw:w-full; height: 100dvh; max-width: none; max-height: none; @apply tw:m-0 tw:p-0; border: 0; background: transparent; @apply tw:text-(--color-text) tw:overflow-hidden; }
 .recommendations::backdrop { background: #0007; }
-.recommendations__panel { @apply tw:absolute; inset: 0 0 0 auto; width: min(520px, 100%); @apply tw:flex tw:flex-col; background: var(--color-surface); border-left: 1px solid var(--color-border-subtle); box-shadow: -12px 0 50px #0003; animation: recommendations-enter .2s ease-out; }
+.recommendations__panel { @apply tw:absolute; inset: 0 0 0 auto; width: min(520px, 100%); @apply tw:flex tw:flex-col; background: var(--color-surface); border-left: 1px solid var(--color-border-subtle); box-shadow: -12px 0 50px #0003; @apply tw:animate-recommendations-enter; }
 .recommendations__header { @apply tw:flex tw:items-center tw:gap-2.5 tw:p-4; }
 .recommendations__header h2 { @apply tw:flex-1 tw:m-0 tw:text-[1rem]; }
 .recommendations__tabs { @apply tw:flex; padding: 0 16px 12px; @apply tw:gap-1.5; border-bottom: 1px solid var(--color-border-subtle); }
@@ -12,7 +12,7 @@
 .recommendations__content { @apply tw:flex-1 tw:min-h-0 tw:overflow-y-auto; overscroll-behavior: contain; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
 .recommendations__grid { @apply tw:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); @apply tw:gap-4; }
 .recommendations__list { @apply tw:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); @apply tw:gap-2.5; }
-.recommendations__card { text-decoration: none; @apply tw:flex tw:flex-col tw:text-left; border: 1px solid var(--color-border-subtle); @apply tw:rounded-[12px] tw:p-0 tw:overflow-hidden; background: var(--color-surface); @apply tw:text-(--color-text) tw:cursor-pointer; font: inherit; @apply tw:min-w-0; transition: border-color .15s, transform .15s; }
+.recommendations__card { text-decoration: none; @apply tw:flex tw:flex-col tw:text-left; border: 1px solid var(--color-border-subtle); @apply tw:rounded-[12px] tw:p-0 tw:overflow-hidden; background: var(--color-surface); @apply tw:text-(--color-text) tw:cursor-pointer; font: inherit; @apply tw:min-w-0; @apply tw:transition-[border-color,transform] tw:duration-150 tw:ease-[ease]; }
 .recommendations__card:hover { @apply tw:border-(--color-text-muted); transform: translateY(-2px); }
 .recommendations__card:focus-visible, .recommendations__tabs button:focus-visible { outline: 2px solid var(--color-text); outline-offset: 3px; }
 .recommendations__cover { @apply tw:w-full; aspect-ratio: 3 / 4; }
@@ -38,16 +38,13 @@
 .recommendations__empty .icon-button { @apply tw:min-w-13 tw:min-h-13; }
 .recommendations__hint { @apply tw:relative tw:inline-flex; }
 .recommendations__tooltip { @apply tw:absolute; z-index: 1; top: calc(100% + 8px); @apply tw:left-[50%]; transform: translateX(-50%); width: max-content; @apply tw:max-w-55; padding: 8px 12px; @apply tw:text-[.75rem]; border: 1px solid var(--color-border-subtle); @apply tw:rounded-[8px]; background: var(--color-surface); @apply tw:text-(--color-text); box-shadow: 0 5px 20px #0003; }
-.recommendations__skeleton { @apply tw:block; aspect-ratio: 3 / 5; @apply tw:rounded-[12px]; background: var(--color-surface-viewer-skeleton-mid); animation: recommendations-pulse 1.6s ease-in-out infinite; }
-.recommendations__pulse { animation: recommendations-pulse 1.8s ease-in-out infinite; }
-@keyframes recommendations-pulse { 50% { opacity: .4; } }
-@keyframes recommendations-enter { from { transform: translateX(40px); opacity: 0; } }
+.recommendations__skeleton { @apply tw:block; aspect-ratio: 3 / 5; @apply tw:rounded-[12px]; background: var(--color-surface-viewer-skeleton-mid); @apply tw:animate-recommendations-skeleton; }
+.recommendations__pulse { @apply tw:animate-recommendations-pulse; }
 @media (max-width: 600px) {
-  .recommendations__panel { inset: auto 0 0; @apply tw:w-full; height: 92dvh; border-radius: 20px 20px 0 0; border-left: 0; animation-name: recommendations-rise; }
-  @keyframes recommendations-rise { from { transform: translateY(40px); opacity: 0; } }
+  .recommendations__panel { inset: auto 0 0; @apply tw:w-full; height: 92dvh; border-radius: 20px 20px 0 0; border-left: 0; @apply tw:animate-recommendations-rise; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .recommendations *, .recommendations *::before { animation: none !important; transition: none !important; }
+  .recommendations *, .recommendations *::before { @apply tw:animate-none!; @apply tw:transition-none!; }
   .recommendations__card:hover { transform: none; }
 }
 .recommendations__debug-list { @apply tw:grid tw:gap-4; }
