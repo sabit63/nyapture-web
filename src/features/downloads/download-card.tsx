@@ -56,7 +56,9 @@ export function DownloadCardSkeleton() {
 
         <div className="download-card__progress-row">
           <span className="download-manager__skeleton download-card__skeleton-progress" />
-          <span className="download-manager__skeleton download-card__skeleton-percent" />
+          <div className="download-card__progress-meta">
+            <span className="download-manager__skeleton download-card__skeleton-percent" />
+          </div>
         </div>
 
         <div className="download-card__details">
@@ -171,7 +173,15 @@ export function DownloadCard({
           >
             <span style={{ width: `${download.progress}%` }} />
           </div>
-          <strong>{download.progress}%</strong>
+          <div className="download-card__progress-meta">
+            <strong>{download.progress}%</strong>
+            {download.status === 'running' && download.speed !== undefined && (
+              <span className="download-card__speed">
+                <Gauge size={14} aria-hidden="true" />
+                {download.speed.toFixed(1)} KB/s
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="download-card__details">
@@ -183,12 +193,6 @@ export function DownloadCard({
             <span className="download-card__failed-pages">
               <TriangleAlert size={14} aria-hidden="true" />
               {download.failedPages}ページ失敗
-            </span>
-          )}
-          {download.status === 'running' && download.speed !== undefined && (
-            <span className="download-card__speed">
-              <Gauge size={14} aria-hidden="true" />
-              {download.speed.toFixed(1)} KB/s
             </span>
           )}
         </div>

@@ -207,7 +207,7 @@
 
 .download-card__progress-row {
   @apply tw:grid;
-  grid-template-columns: minmax(0, 1fr) 42px;
+  grid-template-columns: minmax(0, 1fr);
   @apply tw:items-center tw:gap-(--space-2) tw:mt-(--space-3);
 }
 
@@ -220,7 +220,11 @@
 .download-card__progress--info > span { background: var(--color-info-fill); }
 .download-card__progress--warning > span { background: var(--color-warning-fill); }
 .download-card__progress--danger > span { background: var(--color-danger-fill); }
-.download-card__progress-row > strong { color: #dcdce4; @apply tw:text-right tw:text-[.7rem]; font-variant-numeric: tabular-nums; }
+.download-card__progress-meta {
+  @apply tw:flex tw:flex-wrap tw:items-center tw:justify-center tw:gap-(--space-3) tw:text-(--color-text-muted) tw:text-[.66rem];
+  font-variant-numeric: tabular-nums;
+}
+.download-card__progress-meta > strong { color: #dcdce4; @apply tw:text-[.7rem]; }
 
 .download-card__details,
 .download-card__status-row {
@@ -231,7 +235,7 @@
 .download-card__details > span,
 .download-card__status-row > span { @apply tw:inline-flex tw:items-center tw:gap-(--layout-tight-gap); }
 .download-card__failed-pages { color: #ff8793; }
-.download-card__speed { @apply tw:ml-0; }
+.download-card__speed { @apply tw:inline-flex tw:items-center tw:gap-(--layout-tight-gap); }
 .download-card__priority-text,
 .download-card__queue-position { @apply tw:text-(--color-text-dim); }
 
@@ -327,7 +331,6 @@
     @apply tw:flex-row tw:items-center;
     gap: var(--space-2) var(--space-4);
   }
-  .download-card__speed { @apply tw:ml-auto; }
   .download-card__action span { display: inline; }
   .download-card__action { @apply tw:min-w-0 tw:justify-start; }
 }
@@ -350,10 +353,11 @@
   .download-card__skeleton-cover { @apply tw:w-22 tw:h-28; }
   .download-card__actions {
     grid-column: auto;
+    width: calc(96px + 2 * var(--layout-control-gap) + var(--space-4) + 1px);
     @apply tw:flex-row;
     padding: 0 0 0 var(--space-4);
     border-top: 0;
-  border-left: 1px solid var(--color-border-subtle);
+    border-left: 1px solid var(--color-border-subtle);
   }
 }
 

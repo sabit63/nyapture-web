@@ -6,6 +6,8 @@ import {
   forgetDownloadAttempt,
   projectDownloadSnapshot,
   reduceDownloadStatus,
+  sortDownloads,
+  type DownloadSort,
   type DownloadProjection,
 } from '../src/features/downloads/download-state'
 
@@ -32,6 +34,29 @@ const makeStatus = (
 const project = (status: BookDownloadStatus): DownloadProjection => (
   projectDownloadSnapshot(createEmptyDownloadProjection(), { current: status }, { authoritative: true })
 )
+
+test('running downloads stay first and stable while only other downloads follow the selected sort', () => {
+  const base = project(makeStatus('Running', 2)).downloads[0]!
+  const downloads = [
+    { ...base, id: 'queued', status: 'queued' as const, title: 'B', priority: 0, progress: 90, addedAt: '2026-09-03' },
+    { ...base, id: 'running-first', title: 'Z', priority: 2, progress: 1, addedAt: '2026-09-01' },
+    { ...base, id: 'paused', status: 'paused' as const, title: 'A', priority: 1, progress: 80, addedAt: '2026-09-04' },
+    { ...base, id: 'running-second', title: 'A', priority: 0, progress: 99, addedAt: '2026-09-05' },
+  ]
+  const original = downloads.map(({ id }) => id)
+  const expected: Record<DownloadSort, string[]> = {
+    priority: ['queued', 'paused'],
+    progress: ['queued', 'paused'],
+    added: ['paused', 'queued'],
+    title: ['paused', 'queued'],
+  }
+  for (const sort of Object.keys(expected) as DownloadSort[]) {
+    assert.deepEqual(sortDownloads(downloads, sort).map(({ id }) => id), [
+      'running-first', 'running-second', ...expected[sort],
+    ])
+  }
+  assert.deepEqual(downloads.map(({ id }) => id), original)
+})
 
 test('snapshot projection is repeatable and never mutates the input record or maps', () => {
   const statuses = {

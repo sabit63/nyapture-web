@@ -13,7 +13,7 @@ import { Snackbar, useSnackbar } from '../../components/Snackbar'
 import { Button, IconButton, StatePanel } from '../../components/ui'
 import { DownloadCard, DownloadCardSkeleton } from './download-card'
 import { useDownloadManager } from './use-download-manager'
-import type { DownloadSort } from './download-state'
+import { sortDownloads, type DownloadSort } from './download-state'
 import './download-manager.css'
 
 export interface DownloadManagerProps {
@@ -52,12 +52,7 @@ export function DownloadManager({ apiRevision }: DownloadManagerProps) {
         download.artist?.toLocaleLowerCase('ja-JP').includes(normalizedQuery) === true,
     )
 
-    return [...matches].sort((first, second) => {
-      if (sort === 'progress') return second.progress - first.progress
-      if (sort === 'added') return second.addedAt.localeCompare(first.addedAt)
-      if (sort === 'title') return first.title.localeCompare(second.title, 'ja')
-      return first.priority - second.priority || second.addedAt.localeCompare(first.addedAt)
-    })
+    return sortDownloads(matches, sort)
   }, [downloads, searchQuery, sort])
 
   const hasSearchQuery = searchQuery.trim().length > 0

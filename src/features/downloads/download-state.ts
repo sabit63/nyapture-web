@@ -29,6 +29,18 @@ export type DownloadJob = {
   lastUpdated?: string
 }
 
+export const sortDownloads = (downloads: readonly DownloadJob[], sort: DownloadSort) => (
+  [...downloads].sort((first, second) => {
+    if (first.status === 'running' || second.status === 'running') {
+      return Number(second.status === 'running') - Number(first.status === 'running')
+    }
+    if (sort === 'progress') return second.progress - first.progress
+    if (sort === 'added') return second.addedAt.localeCompare(first.addedAt)
+    if (sort === 'title') return first.title.localeCompare(second.title, 'ja')
+    return first.priority - second.priority || second.addedAt.localeCompare(first.addedAt)
+  })
+)
+
 export type DownloadProjection = {
   downloads: DownloadJob[]
   statuses: ReadonlyMap<string, BookDownloadStatus>
