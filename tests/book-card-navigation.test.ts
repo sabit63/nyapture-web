@@ -109,7 +109,7 @@ it('uses the status action matrix and shows selection except during shredding', 
     ['Deleted', ['再読み込み', 'ダウンロード', '削除']],
     ['WebBook', ['再読み込み', 'ダウンロード']],
     ['WebBookInPage', ['再読み込み', 'ダウンロード']],
-    ['Downloading', ['削除']], ['Downloaded', []], ['Shredding', []],
+    ['Downloading', ['削除']], ['Downloaded', ['再読み込み']], ['Shredding', []],
   ] as const
   try {
     for (const [status, expected] of cases) {
@@ -247,11 +247,19 @@ it('Web Cache changes persisted results to viewer links while retaining candidat
   const container = document.createElement('div')
   document.body.append(container)
   const root = createRoot(container)
-  globalThis.fetch = async (input) => {
+  globalThis.fetch = async (input, init) => {
     const path = new URL(String(input)).pathname
     if (path === '/api/web-cache/search') return new Response(JSON.stringify({
-      books: ['saved', 'standby', 'candidate'].map((id) => ({ groupId: 'g', bookId: id, title: id, totalPage: 3 })), totalPage: 1,
+      books: ['saved', 'standby', 'candidate'].map((id) => ({ groupId: 'g', bookId: id, title: id, totalPage: 3, url: `https://example.invalid/${id}` })), totalPage: 1,
     }))
+    if (path === '/api/web/book') {
+      assert.equal(init?.method, 'POST')
+      assert.equal(JSON.parse(String(init?.body)), 'https://example.invalid/saved')
+      return Response.json({ success: true, book: {
+        groupId: 'g', bookId: 'saved', title: 'saved', status: 'Downloaded', totalPage: 3,
+        tagSet: { Artists: ['existing', 'added'] },
+      } })
+    }
     if (path === '/api/download/status-all') return new Response(JSON.stringify({
       saved: { book: { groupId: 'g', bookId: 'saved', totalPage: 3, status: 'Downloaded' }, executionState: 'Completed' },
       standby: { book: { groupId: 'g', bookId: 'standby', totalPage: 3, status: 'Standby' } },
@@ -290,6 +298,15 @@ it('Web Cache changes persisted results to viewer links while retaining candidat
     const refreshed = container.querySelector('[data-book-id="standby"]')!
     assert.equal(refreshed.getAttribute('data-book-status'), 'Standby')
     assert.ok(refreshed.textContent?.includes('refreshed standby'))
+    const savedRefresh = container.querySelector<HTMLButtonElement>('[aria-label="savedを再読み込み"]')!
+    assert.ok(savedRefresh)
+    await act(async () => { savedRefresh.click() })
+    const saved = container.querySelector('[data-book-id="saved"]')!
+    assert.equal(saved.getAttribute('data-book-status'), 'Downloaded')
+    assert.ok(saved.textContent?.includes('existing'))
+    assert.ok(saved.textContent?.includes('added'))
+    await act(async () => { saved.querySelector<HTMLButtonElement>('[aria-label="savedを再読み込み"]')!.click() })
+    assert.equal(saved.querySelectorAll('.tag-chip').length, 2)
   } finally {
     await act(async () => { root.unmount() })
     container.remove()

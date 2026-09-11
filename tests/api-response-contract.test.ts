@@ -3,7 +3,7 @@ import { afterEach, it } from 'node:test'
 import * as endpoints from '../src/api/endpoints'
 import * as dashboard from '../src/api/dashboard'
 import * as cache from '../src/api/web-cache'
-import { ApiError } from '../src/api/client'
+import { ApiError, configureApi, getApiSettings } from '../src/api/client'
 import type { WebBookCacheConfigDto } from '../src/api/dto/web-cache'
 
 const originalFetch = globalThis.fetch
@@ -107,6 +107,33 @@ const unwrapped: Record<string, Request> = {
   runCacheSync: (s) => cache.runCacheSync({ force: false }, s),
   testCacheSite: (s) => cache.testCacheSite('g', s),
 }
+
+it('sends both configured keys for mutations, including Dashboard and Web Book refresh on localhost', async () => {
+  const settings = getApiSettings()
+  try {
+    configureApi({ apiUrl: 'http://localhost:5270', apiKey: 'read-key', editKey: 'edit-key' })
+    for (const [name, request] of Object.entries({ ...rawRequests, ...unwrapped })) {
+      let calls = 0
+      globalThis.fetch = async (input, init) => {
+        calls += 1
+        const path = new URL(String(input)).pathname
+        const headers = new Headers(init?.headers)
+        const readOnly = (init?.method ?? 'GET') === 'GET'
+          || path.endsWith('/search') || path === '/api/web/page'
+        assert.equal(headers.get('X-Api-Key'), 'read-key', name)
+        assert.equal(headers.get('X-Edit-Api-Key'), readOnly ? null : 'edit-key', name)
+        return new Response(JSON.stringify({ success: true, data: {} }), {
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      await request()
+      assert.equal(calls, 1, name)
+    }
+  } finally {
+    configureApi(settings)
+  }
+})
+
 for (const [name, request] of Object.entries(unwrapped)) {
   it(`${name} preserves its opt-in envelope policy`, async () => {
     respond({ data: { value: 1 } })

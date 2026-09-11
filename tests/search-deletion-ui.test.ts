@@ -144,6 +144,37 @@ it('refreshes and downloads a cancelled library book through the card operations
   }
 })
 
+it('refreshes downloaded library books through the Web API and displays added tags', async () => {
+  const dom = installHookDom('http://localhost/search')
+  const requests: string[] = []
+  const saved = { ...book, tagSet: { Artists: ['existing'] } }
+  globalThis.fetch = async (input, init) => {
+    const path = new URL(String(input)).pathname
+    requests.push(path)
+    if (path === '/api/web/book') {
+      assert.equal(init?.method, 'POST')
+      assert.equal(JSON.parse(String(init?.body)), book.url)
+      return Response.json({ success: true, book: { ...saved, tagSet: { Artists: ['existing', 'added'] } } })
+    }
+    return Response.json({ success: true, books: [saved], totalPage: 1 })
+  }
+  const hook = await renderHook(() => useSearchController({
+    isWebSearch: false, isLibrarySearch: true, isMissingTagSearch: false, isBookViewer: false,
+    apiRevision: 0, displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
+    hubConnectionState: 'idle', notify: () => {},
+  }), undefined)
+  try {
+    await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[0]) })
+    assert.equal(hook.current.visibleBooks[0].status, 'Downloaded')
+    assert.deepEqual(hook.current.visibleBooks[0].tags.map((tag) => tag.name), ['existing', 'added'])
+    assert.ok(requests.includes('/api/web/book'))
+    assert.ok(!requests.includes('/api/book/group-1/book-1'))
+  } finally {
+    await hook.unmount()
+    dom.cleanup()
+  }
+})
+
 type HarnessProps = {
   apiRevision: number
   routeKey: string

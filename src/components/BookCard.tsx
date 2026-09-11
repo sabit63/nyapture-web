@@ -101,8 +101,8 @@ export function BookCard({
   const isDownloaded = book.status === 'Downloaded'
   const isShredding = book.status === 'Shredding'
   const isWebBook = book.status === 'WebBook' || book.status === 'WebBookInPage'
-  const canRefresh = !isDownloading && !isDownloaded && !isShredding
-  const canDownload = canRefresh
+  const canRefresh = !isDownloading && !isShredding
+  const canDownload = canRefresh && !isDownloaded
   const canDelete = !isDownloaded && !isShredding && !isWebBook
   const hasActions = canRefresh || canDownload || canDelete || (extraActions !== undefined && extraActions !== null)
   const coverOpen = onCoverOpen ?? onOpen

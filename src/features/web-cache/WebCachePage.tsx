@@ -1,7 +1,7 @@
 import { ExternalLink, RefreshCw, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { BookGrid } from '../../components/BookGrid'
-import { getDownloadStatuses, getErrorMessage, mapWebCacheBookToCard, type ApiBookCardModel, type DisplaySettings } from '../../api'
+import { getDownloadStatuses, getErrorMessage, getWebBookContent, mapEBookToCard, mapWebCacheBookToCard, type ApiBookCardModel, type DisplaySettings } from '../../api'
 import { ApiError } from '../../api/client'
 import { deleteCacheBook, enqueueCacheBook, getCacheBook, getCacheConfig, searchCache } from '../../api/web-cache'
 import { isDownloadCandidate } from '../search/download-candidate'
@@ -320,13 +320,25 @@ function CachePageSession({ displaySettings, notify, onTagSearchDestinationReque
     setDeleteError('')
     try {
       if (action === 'refresh') {
+        const target = bookCards.find((card) => card.apiGroupId === book.groupId && card.apiBookId === book.bookId)
+        if (target?.status === 'Downloaded') {
+          if (!target.url?.trim()) throw new ApiError('Book URLがありません。', { category: 'validation' })
+          const response = await getWebBookContent(target.url, controller.signal)
+          if (controller.signal.aborted) return
+          if (!response.book) throw new ApiError('Book情報がありません。', { category: 'notFound' })
+          const refreshed = mapEBookToCard(response.book, { context: 'library', entities: response.tags ?? [] })
+          setBookCards((current) => current.map((card) => card.apiGroupId === book.groupId && card.apiBookId === book.bookId
+            ? { ...refreshed, url: refreshed.url?.trim() || target.url, thumbnailReloadKey: `refresh:${Date.now()}` } : card))
+          notify('再取得しました。')
+          return
+        }
         const refreshed = await getCacheBook(book.groupId!, book.bookId!, controller.signal)
         if (controller.signal.aborted) return
         setBooks((current) => current.map((item) => identity(item) === key ? refreshed : item))
         setBookCards((current) => current.map((card) => card.apiGroupId === book.groupId && card.apiBookId === book.bookId
           ? { ...mapCacheResultBook(refreshed), status: card.status, thumbnailRequest: card.thumbnailRequest, thumbnailReloadKey: `refresh:${Date.now()}` }
           : card))
-        notify('書籍情報を再取得しました。')
+        notify('再取得しました。')
         return
       }
       if (action === 'enqueue') await enqueueCacheBook(book.groupId!, book.bookId!, controller.signal)

@@ -165,7 +165,7 @@ export const downloadWebBookCacheBook = (groupId: string, bookId: string, signal
 )
 
 export const getWebBookContent = (url: string, signal?: AbortSignal) => (
-  requestJson<OnlineBookResponse>('/api/web/book', { method: 'POST', body: url, signal })
+  requestJson<OnlineBookResponse>('/api/web/book', { method: 'POST', body: url, auth: 'edit', signal })
 )
 
 export const getWebPageContent = (url: string, signal?: AbortSignal) => (

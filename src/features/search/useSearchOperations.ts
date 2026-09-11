@@ -238,7 +238,7 @@ export function useSearchOperations({
   const refreshWebBook = useCallback(async (book: BookCardModel) => {
     try {
       let refreshed: ApiBookCardModel
-      if (!isWebSearch && book.apiGroupId && book.apiBookId) {
+      if (!isWebSearch && book.status !== 'Downloaded' && book.apiGroupId && book.apiBookId) {
         const response = await getBook(book.apiGroupId, book.apiBookId)
         const result = response.books?.[0]
         if (!result) throw new ApiError('Book情報がありません。', { category: 'notFound' })

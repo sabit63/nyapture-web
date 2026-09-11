@@ -72,6 +72,7 @@ export const validateCacheConfig = async (
   unwrapData(await requestJson<ApiEnvelope<WebBookCacheValidationResponse>>('/api/dashboard/web-cache/config/validate', {
     method: 'POST',
     body: config,
+    auth: 'edit',
     signal,
   }))
 )
@@ -128,7 +129,7 @@ export const testCacheSite = async (
 ): Promise<WebBookCacheSiteTestResponse> => {
   const response = await requestJson<ApiEnvelope<WebBookCacheSiteTestResponse>>(
     `/api/dashboard/web-cache/sites/${segment(groupId)}/test`,
-    { method: 'POST', signal },
+    { method: 'POST', auth: 'edit', signal },
   )
   const result = unwrapData(response)
   if (result.success === false) {

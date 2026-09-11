@@ -59,6 +59,7 @@ export const getDashboardIntervals = (signal?: AbortSignal) => (
 export const updateDashboardIntervals = (body: DomainIntervalsUpdateRequest, signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>('/api/dashboard/downloads/intervals', {
     method: 'PATCH',
+    auth: 'edit',
     body,
     signal,
   })
@@ -67,6 +68,7 @@ export const updateDashboardIntervals = (body: DomainIntervalsUpdateRequest, sig
 export const cancelDashboardJob = (jobId: string, signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>(`/api/dashboard/downloads/${segment(jobId)}/cancel`, {
     method: 'POST',
+    auth: 'edit',
     signal,
   })
 )
@@ -74,6 +76,7 @@ export const cancelDashboardJob = (jobId: string, signal?: AbortSignal) => (
 export const retryDashboardJob = (jobId: string, signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>(`/api/dashboard/downloads/${segment(jobId)}/retry`, {
     method: 'POST',
+    auth: 'edit',
     signal,
   })
 )
@@ -110,6 +113,7 @@ export const updateServiceConfig = (
 ) => (
   requestJson<DashboardMutationResponse>(`/api/dashboard/${service}/config`, {
     method: 'PATCH',
+    auth: 'edit',
     body,
     signal,
   })
@@ -118,6 +122,7 @@ export const updateServiceConfig = (
 export const testService = (service: DashboardService, signal?: AbortSignal) => (
   requestJson<ApiEnvelope<ConnectionTestResult>>(`/api/dashboard/${service}/test`, {
     method: 'POST',
+    auth: 'edit',
     signal,
   })
 )
@@ -139,6 +144,7 @@ export const startMaintenance = (
   const body: MaintenanceStartRequestDto = { mode }
   return requestJson<ApiEnvelope<MaintenanceTriggerResponse>>('/api/dashboard/maintenance/run', {
     method: 'POST',
+    auth: 'edit',
     body,
     signal,
   })
@@ -147,6 +153,7 @@ export const startMaintenance = (
 export const cancelMaintenance = (signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>('/api/dashboard/maintenance/cancel', {
     method: 'POST',
+    auth: 'edit',
     signal,
   })
 )
@@ -154,6 +161,7 @@ export const cancelMaintenance = (signal?: AbortSignal) => (
 export const pauseMaintenance = (signal?: AbortSignal) => (
   requestJson<ApiEnvelope<MaintenanceActionResponse>>('/api/dashboard/maintenance/pause', {
     method: 'POST',
+    auth: 'edit',
     signal,
   })
 )
@@ -161,6 +169,7 @@ export const pauseMaintenance = (signal?: AbortSignal) => (
 export const resumeMaintenance = (signal?: AbortSignal) => (
   requestJson<ApiEnvelope<MaintenanceActionResponse>>('/api/dashboard/maintenance/resume', {
     method: 'POST',
+    auth: 'edit',
     signal,
   })
 )
@@ -172,6 +181,7 @@ export const getMaintenanceRun = (runId: string, signal?: AbortSignal) => (
 export const updateMaintenanceSchedule = (body: MaintenanceScheduleUpdateRequest, signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>('/api/dashboard/maintenance/schedule', {
     method: 'PATCH',
+    auth: 'edit',
     body,
     signal,
   })
@@ -186,6 +196,7 @@ export const getCacheMetrics = (signal?: AbortSignal) => (
 export const clearDashboardCache = (signal?: AbortSignal) => (
   requestJson<DashboardCacheClearResponse>('/api/dashboard/cache', {
     method: 'DELETE',
+    auth: 'edit',
     signal,
   })
 )
@@ -194,6 +205,7 @@ export const clearDashboardCache = (signal?: AbortSignal) => (
 export const removeDashboardBookCache = (bookId: string, signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>(`/api/dashboard/cache/${segment(bookId)}`, {
     method: 'DELETE',
+    auth: 'edit',
     signal,
   })
 )
@@ -244,6 +256,7 @@ export const getDashboardLogEntries = (
 export const clearDashboardLogs = (signal?: AbortSignal) => (
   requestJson<DashboardMutationResponse>('/api/dashboard/logs', {
     method: 'DELETE',
+    auth: 'edit',
     signal,
   })
 )

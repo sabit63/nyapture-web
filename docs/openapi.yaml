@@ -5,6 +5,9 @@ info:
   description: |-
     Nya Book管理システム API - Book検索・ダウンロード管理・タグ管理・Webスクレイピング・データメンテナンス。
     REST API は `paths`、SignalR Hub はルート拡張 `x-signalr-hubs` に記載する。
+    security は各キーが設定済みの場合の要件を示す。未設定のキーは検証しない。
+    Dashboard を含む全API操作でAPIKeyを要求し、変更系では追加でEditKeyを要求する。
+    Dashboard変更系はローカル／信頼ネットワークからの接続も必要。/alive は認証不要。
 
 servers:
   - url: http://localhost:5270
@@ -236,6 +239,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/EBookResponse"
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Book]
       summary: Book削除ジョブ受付
       description: |-
@@ -345,7 +351,13 @@ paths:
     get:
       tags: [Book]
       summary: Bookページ画像取得
-      description: 指定Bookのページ画像を取得する。リサイズ・圧縮オプション対応、キャッシュ機能付き
+      description: |-
+        指定Bookのページ画像を取得する。リサイズ・圧縮オプション対応、キャッシュ機能付き。
+        変換実行時は、処理中・待機中の件数と入力データの合計バイト数を制限する。
+        同期変換が必要なキャッシュミスはAPI側の有界キューで受け付け、一時的なBusyはAPI側で待機・再試行する。
+        待機中は画像の識別子と変換条件を保持し、原画像の取得は実行時に行う。同じ画像・変換条件の要求は結果を共有する。
+        キャッシュ済み画像と元画像の返却は、この変換キューを経由しない。
+        入力単体が設定上限を超える場合と、一時的に処理枠が不足している場合では応答が異なる。
       operationId: getBookPage
       parameters:
         - name: bookId
@@ -402,7 +414,11 @@ paths:
           schema:
             type: boolean
             default: true
-          description: オリジナルフォールバック。true（デフォルト）の場合、変換済み画像がなければオリジナルを即時返却。falseの場合、変換完了まで待機
+          description: |-
+            オリジナルフォールバック。true（デフォルト）の場合、変換済み画像がなければ元画像を返し、バックグラウンド変換を試行する。
+            バックグラウンド変換の入力単体が容量上限を超える場合も元画像を返すが、同じ入力・設定のままでは変換されない。
+            falseの場合、必要な変換の完了まで待機する。入力単体の容量超過は400を返す。
+            一時的な処理枠不足はAPI側で再試行し、API待機キューが満杯、または待機・再試行の期限切れの場合に503を返す。
       responses:
         "200":
           description: ページ画像データ
@@ -411,17 +427,40 @@ paths:
               schema:
                 type: boolean
               description: 返却された画像が変換処理済みかどうか
+            X-Image-Processing-Skipped:
+              schema:
+                type: string
+                enum: [input-too-large]
+              description: |-
+                バックグラウンド変換の受付時に入力単体の容量超過を検出し、元画像を返す場合に付与する。
+                この場合、X-Image-Processedはfalse。同じ入力・設定で再試行しても変換は開始されない。
+                受付後に後段の上限超過を検出した場合には付与できないため、このヘッダーがないことは変換の開始・成功を保証しない。
           content:
             image/*:
               schema:
                 type: string
                 format: binary
         "400":
-          description: パラメーター不正
+          description: |-
+            パラメーター不正、未対応の画像形式、または同期変換での入力単体の容量超過。
+            容量超過は、変換が必要でfallback_to_original=falseの場合に発生する。
+            上限はサーバー設定による（既定256 MiB）。対象は展開後の画素数ではなく、変換に渡す入力データのバイト数。
+            容量超過の場合は、同じ入力・設定のまま再試行しても解消しない。
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/NyaApiResponse"
+              examples:
+                invalidParameter:
+                  summary: ページ番号が不正
+                  value:
+                    success: false
+                    message: Page number must be greater than 0
+                inputTooLarge:
+                  summary: 入力単体が既定の256 MiB上限を超過
+                  value:
+                    success: false
+                    message: "Image payload is too large for image processing: 268435457 bytes requested, maximum 268435456 bytes."
         "404":
           description: Bookまたはページが見つからない
           content:
@@ -435,11 +474,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponse"
         "503":
-          description: 画像処理混雑（fallback_to_original=false時、並列制限超過）
+          description: |-
+            同期変換の一時的な混雑。fallback_to_original=falseで、API待機キューが満杯、またはAPI側の待機・再試行期限に達した場合。
+            変換サービスの件数・合計入力バイト数の上限やアダプター不足によるBusyは、API側で期限内に再試行する。
+            既定はAPI同時実行8件、待機64件、受付からの待機・再試行期限20秒、再試行間隔100ミリ秒。各値はサーバー設定で変更できる。
+            開始済みの変換はこの待機期限で中断しないため、HTTP応答時間の上限が20秒になるわけではない。
+            サーバー停止により新しい処理を受け付けられない場合も503となる。処理枠の解放後に再試行できる。
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/NyaApiResponse"
+              example:
+                success: false
+                message: All adapters busy
 
   /api/book/search/grouped:
     post:
@@ -516,6 +563,9 @@ paths:
 
   /api/book/{gid}/{id}/title:
     patch:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Book]
       summary: Bookタイトル更新
       description: 指定されたBookのタイトルを更新する
@@ -567,6 +617,9 @@ paths:
 
   /api/book/{gid}/{id}/tags:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Book]
       summary: Bookタグ追加
       description: 指定されたBookにタグを追加する
@@ -616,6 +669,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponse"
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Book]
       summary: Bookタグ削除
       description: 指定されたBookからタグを削除する
@@ -768,6 +824,9 @@ paths:
 
   /api/dashboard/cache/{bookId}:
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: BookId指定画像キャッシュ削除
       description: 同じBookIdを持つ全Groupの画像キャッシュを削除する互換API
@@ -800,6 +859,9 @@ paths:
 
   /api/dashboard/cache/{groupId}/{bookId}:
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Group指定画像キャッシュ削除
       description: GroupIdとBookIdが一致するBookの画像キャッシュだけを削除する
@@ -837,11 +899,14 @@ paths:
 
   /api/dashboard/backup:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: データストアバックアップ実行
       description: >-
         API内蔵バックアップを1回実行する。Dashboardの変更操作と同様に
-        LocalOnly/TrustedNetworks判定と、設定時はX-Edit-Api-Keyの検証を行う。
+        LocalOnly/TrustedNetworks判定と、設定時はX-Api-KeyおよびX-Edit-Api-Keyの検証を行う。
       operationId: triggerDashboardBackup
       responses:
         "200":
@@ -851,7 +916,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponseBackupTriggerResponse"
         "401":
-          description: 編集APIキーが不正または未指定
+          description: APIキーまたは編集APIキーが不正または未指定
           content:
             application/json:
               schema:
@@ -958,6 +1023,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponseDashboardLogsResponse"
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Dashboardログ消去
       description: ログリングバッファを消去する。ローカルからの変更操作のみ許可される
@@ -978,6 +1046,9 @@ paths:
 
   /api/dashboard/cache:
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: 画像キャッシュ全削除ジョブ開始
       description: すべての画像キャッシュを非同期で削除する。進捗はキャッシュメトリクスで確認する。ローカルからの変更操作のみ許可される
@@ -1041,6 +1112,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponseDomainIntervalsResponse"
     patch:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: ドメイン別ダウンロード間隔更新
       operationId: updateDashboardDownloadIntervals
@@ -1072,6 +1146,9 @@ paths:
 
   /api/dashboard/downloads/{jobId}/cancel:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Dashboardダウンロードジョブキャンセル
       description: URLをURLエンコードしたjobIdで指定してダウンロードジョブをキャンセルする
@@ -1111,6 +1188,9 @@ paths:
 
   /api/dashboard/downloads/{jobId}/retry:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Dashboardダウンロードジョブ再試行
       description: URLをURLエンコードしたjobIdで指定して失敗ジョブを再キューする
@@ -1161,6 +1241,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponseWebPilotConfigResponse"
     patch:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: WebPilot設定更新
       operationId: updateWebPilotConfig
@@ -1192,6 +1275,9 @@ paths:
 
   /api/dashboard/webpilot/test:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: WebPilot接続試験
       operationId: testWebPilot
@@ -1222,6 +1308,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponseImageWorkerConfigResponse"
     patch:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Image Worker設定更新
       operationId: updateImageWorkerConfig
@@ -1253,6 +1342,9 @@ paths:
 
   /api/dashboard/image-worker/test:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Image Worker接続試験
       operationId: testImageWorker
@@ -1298,6 +1390,9 @@ paths:
 
   /api/dashboard/maintenance/orphans:
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: 孤児ストレージエントリ削除
       description: 現在のストレージを再検査し、DBに所有者が存在しないことを再確認してからopaque storage keyのエントリを削除する。ローカルからの変更操作のみ許可される
@@ -1325,6 +1420,9 @@ paths:
 
   /api/dashboard/maintenance/run:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: メンテナンス開始
       operationId: triggerDashboardMaintenance
@@ -1350,6 +1448,9 @@ paths:
 
   /api/dashboard/maintenance/cancel:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: メンテナンスキャンセル要求
       operationId: cancelDashboardMaintenance
@@ -1369,6 +1470,9 @@ paths:
 
   /api/dashboard/maintenance/pause:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: メンテナンス一時停止要求
       operationId: pauseDashboardMaintenance
@@ -1388,6 +1492,9 @@ paths:
 
   /api/dashboard/maintenance/resume:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: メンテナンス再開要求
       operationId: resumeDashboardMaintenance
@@ -1444,6 +1551,9 @@ paths:
 
   /api/dashboard/maintenance/schedule:
     patch:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: メンテナンススケジュール更新
       operationId: updateDashboardMaintenanceSchedule
@@ -1486,6 +1596,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponseWebBookCacheConfigResponse"
     patch:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Web Book Cache設定更新
       operationId: updateDashboardWebBookCacheConfig
@@ -1511,6 +1624,9 @@ paths:
 
   /api/dashboard/web-cache/config/validate:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Web Book Cache設定検証
       operationId: validateDashboardWebBookCacheConfig
@@ -1530,6 +1646,9 @@ paths:
 
   /api/dashboard/web-cache/config/reset:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Web Book Cache設定リセット
       operationId: resetDashboardWebBookCacheConfig
@@ -1556,6 +1675,9 @@ paths:
 
   /api/dashboard/web-cache/sync/run:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Web Book Cache同期開始
       operationId: runDashboardWebBookCacheSync
@@ -1575,6 +1697,9 @@ paths:
 
   /api/dashboard/web-cache/sync/cancel:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Web Book Cache同期キャンセル要求
       operationId: cancelDashboardWebBookCacheSync
@@ -1588,6 +1713,9 @@ paths:
 
   /api/dashboard/web-cache/sites/{groupId}/test:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Dashboard]
       summary: Web Book Cacheサイト接続試験
       operationId: testDashboardWebBookCacheSite
@@ -1674,6 +1802,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponse"
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [TagAdditionalName]
       summary: タグ表示名登録・更新（Upsert）
       description: タグの日本語表示名を一括で登録・更新する
@@ -1784,6 +1915,9 @@ paths:
   # ============================================================
   /api/download/start:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: ダウンロード開始
       description: 指定URLのBookダウンロードをキューに追加して開始する
@@ -1834,6 +1968,9 @@ paths:
 
   /api/download/pause:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: ダウンロード一時停止
       description: 実行中のダウンロードを一時停止する
@@ -1860,6 +1997,9 @@ paths:
 
   /api/download/resume:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: ダウンロード再開
       description: 一時停止中のダウンロードを再開する
@@ -1892,6 +2032,9 @@ paths:
 
   /api/download/pause-item:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: 指定Bookダウンロード一時停止
       description: URLを指定して対象Bookのダウンロードを一時停止する
@@ -1931,6 +2074,9 @@ paths:
 
   /api/download/resume-item:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: 指定Bookダウンロード再開
       description: URLを指定して対象Bookのダウンロードを再開する
@@ -1976,6 +2122,9 @@ paths:
 
   /api/download/delete:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: ダウンロード削除
       description: キューからダウンロードを削除する
@@ -2009,6 +2158,9 @@ paths:
 
   /api/download/queue/priority:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [Download]
       summary: ダウンロード優先度更新
       description: キュー内のダウンロードの優先度を変更する
@@ -2135,6 +2287,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/NyaApiResponse"
     delete:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [WebBookCache]
       summary: Web Book Cache削除
       description: RAM上のWeb Book CacheからBookを同期的に削除する。サムネイルファイルは期限掃除に委ねる
@@ -2222,6 +2377,9 @@ paths:
 
   /api/web-cache/{groupId}/{bookId}/download:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [WebBookCache]
       summary: Web Book Cache Bookダウンロード
       description: キャッシュBookのURLをダウンロードキューへ追加する
@@ -2307,9 +2465,16 @@ paths:
 
   /api/web/book:
     post:
+      security:
+        - ApiKeyAuth: []
+          EditApiKeyAuth: []
       tags: [WebPage]
       summary: Bookコンテンツ取得
-      description: 指定URLのBook詳細情報をスクレイピングして取得する
+      description: |-
+        指定URLのBook詳細情報をスクレイピングして取得する。
+        保存済みBookがStatus=Downloadedの場合、DomainのTagSet.Exceptでタグを正規化・重複除去し、
+        不足タグだけをDBに追加する。既存タグは削除せず、更新後のBookを返す。
+        未保存・未ダウンロードのBookは更新しない。
       operationId: getWebBookContent
       requestBody:
         required: true
@@ -2511,6 +2676,7 @@ paths:
   # ============================================================
   /alive:
     get:
+      security: []
       tags: [System]
       summary: ヘルスチェック
       description: サービスの稼働確認用エンドポイント
@@ -4965,8 +5131,13 @@ components:
     ApiKeyAuth:
       type: apiKey
       in: header
-      name: X-API-Key
-      description: APIキー認証（localhost以外のアクセスに必要）
+      name: X-Api-Key
+      description: 設定時は接続元IPにかかわらず必須。Dashboardを含み、localhostも例外にしない。
+    EditApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Edit-Api-Key
+      description: 設定時は変更系操作に追加で必須。APIKeyの代用にはならない。
 
 security:
   - ApiKeyAuth: []
