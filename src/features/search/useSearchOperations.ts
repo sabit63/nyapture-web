@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 
 import {
   ApiError,
@@ -54,17 +54,45 @@ export function useSearchOperations({
   setSelectMode,
   updateWebSearchResultBooks,
   replaceWebSearchBook,
-  replaceWebSearchBooks,
   notify,
 }: SearchOperationsOptions) {
-  const [bulkDownloadPending, setBulkDownloadPending] = useState(false)
-  const bulkDownloadRef = useRef<AbortController | null>(null)
+  const [failedBookKeys, setFailedBookKeys] = useState<Set<string>>(new Set())
+  const failureScope = useMemo(() => ({
+    active: false,
+    timers: new Map<string, ReturnType<typeof setTimeout>>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A new scope invalidates callbacks from the previous search/API.
+  }), [apiRevision, routeKey])
   useEffect(() => {
-    setBulkDownloadPending(false)
+    failureScope.active = true
+    setFailedBookKeys(new Set())
+    return () => {
+      failureScope.active = false
+      failureScope.timers.forEach(clearTimeout)
+      failureScope.timers.clear()
+    }
+  }, [failureScope])
+  const markBookFailed = useCallback((book: BookCardModel) => {
+    if (!failureScope.active) return
+    const key = getBookIdentityKey(book)
+    clearTimeout(failureScope.timers.get(key))
+    setFailedBookKeys((current) => new Set([...current, key]))
+    failureScope.timers.set(key, setTimeout(() => {
+      failureScope.timers.delete(key)
+      setFailedBookKeys((current) => {
+        const next = new Set(current)
+        next.delete(key)
+        return next
+      })
+    }, 5000))
+  }, [failureScope])
+  const [bulkOperation, setBulkOperation] = useState<'download' | 'refresh' | null>(null)
+  const bulkOperationRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setBulkOperation(null)
     downloadRequestsRef.current = new Set()
     return () => {
-      bulkDownloadRef.current?.abort()
-      bulkDownloadRef.current = null
+      bulkOperationRef.current?.abort()
+      bulkOperationRef.current = null
     }
   }, [apiRevision, routeKey])
   const [deleteDialogBooks, setDeleteDialogBooks] = useState<ApiBookCardModel[]>([])
@@ -150,8 +178,16 @@ export function useSearchOperations({
   const fetchWebBook = useCallback(async (book: BookCardModel, signal?: AbortSignal) => {
     if (!book.url) throw new ApiError('Book URLがありません。', { category: 'validation' })
     const response = await getWebBookContent(book.url, signal)
-    const refreshed = response.book
-      ? mapEBookToCard(response.book, {
+    let savedBook = response.book
+    if (!savedBook && book.status === 'Downloaded' && book.apiGroupId && book.apiBookId) {
+      const library = await getBook(book.apiGroupId, book.apiBookId, signal)
+      if (library.success === false || !Array.isArray(library.books)) {
+        throw new ApiError('保存状態を確認できませんでした。', { category: 'server' })
+      }
+      savedBook = library.books[0]
+    }
+    const refreshed = savedBook
+      ? mapEBookToCard(savedBook, {
           context: 'library',
           entities: response.tags ?? [],
         })
@@ -235,15 +271,15 @@ export function useSearchOperations({
     })
   }, [isWebSearch, replaceWebSearchBook, setLibrarySearchBooks])
 
-  const fetchResultBook = useCallback(async (book: BookCardModel) => {
+  const fetchResultBook = useCallback(async (book: BookCardModel, signal?: AbortSignal) => {
     let refreshed: ApiBookCardModel
     if (!isWebSearch && book.status !== 'Downloaded' && book.apiGroupId && book.apiBookId) {
-      const response = await getBook(book.apiGroupId, book.apiBookId)
+      const response = await getBook(book.apiGroupId, book.apiBookId, signal)
       const result = response.books?.[0]
       if (!result) throw new ApiError('Book情報がありません。', { category: 'notFound' })
       refreshed = mapEBookToCard(result)
     } else {
-      refreshed = await fetchWebBook(book)
+      refreshed = await fetchWebBook(book, signal)
     }
     return { ...refreshed, thumbnailReloadKey: `refresh:${Date.now()}` }
   }, [fetchWebBook, isWebSearch])
@@ -253,32 +289,10 @@ export function useSearchOperations({
       replaceResultBook(book, await fetchResultBook(book))
       notify(`「${book.title}」の情報を再取得しました`)
     } catch (error) {
+      markBookFailed(book)
       notify(`再取得できませんでした: ${getErrorMessage(error)}`, 'error')
     }
-  }, [fetchResultBook, notify, replaceResultBook])
-
-  const refreshSelectedBooks = useCallback(async () => {
-    const selectedKeys = new Set(selected)
-    const books = isWebSearch ? webSearchResultBooks : librarySearchBooks
-    const selectedBooks = books.filter((book) => selectedKeys.has(getBookIdentityKey(book)) && !pendingDeletionKeysRef.current.has(getBookIdentityKey(book)))
-    if (selectedBooks.length === 0) return
-
-    setSelected([])
-    setSelectMode(false)
-
-    const results = await Promise.allSettled(selectedBooks.map((selectedBook) => fetchResultBook(selectedBook)))
-    const refreshed: { original: BookCardModel; refreshed: ApiBookCardModel }[] = []
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') refreshed.push({ original: selectedBooks[index], refreshed: result.value })
-    })
-    if (isWebSearch) replaceWebSearchBooks(refreshed)
-    else refreshed.forEach(({ original, refreshed: book }) => replaceResultBook(original, book))
-    const failed = results.length - refreshed.length
-    notify(
-      failed ? `${refreshed.length}件を更新、${failed}件は失敗しました` : `選択した${refreshed.length}件を読み込みました`,
-      failed === 0 ? 'success' : refreshed.length === 0 ? 'error' : 'warning',
-    )
-  }, [fetchResultBook, isWebSearch, librarySearchBooks, notify, replaceResultBook, replaceWebSearchBooks, selected, setSelected, setSelectMode, webSearchResultBooks])
+  }, [fetchResultBook, markBookFailed, notify, replaceResultBook])
 
   const downloadWebBook = useCallback(async (book: BookCardModel) => {
     if (['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(book.status)) return
@@ -310,6 +324,7 @@ export function useSearchOperations({
 
     const targetUrl = targetBook.url?.trim() || originalUrl
     if (!targetUrl) {
+      markBookFailed(targetBook)
       notify(`ダウンロードを開始できませんでした: Book URLがありません。`, 'error')
       return
     }
@@ -336,58 +351,73 @@ export function useSearchOperations({
       if (!await requestDownload(targetUrl)) return
       notify(`「${targetBook.title || book.title}」のダウンロードを開始しました`)
     } catch (error) {
+      markBookFailed(targetBook)
       notify(`ダウンロードを開始できませんでした: ${getErrorMessage(error)}`, 'error')
     }
-  }, [fetchWebBook, isWebSearch, notify, replaceResultBook, requestDownload, searchResultsRef])
+  }, [fetchWebBook, isWebSearch, markBookFailed, notify, replaceResultBook, requestDownload, searchResultsRef])
 
   const canDownloadBook = useCallback((book: ApiBookCardModel) => Boolean(book.url?.trim())
     && !['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(book.status)
     && !pendingDeletionKeysRef.current.has(getBookIdentityKey(book)), [])
   const downloadableSelectedCount = (isWebSearch ? webSearchResultBooks : librarySearchBooks).filter((book) => selected.includes(getBookIdentityKey(book)) && canDownloadBook(book)).length
 
-  const downloadSelectedBooks = useCallback(async () => {
-    if (bulkDownloadRef.current || deleteDialogPendingRef.current) return
-    const selectedKeys = new Set(selected)
+  const runBulkOperation = useCallback(async (operation: 'download' | 'refresh') => {
+    if (bulkOperationRef.current || deleteDialogPendingRef.current) return
+    const selectedKeys = new Set(searchResultsRef.current.selected)
     const resultKey = isWebSearch ? 'webSearchResultBooks' : 'librarySearchBooks'
     const targets = searchResultsRef.current[resultKey].filter((book) => selectedKeys.has(getBookIdentityKey(book)))
     if (!targets.length) return
+    setSelectMode(false)
     const controller = new AbortController()
-    bulkDownloadRef.current = controller
-    setBulkDownloadPending(true)
+    bulkOperationRef.current = controller
+    setBulkOperation(operation)
     let succeeded = 0
     let failed = 0
     let skipped = 0
-    try {
-      for (const book of targets) {
-        if (controller.signal.aborted) return
+    let nextIndex = 0
+    const worker = async () => {
+      while (!controller.signal.aborted && nextIndex < targets.length) {
+        const book = targets[nextIndex++]
         const key = getBookIdentityKey(book)
         const current = searchResultsRef.current[resultKey].find((candidate) => getBookIdentityKey(candidate) === key)
-        if (!current || !canDownloadBook(current)) {
+        if (!current || pendingDeletionKeysRef.current.has(key) || (operation === 'download' && !canDownloadBook(current))) {
           skipped++
           continue
         }
         try {
-          if (!await requestDownload(current.url.trim(), controller.signal)) {
+          const refreshed = operation === 'refresh' ? await fetchResultBook(current, controller.signal) : undefined
+          if (controller.signal.aborted) return
+          if (operation === 'download' && !await requestDownload(current.url.trim(), controller.signal)) {
             skipped++
             continue
           }
           if (controller.signal.aborted) return
           succeeded++
           setSelected((keys) => keys.filter((value) => value !== key))
+          if (refreshed) replaceResultBook(current, refreshed)
         } catch {
           if (controller.signal.aborted) return
+          markBookFailed(current)
           failed++
         }
       }
-      notify(`${succeeded}件のダウンロードを開始しました${failed ? `、${failed}件は失敗しました` : ''}${skipped ? `、${skipped}件は対象外です` : ''}`,
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, targets.length) }, () => worker()))
+      if (controller.signal.aborted) return
+      const summary = operation === 'download' ? `${succeeded}件のダウンロードを開始しました` : `${succeeded}件を読み込みました`
+      notify(`${summary}${failed ? `、${failed}件は失敗しました` : ''}${skipped ? `、${skipped}件は対象外です` : ''}`,
         failed ? succeeded ? 'warning' : 'error' : 'success')
     } finally {
-      if (bulkDownloadRef.current === controller) {
-        bulkDownloadRef.current = null
-        setBulkDownloadPending(false)
+      if (bulkOperationRef.current === controller) {
+        bulkOperationRef.current = null
+        setBulkOperation(null)
       }
     }
-  }, [canDownloadBook, isWebSearch, notify, requestDownload, searchResultsRef, selected, setSelected])
+  }, [canDownloadBook, fetchResultBook, isWebSearch, markBookFailed, notify, replaceResultBook, requestDownload, searchResultsRef, setSelected, setSelectMode])
+
+  const downloadSelectedBooks = useCallback(() => runBulkOperation('download'), [runBulkOperation])
+  const refreshSelectedBooks = useCallback(() => runBulkOperation('refresh'), [runBulkOperation])
 
   const openDeleteDialog = useCallback((books: ApiBookCardModel[], trigger: HTMLElement | null, bulk = false) => {
     if (!books.length || deleteDialogPendingRef.current) return
@@ -518,6 +548,7 @@ export function useSearchOperations({
   }, [deleteDialogThumbnailRequest])
 
   return {
+    failedBookKeys,
     deleteDialogRef,
     deleteDialogBooks,
     deleteDialogOpen,
@@ -542,7 +573,9 @@ export function useSearchOperations({
     deleteSelectedLibraryBooks,
     downloadSelectedBooks,
     downloadableSelectedCount,
-    bulkDownloadPending,
+    bulkDownloadPending: bulkOperation === 'download',
+    bulkRefreshPending: bulkOperation === 'refresh',
+    bulkOperationPending: bulkOperation !== null,
     requestDeleteDialogClose,
     afterDeleteDialogClose,
     resolveDeleteRestoreFocus,

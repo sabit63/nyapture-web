@@ -29,6 +29,7 @@ export type BookCardProps = {
   book: ApiBookCardModel
   selectMode: boolean
   selected: boolean
+  actionFailed?: boolean
   onToggle: () => void
   onTagSearch: (tag: BookTag) => void
   onTagSearchDestinationRequest?: (tag: BookTag, trigger: HTMLButtonElement) => void
@@ -56,6 +57,7 @@ export function BookCard({
   book,
   selectMode,
   selected,
+  actionFailed = false,
   onToggle,
   onTagSearch,
   onTagSearchDestinationRequest,
@@ -153,7 +155,7 @@ export function BookCard({
 
   return (
     <article
-      className={`book-card ${selected ? 'book-card--selected' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`}
+      className={`book-card ${selectMode && selected ? 'book-card--selected' : actionFailed ? 'book-card--action-failed' : ''} ${isDownloadCandidate ? 'book-card--download-candidate' : ''}`}
       data-book-status={book.status}
       data-book-group-id={apiGroupId}
       data-book-id={apiBookId}

@@ -3,6 +3,7 @@ import { it } from 'node:test'
 import type { FormEvent } from 'react'
 import { useSearchController } from '../src/features/search/useSearchController'
 import { buildHitomiSearchUrl } from '../src/api/hitomi'
+import { navigate } from '../src/app/client-router'
 import { act, installHookDom, renderHook } from './helpers/react-hook'
 
 it('Hitomi sort changes restart the search on page one and preserve the period during pagination', async () => {
@@ -69,10 +70,12 @@ it('composed search controller synchronizes URL state, execution, selection and 
   try {
     assert.equal(hook.current.searchState, 'success')
     assert.equal(hook.current.criteria.text, 'sample')
-    await act(async () => { hook.current.toggleSelection('selected') })
+    await act(async () => { hook.current.toggleSelectMode(); hook.current.toggleSelection('selected') })
+    assert.equal(hook.current.selectMode, true)
     assert.deepEqual(hook.current.selected, ['selected'])
     await act(async () => { hook.current.setResultPage(3) })
     assert.equal(hook.current.resultPage, 3)
+    assert.equal(hook.current.selectMode, false)
     assert.equal(new URL(dom.window.location.href).searchParams.get('page'), '3')
     assert.deepEqual(hook.current.selected, [])
     assert.equal(hook.current.searchState, 'success')
@@ -83,6 +86,10 @@ it('composed search controller synchronizes URL state, execution, selection and 
     await act(async () => { hook.current.refresh() })
     assert.equal(requests.length, count + 1)
     assert.equal(requests.at(-1)?.page, 3)
+    await act(async () => { hook.current.toggleSelectMode(); hook.current.toggleSelection('selected') })
+    await act(async () => { navigate('/dashboard') })
+    assert.equal(hook.current.selectMode, false)
+    assert.deepEqual(hook.current.selected, [])
   } finally {
     await hook.unmount()
     dom.cleanup()

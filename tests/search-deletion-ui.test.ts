@@ -221,6 +221,59 @@ it('refreshes downloaded library books through the Web API and displays added ta
   }
 })
 
+for (const isWebSearch of [false, true]) {
+  for (const bulk of [false, true]) {
+    for (const outcome of ['saved', 'deleted', 'error', 'malformed'] as const) {
+      it(`${isWebSearch ? 'online' : 'library'} ${bulk ? 'bulk' : 'single'} refresh verifies saved state when only onlineBook is returned: ${outcome}`, async () => {
+        const dom = installHookDom()
+        const requests: string[] = []
+        const notices: string[] = []
+        globalThis.fetch = async (input) => {
+          const path = new URL(String(input)).pathname
+          requests.push(path)
+          if (path === '/api/web/book') return Response.json({
+            success: true, onlineBook: { ...book, title: 'Online title', status: 'WebBook' },
+          })
+          assert.equal(path, '/api/book/group-1/book-1')
+          if (outcome === 'error') return new Response('failed', { status: 500 })
+          if (outcome === 'malformed') return Response.json({ success: true })
+          return Response.json({ success: true, books: outcome === 'saved' ? [{ ...book, title: 'Saved title' }] : [] })
+        }
+        const hook = await renderHook(() => {
+          const results = useSearchResults()
+          const operations = useSearchOperations({
+            ...results, isWebSearch, apiRevision: 0, routeKey: '/search',
+            searchResultsRef: results.stateRef, setSelectMode: () => {}, notify: (message) => notices.push(message),
+          })
+          return { ...results, ...operations }
+        }, undefined)
+        try {
+          await act(async () => {
+            const setBooks = isWebSearch ? hook.current.updateWebSearchResultBooks : hook.current.setLibrarySearchBooks
+            setBooks([book])
+            hook.current.setSelected(['group-1\u0000book-1'])
+          })
+          await act(async () => {
+            if (bulk) await hook.current.refreshSelectedBooks()
+            else await hook.current.refreshWebBook(book)
+          })
+          const current = (isWebSearch ? hook.current.webSearchResultBooks : hook.current.librarySearchBooks)[0]
+          assert.deepEqual(requests, ['/api/web/book', '/api/book/group-1/book-1'])
+          assert.equal(current.status, outcome === 'deleted' ? 'WebBook' : 'Downloaded')
+          if (outcome === 'saved') {
+            assert.equal(current.title, 'Saved title')
+            assert.equal(current.thumbnailRequest?.path, '/api/book/page')
+          } else if (outcome !== 'deleted') {
+            assert.deepEqual(current, book)
+            assert.deepEqual(hook.current.selected, ['group-1\u0000book-1'])
+            assert.match(notices[0], /失敗|再取得できませんでした/)
+          }
+        } finally { await hook.unmount(); dom.cleanup() }
+      })
+    }
+  }
+}
+
 type HarnessProps = {
   apiRevision: number
   routeKey: string

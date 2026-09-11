@@ -118,7 +118,7 @@ it('bulk download skips ineligible books, prevents duplicate runs, preserves fai
     await act(async () => { run = hook.current.downloadSelectedBooks() })
     assert.equal(hook.current.bulkDownloadPending, true)
     await act(async () => { await hook.current.downloadSelectedBooks() })
-    assert.equal(started.length, 1)
+    assert.equal(started.length, 2)
     await act(async () => { first.resolve(response({ success: true })); await run })
     assert.deepEqual(started, ['https://example.test/0', 'https://example.test/1'])
     assert.equal(hook.current.bulkDownloadPending, false)
@@ -179,7 +179,7 @@ it('renders the status checkboxes and enables both bulk actions in selection mod
 
 it('rechecks the latest book status before each bulk download request', async () => {
   const dom = installHookDom('http://localhost/search/status')
-  const books = ['0', '1'].map((bookId) => ({
+  const books = ['0', '1', '2', '3'].map((bookId) => ({
     groupId: 'g', bookId, title: bookId, status: 'Cancel', totalPage: 1, url: `https://example.test/${bookId}`,
   }))
   const first = deferred<Response>()
@@ -188,21 +188,21 @@ it('rechecks the latest book status before each bulk download request', async ()
     const path = new URL(String(url)).pathname
     if (path === '/api/download/start') {
       started.push((JSON.parse(String(init?.body)) as { url: string }).url)
-      return first.promise
+      return (await first.promise).clone()
     }
-    return response({ success: true, books: path === '/api/book/g/1' ? [{ ...books[1], status: 'Downloaded' }] : books, totalPage: 1 })
+    return response({ success: true, books: path === '/api/book/g/3' ? [{ ...books[3], status: 'Downloaded' }] : books, totalPage: 1 })
   }
   const hook = await renderHook(() => useSearchController(options), undefined)
   try {
     await act(async () => { hook.current.toggleSelectMode(); hook.current.selectAllVisibleBooks() })
-    assert.equal(hook.current.downloadableSelectedCount, 2)
+    assert.equal(hook.current.downloadableSelectedCount, 4)
     let run!: Promise<void>
     await act(async () => { run = hook.current.downloadSelectedBooks() })
-    await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[1]) })
-    assert.equal(hook.current.downloadableSelectedCount, 1)
+    await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[3]) })
+    assert.equal(hook.current.downloadableSelectedCount, 3)
     await act(async () => { first.resolve(response({ success: true })); await run })
-    assert.deepEqual(started, ['https://example.test/0'])
-    assert.equal(hook.current.visibleBooks[1].status, 'Downloaded')
+    assert.deepEqual(started, ['https://example.test/0', 'https://example.test/1', 'https://example.test/2'])
+    assert.equal(hook.current.visibleBooks[3].status, 'Downloaded')
     assert.equal(hook.current.bulkDownloadPending, false)
   } finally { await hook.unmount(); dom.cleanup() }
 })

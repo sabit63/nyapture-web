@@ -11,6 +11,7 @@ type Props = Pick<SearchController,
   'visibleBooks'
   | 'displaySettings'
   | 'pendingDeletionKeys'
+  | 'failedBookKeys'
   | 'isWebSearch'
   | 'selectMode'
   | 'selected'
@@ -32,6 +33,7 @@ export const SearchResultsGrid = memo(function SearchResultsGrid({
   visibleBooks,
   displaySettings,
   pendingDeletionKeys,
+  failedBookKeys,
   isWebSearch,
   selectMode,
   selected,
@@ -63,6 +65,7 @@ export const SearchResultsGrid = memo(function SearchResultsGrid({
             book={book}
             selectMode={selectMode}
             selected={selected.includes(bookKey)}
+            actionFailed={failedBookKeys.has(bookKey)}
             onToggle={() => toggleSelection(bookKey)}
             actionsDisabled={deletionPending}
             onTagSearch={searchByTag}

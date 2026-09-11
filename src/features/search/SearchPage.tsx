@@ -425,15 +425,15 @@ export function SearchPage({ controller }: SearchPageProps) {
               tone="neutral"
               size="compact"
               type="button"
-              aria-label="再読み込み"
-              disabled={isSearchLoading || controller.bulkDownloadPending || selected.length === 0}
+              aria-label="再読み込み" aria-busy={controller.bulkRefreshPending}
+              disabled={isSearchLoading || controller.bulkOperationPending || selected.length === 0}
               onClick={refreshSelectedBooks}
             >
               <RefreshCw size={17} aria-hidden="true" />
             </IconButton>
             <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button"
               aria-label="選択をダウンロード" aria-busy={controller.bulkDownloadPending}
-              disabled={isSearchLoading || controller.bulkDownloadPending || controller.downloadableSelectedCount === 0}
+              disabled={isSearchLoading || controller.bulkOperationPending || controller.downloadableSelectedCount === 0}
               onClick={controller.downloadSelectedBooks}>
               <Download size={17} aria-hidden="true" />
             </IconButton>
@@ -457,8 +457,8 @@ export function SearchPage({ controller }: SearchPageProps) {
               <ListChecks size={17} aria-hidden="true" />
             </IconButton>
             <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button"
-              aria-label="再読み込み"
-              disabled={isSearchLoading || controller.bulkDownloadPending || selected.length === 0}
+              aria-label="再読み込み" aria-busy={controller.bulkRefreshPending}
+              disabled={isSearchLoading || controller.bulkOperationPending || selected.length === 0}
               onClick={refreshSelectedBooks}>
               <RefreshCw size={17} aria-hidden="true" />
             </IconButton>
@@ -469,7 +469,7 @@ export function SearchPage({ controller }: SearchPageProps) {
               size="compact"
               type="button"
               aria-label="選択を削除"
-              disabled={isSearchLoading || controller.bulkDownloadPending || selected.length === 0}
+              disabled={isSearchLoading || controller.bulkOperationPending || selected.length === 0}
               onClick={(event) => deleteSelectedLibraryBooks(event.currentTarget)}
             >
               <Trash2 size={17} aria-hidden="true" />
@@ -535,6 +535,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                 visibleBooks={visibleBooks}
                 displaySettings={displaySettings}
                 pendingDeletionKeys={pendingDeletionKeys}
+                failedBookKeys={controller.failedBookKeys}
                 isWebSearch={isWebSearch}
                 selectMode={selectMode}
                 selected={selected}

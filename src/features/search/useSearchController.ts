@@ -245,7 +245,7 @@ export function useSearchController({
     resetSearchOrder()
   }, [resetSearchOrder, sortDirection])
 
-  const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}`
+  const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}\u0000${sortType}\u0000${sortDirection}\u0000${hitomiSortPeriod}`
   const searchOperations = useSearchOperations({
     isWebSearch,
     apiRevision,
@@ -350,9 +350,11 @@ export function useSearchController({
 
   useEffect(() => {
     if (routerLocation.revision === 0) return
+    setSelectMode(false)
+    setSelected([])
     setAdvancedOpen(false)
     setTagSearchDestinationDialogOpen(false)
-  }, [routerLocation.revision])
+  }, [routerLocation.revision, setSelected])
 
   const displayedSearchResultBooks = useMemo(() => searchResultBooks.map((book) => {
     const deletionPending = searchOperations.pendingDeletionKeys.has(getBookIdentityKey(book))
