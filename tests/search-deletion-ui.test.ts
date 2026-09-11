@@ -5,6 +5,7 @@ import { useRef, useState } from 'react'
 import type { ApiBookCardModel } from '../src/api'
 import { useSearchController } from '../src/features/search/useSearchController'
 import { useSearchOperations } from '../src/features/search/useSearchOperations'
+import { useSearchResults } from '../src/features/search/useSearchResults'
 import { bookDownloadHubClient, type BookDownloadHubListener } from '../src/realtime/book-download-hub'
 import { act, deferred, installHookDom, renderHook } from './helpers/react-hook'
 
@@ -23,6 +24,51 @@ const book: ApiBookCardModel = {
   status: 'Downloaded',
   tags: [],
   cover: 'violet',
+}
+
+for (const isWebSearch of [false, true]) {
+  it(`bulk refresh updates selected ${isWebSearch ? 'online' : 'library'} books and online download skips completed books`, async () => {
+    const dom = installHookDom()
+    const started: string[] = []
+    globalThis.fetch = async (input, init) => {
+      if (new URL(String(input)).pathname === '/api/download/start') {
+        started.push(JSON.parse(String(init?.body)).url)
+        return Response.json({ success: true })
+      }
+      const refreshed = { ...book, title: 'Refreshed', status: 'Cancel' }
+      return Response.json({ success: true, book: refreshed, books: [refreshed] })
+    }
+    const hook = await renderHook(() => {
+      const results = useSearchResults()
+      const operations = useSearchOperations({
+        ...results, isWebSearch, apiRevision: 0, routeKey: '/search',
+        searchResultsRef: results.stateRef, setSelectMode: () => {}, notify: () => {},
+      })
+      return { ...results, ...operations }
+    }, undefined)
+    try {
+      const second = { ...book, bookId: 'second', apiBookId: 'second', url: 'https://example.invalid/second' }
+      await act(async () => {
+        const setBooks = isWebSearch ? hook.current.updateWebSearchResultBooks : hook.current.setLibrarySearchBooks
+        setBooks([{ ...book, status: isWebSearch ? 'WebBookInPage' : 'Cancel' }, second])
+        hook.current.setSelected(['group-1\u0000book-1'])
+      })
+      await act(async () => { await hook.current.refreshSelectedBooks() })
+      const books = isWebSearch ? hook.current.webSearchResultBooks : hook.current.librarySearchBooks
+      assert.equal(books[0].title, 'Refreshed')
+      assert.equal(typeof books[0].thumbnailReloadKey, 'string')
+      assert.match(String(books[0].thumbnailReloadKey), /^refresh:/)
+      assert.equal(books[1].title, book.title)
+      assert.deepEqual(hook.current.selected, [])
+      if (isWebSearch) {
+        await act(async () => { hook.current.setSelected(['group-1\u0000book-1', 'group-1\u0000second']) })
+        assert.equal(hook.current.downloadableSelectedCount, 1)
+        await act(async () => { await hook.current.downloadSelectedBooks() })
+        assert.deepEqual(started, [book.url])
+        assert.deepEqual(hook.current.selected, ['group-1\u0000second'])
+      }
+    } finally { await hook.unmount(); dom.cleanup() }
+  })
 }
 
 for (const bulk of [false, true]) {
@@ -49,7 +95,7 @@ for (const bulk of [false, true]) {
     }), undefined)
     try {
       await act(async () => { hook.current.selectAllVisibleBooks() })
-      const download = () => bulk ? hook.current.downloadSelectedLibraryBooks()
+      const download = () => bulk ? hook.current.downloadSelectedBooks()
         : hook.current.downloadWebBook(hook.current.visibleBooks[0])
       let run!: Promise<void>
       await act(async () => { run = download() })

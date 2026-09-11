@@ -115,9 +115,9 @@ it('bulk download skips ineligible books, prevents duplicate runs, preserves fai
     await act(async () => { hook.current.toggleSelectMode(); hook.current.selectAllVisibleBooks() })
     assert.equal(hook.current.downloadableSelectedCount, 2)
     let run!: Promise<void>
-    await act(async () => { run = hook.current.downloadSelectedLibraryBooks() })
+    await act(async () => { run = hook.current.downloadSelectedBooks() })
     assert.equal(hook.current.bulkDownloadPending, true)
-    await act(async () => { await hook.current.downloadSelectedLibraryBooks() })
+    await act(async () => { await hook.current.downloadSelectedBooks() })
     assert.equal(started.length, 1)
     await act(async () => { first.resolve(response({ success: true })); await run })
     assert.deepEqual(started, ['https://example.test/0', 'https://example.test/1'])
@@ -161,7 +161,7 @@ it('renders the status checkboxes and enables both bulk actions in selection mod
     assert.equal(checks.filter((input) => !input.checked).length, 1)
     assert.equal(checks.find((input) => !input.checked)?.parentElement?.textContent, 'ダウンロード済み')
     await act(async () => { controller.toggleSelectMode(); controller.selectAllVisibleBooks() })
-    for (const label of ['選択を削除', '選択をダウンロード']) {
+    for (const label of ['選択を削除', '再読み込み']) {
       const button = container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
       assert.ok(button)
       assert.equal(button.disabled, false)
@@ -197,7 +197,7 @@ it('rechecks the latest book status before each bulk download request', async ()
     await act(async () => { hook.current.toggleSelectMode(); hook.current.selectAllVisibleBooks() })
     assert.equal(hook.current.downloadableSelectedCount, 2)
     let run!: Promise<void>
-    await act(async () => { run = hook.current.downloadSelectedLibraryBooks() })
+    await act(async () => { run = hook.current.downloadSelectedBooks() })
     await act(async () => { await hook.current.refreshWebBook(hook.current.visibleBooks[1]) })
     assert.equal(hook.current.downloadableSelectedCount, 1)
     await act(async () => { first.resolve(response({ success: true })); await run })

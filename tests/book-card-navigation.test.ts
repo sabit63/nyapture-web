@@ -35,6 +35,49 @@ const book: ApiBookCardModel = {
   cover: 'violet',
 }
 
+it('keeps the loaded thumbnail when selection mode changes retry visibility', async (t) => {
+  const { Thumbnail } = await import('../src/components/Thumbnail')
+  const dom = installHookDom()
+  const container = document.createElement('div')
+  document.body.append(container)
+  const root = createRoot(container)
+  let requests = 0
+  const revoked: string[] = []
+  t.mock.method(URL, 'createObjectURL', () => `blob:thumbnail-${requests}`)
+  t.mock.method(URL, 'revokeObjectURL', (url: string) => { revoked.push(url) })
+  const load = async () => { requests++; return new Blob(['image']) }
+  const render = async (selectMode: boolean, reloadKey = 0) => {
+    await act(async () => {
+      root.render(createElement(Thumbnail, {
+        alt: 'Fixture', load, reloadKey, retryOnError: !selectMode,
+        loadingPolicy: { mode: 'page', viewports: 3 }, linkHref: '/book',
+      }))
+    })
+  }
+  try {
+    await render(false)
+    const image = container.querySelector('img')!
+    assert.ok(image)
+    await act(async () => { image.dispatchEvent(new dom.window.Event('load')) })
+    for (const selectMode of [true, false]) {
+      await render(selectMode)
+      assert.equal(requests, 1)
+      assert.equal(container.querySelector('img'), image)
+      assert.ok(container.querySelector('.is-loaded'))
+      assert.equal(container.querySelector('.book-cover__skeleton'), null)
+      assert.deepEqual(revoked, [])
+    }
+    await render(false, 1)
+    assert.equal(requests, 2)
+    assert.deepEqual(revoked, ['blob:thumbnail-1'])
+    assert.notEqual(container.querySelector('img'), image)
+  } finally {
+    await act(async () => { root.unmount() })
+    container.remove()
+    dom.cleanup()
+  }
+})
+
 it('removes every thumbnail action during shredding and restores actions after cancellation', async () => {
   const { BookCard } = await import('../src/components/BookCard')
   const dom = installHookDom('http://localhost/search')

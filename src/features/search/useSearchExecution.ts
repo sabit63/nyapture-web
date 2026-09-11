@@ -19,7 +19,7 @@ import {
   normalizeSearchBookDownloadStatus,
   type SearchBookStatusVersionMap,
 } from '../../realtime/search-book-status'
-import type { BookDownloadStatus, HitomiAppend, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
+import type { BookDownloadStatus, HitomiAppend, HitomiSortPeriod, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
 import { validateCriteria } from './search-utils'
 import { applyTagEntityMetadata } from './tag-display-name'
 import { resolveSearchTags } from './resolve-search-tags'
@@ -64,6 +64,7 @@ export type SearchExecutionOptions = {
   searchLimit?: number
   criteria: SearchCriteria
   hitomiAppend: HitomiAppend
+  hitomiSortPeriod?: HitomiSortPeriod
   resultPage: number
   sortType: SortType
   sortDirection: SortDirection
@@ -136,6 +137,7 @@ export function useSearchExecution({
   searchLimit = 50,
   criteria,
   hitomiAppend,
+  hitomiSortPeriod = 'recent',
   resultPage,
   sortType,
   sortDirection,
@@ -245,7 +247,7 @@ export function useSearchExecution({
 
     if (isWebSearch) {
       const response = await getWebPageContent(
-        buildHitomiSearchUrl(criteria, hitomiAppend, resultPage),
+        buildHitomiSearchUrl(criteria, hitomiAppend, resultPage, hitomiSortPeriod),
         signal,
       )
       const tags = response.tags ?? []
@@ -267,7 +269,7 @@ export function useSearchExecution({
       tags: entities,
       totalPages: Math.max(1, response.totalPage ?? 1),
     }
-  }, [criteria, hitomiAppend, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
+  }, [criteria, hitomiAppend, hitomiSortPeriod, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
 
   const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
     tagEnrichmentRef.current?.abort()

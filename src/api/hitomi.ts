@@ -1,6 +1,7 @@
 import type {
   EBook,
   HitomiAppend,
+  HitomiSortPeriod,
   NyaBookStatus,
   NyaTagType,
   OnlineBookInPage,
@@ -52,6 +53,7 @@ export const buildHitomiSearchUrl = (
   criteria: HitomiSearchCriteria,
   append: HitomiAppend = 'Normal',
   page?: number,
+  sortPeriod: HitomiSortPeriod = 'recent',
 ) => {
   const normalizedPage = safePage(page)
   const text = typeof criteria?.text === 'string' ? criteria.text.trim() : ''
@@ -63,11 +65,13 @@ export const buildHitomiSearchUrl = (
   const terms = text ? [text, ...tagTerms] : tagTerms
 
   if (terms.length === 0) {
+    const indexUrl = sortPeriod === 'recent' ? HITOMI_INDEX_ALL_URL : `https://hitomi.la/popular/${sortPeriod}-all.html`
     return normalizedPage > 1
-      ? `${HITOMI_INDEX_ALL_URL}?page=${normalizedPage}`
-      : HITOMI_INDEX_ALL_URL
+      ? `${indexUrl}?page=${normalizedPage}`
+      : indexUrl
   }
 
+  if (sortPeriod !== 'recent') terms.push('orderby:popular', `orderbykey:${sortPeriod}`)
   const searchUrl = `${HITOMI_SEARCH_URL}?${encodeURIComponent(terms.join(' '))}`
   return normalizedPage > 1 ? `${searchUrl}#${normalizedPage}` : searchUrl
 }

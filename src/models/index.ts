@@ -38,6 +38,7 @@ export const BOOK_STATUS_LABELS: Record<NyaBookStatus, string> = {
 export const HITOMI_APPENDS = ['Normal', 'Male', 'Female'] as const
 
 export type HitomiAppend = (typeof HITOMI_APPENDS)[number]
+export type HitomiSortPeriod = 'recent' | 'today' | 'week' | 'month' | 'year'
 
 export const BOOK_SEARCH_SORT_TYPES = ['UploadedTime', 'Title', 'TotalPage', 'UpdatedTime'] as const
 

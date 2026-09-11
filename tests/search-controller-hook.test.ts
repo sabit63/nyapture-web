@@ -2,7 +2,47 @@ import assert from 'node:assert/strict'
 import { it } from 'node:test'
 import type { FormEvent } from 'react'
 import { useSearchController } from '../src/features/search/useSearchController'
+import { buildHitomiSearchUrl } from '../src/api/hitomi'
 import { act, installHookDom, renderHook } from './helpers/react-hook'
+
+it('Hitomi sort changes restart the search on page one and preserve the period during pagination', async () => {
+  const dom = installHookDom('http://localhost/hitomila/search?q=sample&page=3')
+  const requests: string[] = []
+  globalThis.fetch = async (input, init) => {
+    assert.equal(new URL(String(input)).pathname, '/api/web/page')
+    requests.push(JSON.parse(String(init?.body)))
+    return Response.json({ success: true, onlineBookPage: { books: [], totalPage: 5 } })
+  }
+  const hook = await renderHook(() => useSearchController({
+    isWebSearch: true, isLibrarySearch: false, isMissingTagSearch: false, isBookViewer: false,
+    apiRevision: 0, displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
+    hubConnectionState: 'idle', notify: () => {},
+  }), undefined)
+  try {
+    assert.ok(requests.length >= 1)
+    assert.equal(new URL(requests[0]).hash, '#3')
+    for (const period of ['today', 'week', 'month', 'year', 'recent'] as const) {
+      const count: number = requests.length
+      await act(async () => { hook.current.setHitomiSortPeriod(period) })
+      assert.equal(requests.length, count + 1)
+      assert.equal(hook.current.resultPage, 1)
+      const url = new URL(requests.at(-1)!)
+      assert.equal(url.hash, '')
+      const terms = decodeURIComponent(url.search.slice(1))
+      assert.ok(terms.includes('sample'))
+      assert.ok(terms.includes('language:japanese'))
+      assert.equal(terms.includes('orderby:popular'), period !== 'recent')
+      if (period !== 'recent') assert.ok(terms.includes(`orderbykey:${period}`))
+      await act(async () => { hook.current.setHitomiSortPeriod(period) })
+      assert.equal(requests.length, count + 1)
+      await act(async () => { hook.current.goToResultPage(2) })
+      assert.equal(new URL(requests.at(-1)!).hash, '#2')
+      assert.equal(new URL(requests.at(-1)!).search, url.search)
+    }
+    assert.equal(buildHitomiSearchUrl({ text: '', tags: [] }, 'Normal', 2, 'week'), 'https://hitomi.la/popular/week-all.html?page=2')
+    assert.equal(buildHitomiSearchUrl({ text: '', tags: [] }), 'https://hitomi.la/index-all.html')
+  } finally { await hook.unmount(); dom.cleanup() }
+})
 
 it('composed search controller synchronizes URL state, execution, selection and refresh', async () => {
   const dom = installHookDom('http://localhost/search?q=sample')

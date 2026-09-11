@@ -141,7 +141,7 @@ export function SearchPage({ controller }: SearchPageProps) {
     japaneseLanguageEnabled,
     toggleJapaneseLanguage,
     selectAllVisibleBooks,
-    refreshSelectedWebBooks,
+    refreshSelectedBooks,
     deleteSelectedLibraryBooks,
     toggleSelection,
     getTagSearchHref,
@@ -425,11 +425,17 @@ export function SearchPage({ controller }: SearchPageProps) {
               tone="neutral"
               size="compact"
               type="button"
-              aria-label="読み込み"
-              disabled={isSearchLoading || selected.length === 0}
-              onClick={refreshSelectedWebBooks}
+              aria-label="再読み込み"
+              disabled={isSearchLoading || controller.bulkDownloadPending || selected.length === 0}
+              onClick={refreshSelectedBooks}
             >
               <RefreshCw size={17} aria-hidden="true" />
+            </IconButton>
+            <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button"
+              aria-label="選択をダウンロード" aria-busy={controller.bulkDownloadPending}
+              disabled={isSearchLoading || controller.bulkDownloadPending || controller.downloadableSelectedCount === 0}
+              onClick={controller.downloadSelectedBooks}>
+              <Download size={17} aria-hidden="true" />
             </IconButton>
           </div>
           </div>
@@ -450,14 +456,12 @@ export function SearchPage({ controller }: SearchPageProps) {
             >
               <ListChecks size={17} aria-hidden="true" />
             </IconButton>
-            {controller.isStatusSearch && (
-              <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button"
-                aria-label="選択をダウンロード" aria-busy={controller.bulkDownloadPending}
-                disabled={isSearchLoading || controller.bulkDownloadPending || controller.downloadableSelectedCount === 0}
-                onClick={controller.downloadSelectedLibraryBooks}>
-                <Download size={17} aria-hidden="true" />
-              </IconButton>
-            )}
+            <IconButton className="toolbar-icon" variant="ghost" tone="neutral" size="compact" type="button"
+              aria-label="再読み込み"
+              disabled={isSearchLoading || controller.bulkDownloadPending || selected.length === 0}
+              onClick={refreshSelectedBooks}>
+              <RefreshCw size={17} aria-hidden="true" />
+            </IconButton>
             <IconButton
               className="toolbar-icon selection-toolbar__delete"
               variant="ghost"

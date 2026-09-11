@@ -290,7 +290,7 @@ function ThumbnailInstance({
     }
 
     function retry() {
-      if ((!src && !load) || !retryOnError || disposed) return
+      if ((!src && !load) || disposed) return
       automaticRetriesRef.current = 0
       clearRetryTimer()
       executeTransition(lifecycle.start())
@@ -388,7 +388,7 @@ function ThumbnailInstance({
       revokeObjectUrl(request)
       if (lifecycleRef.current === lifecycle) lifecycleRef.current = null
     }
-  }, [hasSource, load, loadingMode, retryOnError, src, viewports])
+  }, [hasSource, load, loadingMode, src, viewports])
 
   const imageLoaded = () => {
     if (renderToken) handlersRef.current.imageLoaded(renderToken)

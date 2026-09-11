@@ -1,5 +1,5 @@
 import { HITOMI_APPENDS, NYA_BOOK_STATUSES, isValidLocalDate, TAG_TYPE_ORDER } from '../../models'
-import type { BookTag, HitomiAppend, NyaBookStatus, NyaTagType, SearchCriteria } from '../../models'
+import type { BookTag, HitomiAppend, HitomiSortPeriod, NyaBookStatus, NyaTagType, SearchCriteria } from '../../models'
 import { toPublicPath } from '../../app/app-base-path'
 
 export { isValidLocalDate }
@@ -249,7 +249,7 @@ export const validateCriteria = (criteria: SearchCriteria, isMissingTagSearch = 
   return errors
 }
 
-export type HitomiSortPeriod = 'recent' | 'today' | 'week' | 'month' | 'year'
+export type { HitomiSortPeriod } from '../../models'
 
 export const HITOMI_SORT_PERIODS: { value: HitomiSortPeriod; label: string }[] = [
   { value: 'recent', label: '最近' },

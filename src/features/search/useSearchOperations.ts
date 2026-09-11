@@ -235,44 +235,50 @@ export function useSearchOperations({
     })
   }, [isWebSearch, replaceWebSearchBook, setLibrarySearchBooks])
 
+  const fetchResultBook = useCallback(async (book: BookCardModel) => {
+    let refreshed: ApiBookCardModel
+    if (!isWebSearch && book.status !== 'Downloaded' && book.apiGroupId && book.apiBookId) {
+      const response = await getBook(book.apiGroupId, book.apiBookId)
+      const result = response.books?.[0]
+      if (!result) throw new ApiError('Book情報がありません。', { category: 'notFound' })
+      refreshed = mapEBookToCard(result)
+    } else {
+      refreshed = await fetchWebBook(book)
+    }
+    return { ...refreshed, thumbnailReloadKey: `refresh:${Date.now()}` }
+  }, [fetchWebBook, isWebSearch])
+
   const refreshWebBook = useCallback(async (book: BookCardModel) => {
     try {
-      let refreshed: ApiBookCardModel
-      if (!isWebSearch && book.status !== 'Downloaded' && book.apiGroupId && book.apiBookId) {
-        const response = await getBook(book.apiGroupId, book.apiBookId)
-        const result = response.books?.[0]
-        if (!result) throw new ApiError('Book情報がありません。', { category: 'notFound' })
-        refreshed = mapEBookToCard(result)
-      } else {
-        refreshed = await fetchWebBook(book)
-      }
-      replaceResultBook(book, { ...refreshed, thumbnailReloadKey: `refresh:${Date.now()}` })
+      replaceResultBook(book, await fetchResultBook(book))
       notify(`「${book.title}」の情報を再取得しました`)
     } catch (error) {
       notify(`再取得できませんでした: ${getErrorMessage(error)}`, 'error')
     }
-  }, [fetchWebBook, isWebSearch, notify, replaceResultBook])
+  }, [fetchResultBook, notify, replaceResultBook])
 
-  const refreshSelectedWebBooks = useCallback(async () => {
+  const refreshSelectedBooks = useCallback(async () => {
     const selectedKeys = new Set(selected)
-    const selectedBooks = webSearchResultBooks.filter((book) => selectedKeys.has(getBookIdentityKey(book)))
+    const books = isWebSearch ? webSearchResultBooks : librarySearchBooks
+    const selectedBooks = books.filter((book) => selectedKeys.has(getBookIdentityKey(book)) && !pendingDeletionKeysRef.current.has(getBookIdentityKey(book)))
     if (selectedBooks.length === 0) return
 
     setSelected([])
     setSelectMode(false)
 
-    const results = await Promise.allSettled(selectedBooks.map((selectedBook) => fetchWebBook(selectedBook)))
+    const results = await Promise.allSettled(selectedBooks.map((selectedBook) => fetchResultBook(selectedBook)))
     const refreshed: { original: BookCardModel; refreshed: ApiBookCardModel }[] = []
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') refreshed.push({ original: selectedBooks[index], refreshed: result.value })
     })
-    replaceWebSearchBooks(refreshed)
+    if (isWebSearch) replaceWebSearchBooks(refreshed)
+    else refreshed.forEach(({ original, refreshed: book }) => replaceResultBook(original, book))
     const failed = results.length - refreshed.length
     notify(
       failed ? `${refreshed.length}件を更新、${failed}件は失敗しました` : `選択した${refreshed.length}件を読み込みました`,
       failed === 0 ? 'success' : refreshed.length === 0 ? 'error' : 'warning',
     )
-  }, [fetchWebBook, notify, replaceWebSearchBooks, selected, setSelected, setSelectMode, webSearchResultBooks])
+  }, [fetchResultBook, isWebSearch, librarySearchBooks, notify, replaceResultBook, replaceWebSearchBooks, selected, setSelected, setSelectMode, webSearchResultBooks])
 
   const downloadWebBook = useCallback(async (book: BookCardModel) => {
     if (['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(book.status)) return
@@ -334,15 +340,16 @@ export function useSearchOperations({
     }
   }, [fetchWebBook, isWebSearch, notify, replaceResultBook, requestDownload, searchResultsRef])
 
-  const canDownloadLibraryBook = useCallback((book: ApiBookCardModel) => Boolean(book.url?.trim())
+  const canDownloadBook = useCallback((book: ApiBookCardModel) => Boolean(book.url?.trim())
     && !['Downloaded', 'Downloading', 'Standby', 'Shredding'].includes(book.status)
     && !pendingDeletionKeysRef.current.has(getBookIdentityKey(book)), [])
-  const downloadableSelectedCount = librarySearchBooks.filter((book) => selected.includes(getBookIdentityKey(book)) && canDownloadLibraryBook(book)).length
+  const downloadableSelectedCount = (isWebSearch ? webSearchResultBooks : librarySearchBooks).filter((book) => selected.includes(getBookIdentityKey(book)) && canDownloadBook(book)).length
 
-  const downloadSelectedLibraryBooks = useCallback(async () => {
+  const downloadSelectedBooks = useCallback(async () => {
     if (bulkDownloadRef.current || deleteDialogPendingRef.current) return
     const selectedKeys = new Set(selected)
-    const targets = searchResultsRef.current.librarySearchBooks.filter((book) => selectedKeys.has(getBookIdentityKey(book)))
+    const resultKey = isWebSearch ? 'webSearchResultBooks' : 'librarySearchBooks'
+    const targets = searchResultsRef.current[resultKey].filter((book) => selectedKeys.has(getBookIdentityKey(book)))
     if (!targets.length) return
     const controller = new AbortController()
     bulkDownloadRef.current = controller
@@ -354,8 +361,8 @@ export function useSearchOperations({
       for (const book of targets) {
         if (controller.signal.aborted) return
         const key = getBookIdentityKey(book)
-        const current = searchResultsRef.current.librarySearchBooks.find((candidate) => getBookIdentityKey(candidate) === key)
-        if (!current || !canDownloadLibraryBook(current)) {
+        const current = searchResultsRef.current[resultKey].find((candidate) => getBookIdentityKey(candidate) === key)
+        if (!current || !canDownloadBook(current)) {
           skipped++
           continue
         }
@@ -380,7 +387,7 @@ export function useSearchOperations({
         setBulkDownloadPending(false)
       }
     }
-  }, [canDownloadLibraryBook, notify, requestDownload, searchResultsRef, selected, setSelected])
+  }, [canDownloadBook, isWebSearch, notify, requestDownload, searchResultsRef, selected, setSelected])
 
   const openDeleteDialog = useCallback((books: ApiBookCardModel[], trigger: HTMLElement | null, bulk = false) => {
     if (!books.length || deleteDialogPendingRef.current) return
@@ -528,12 +535,12 @@ export function useSearchOperations({
     requestWebDetailClose,
     afterWebDetailClose,
     resolveWebDetailRestoreFocus,
-    refreshSelectedWebBooks,
+    refreshSelectedBooks,
     refreshWebBook,
     downloadWebBook,
     deleteLibraryBook,
     deleteSelectedLibraryBooks,
-    downloadSelectedLibraryBooks,
+    downloadSelectedBooks,
     downloadableSelectedCount,
     bulkDownloadPending,
     requestDeleteDialogClose,

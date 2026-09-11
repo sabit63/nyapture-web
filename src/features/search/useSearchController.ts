@@ -167,6 +167,7 @@ export function useSearchController({
     apiRevision,
     criteria,
     hitomiAppend,
+    hitomiSortPeriod,
     resultPage,
     sortType,
     sortDirection,
@@ -231,6 +232,12 @@ export function useSearchController({
     setSortType(next)
     resetSearchOrder()
   }, [resetSearchOrder, sortType])
+
+  const changeHitomiSortPeriod = useCallback((next: HitomiSortPeriod) => {
+    if (next === hitomiSortPeriod) return
+    setHitomiSortPeriod(next)
+    resetSearchOrder()
+  }, [hitomiSortPeriod, resetSearchOrder])
 
   const changeSortDirection = useCallback((next: SortDirection) => {
     if (next === sortDirection) return
@@ -676,7 +683,7 @@ export function useSearchController({
     setTagInputFocused,
     setHighlightedTagIndex,
     setAdvancedErrors,
-    setHitomiSortPeriod,
+    setHitomiSortPeriod: changeHitomiSortPeriod,
     setSortType: changeSortType,
     setSortDirection: changeSortDirection,
     enterContinuousView,
