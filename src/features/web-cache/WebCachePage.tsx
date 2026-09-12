@@ -7,6 +7,7 @@ import { deleteCacheBook, enqueueCacheBook, getCacheBook, getCacheConfig, search
 import { isDownloadCandidate } from '../search/download-candidate'
 import { InternalLink, navigate, useRouterLocation } from '../../app/client-router'
 import { formatPageTitle, useDocumentTitle } from '../../app/page-title'
+import { formatDateTime as dateText } from '../../models/date-time'
 import { useRouteContentCommitted } from '../../app/use-route-content-committed'
 import { BookCard } from '../../components/BookCard'
 import { TagChip } from '../../components/TagChip'
@@ -35,7 +36,6 @@ type Props = {
 const identity = (book: WebBookCacheBookDto) => JSON.stringify([book.groupId, book.bookId])
 const cacheError = (error: unknown) => error instanceof ApiError ? error.message : getErrorMessage(error)
 const hasIdentity = (book: WebBookCacheBookDto) => Boolean(book.groupId?.trim() && book.bookId?.trim())
-const dateText = (value?: string | null) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : '—'
 const sourceUrl = (book: WebBookCacheBookDto) => safeUrl(book.sourcePageUrl?.trim() || book.url)
 function safeUrl(value?: string | null) {
   try {

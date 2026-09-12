@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type { BookViewerPageProps } from './BookViewerPage'
 import { getTagLabel, TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../../models'
+import { formatDateTime } from '../../models/date-time'
 import type { BookTag, NyaTagType } from '../../models'
 import { BookStatusBadge } from '../../components/BookStatusBadge'
 import { TagChip } from '../../components/TagChip'
@@ -11,32 +12,6 @@ import { BookTagEditor } from './BookTagEditor'
 import { useBookTagEditor } from './use-book-tag-editor'
 import { BookTitleEditDialog } from './BookTitleEditDialog'
 import './book-viewer.css'
-
-const formatUploadDate = (uploadedTime: string) => {
-  const date = new Date(uploadedTime)
-  if (Number.isNaN(date.getTime())) return '不明'
-
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date)
-  const getPart = (type: string) => parts.find((part) => part.type === type)?.value
-  const year = getPart('year')
-  const month = getPart('month')
-  const day = getPart('day')
-  const hour = getPart('hour')
-  const minute = getPart('minute')
-  const second = getPart('second')
-
-  if (!year || !month || !day || !hour || !minute || !second) return '不明'
-  return `${year}/${month}/${day} ${hour}:${minute}:${second} JST`
-}
 
 const groupBookTags = (tags: BookTag[]) => {
   const tagsByType = new Map<NyaTagType, BookTag[]>()
@@ -215,7 +190,7 @@ export function BookDetailsSheet({ book, totalPages, onBookChange, onTitleChange
               <div className="book-viewer__details-meta-group book-viewer__details-meta-group--right">
                 <span className="book-viewer__meta-chip book-viewer__meta-chip--page">Page: {totalPages}</span>
                 <time className="book-viewer__meta-chip book-viewer__meta-chip--date" dateTime={book.uploadedTime}>
-                  {formatUploadDate(book.uploadedTime)}
+                  {formatDateTime(book.uploadedTime)}
                 </time>
               </div>
             </div>

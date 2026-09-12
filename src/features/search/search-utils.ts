@@ -1,5 +1,5 @@
 import { HITOMI_APPENDS, NYA_BOOK_STATUSES, isValidLocalDate, TAG_TYPE_ORDER } from '../../models'
-import type { BookTag, HitomiAppend, HitomiSortPeriod, NyaBookStatus, NyaTagType, SearchCriteria } from '../../models'
+import type { BookTag, HitomiAppend, HitomiSortPeriod, NyaBookStatus, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
 import { toPublicPath } from '../../app/app-base-path'
 
 export { isValidLocalDate }
@@ -123,7 +123,7 @@ export type SearchDestination = 'library' | 'hitomi' | 'missing-tags' | 'status'
 
 export const createSearchUrlForDestination = (
   criteria: SearchCriteria,
-  options: { destination: SearchDestination; hitomiAppend?: HitomiAppend; origin?: string },
+  options: { destination: SearchDestination; hitomiAppend?: HitomiAppend; origin?: string; sortType?: SortType; sortDirection?: SortDirection },
 ): URL => {
   const isHitomiSearch = options.destination === 'hitomi'
   const isMissingTagSearch = options.destination === 'missing-tags'
@@ -154,6 +154,8 @@ export const createSearchUrlForDestination = (
     else criteria.statuses.forEach((status) => url.searchParams.append('status', status))
   }
   if (isHitomiSearch) url.searchParams.set('append', options.hitomiAppend ?? 'Normal')
+  if (!isHitomiSearch && options.sortType && options.sortType !== 'uploaded') url.searchParams.set('sort', options.sortType)
+  if (!isHitomiSearch && options.sortDirection === 'asc') url.searchParams.set('direction', 'asc')
   url.searchParams.set('page', '1')
   return url
 }

@@ -1,4 +1,5 @@
 import { useCacheManagement } from './use-cache-management'
+import { formatDateTime } from '../../models/date-time'
 import {
   Activity,
   Check,
@@ -44,13 +45,6 @@ const formatNumber = (value?: number | null) => (
     ? new Intl.NumberFormat('ja-JP').format(value)
     : '—'
 )
-
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(date)
-}
 
 const updateNumber = (event: ChangeEvent<HTMLInputElement>) => (
   event.target.value === '' ? Number.NaN : Number(event.target.value)

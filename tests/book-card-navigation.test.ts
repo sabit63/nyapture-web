@@ -95,6 +95,8 @@ it('removes every thumbnail action during shredding and restores actions after c
   try {
     for (const selectMode of [false, true]) {
       await act(async () => { root.render(createElement(BookCard, { ...props, selectMode })) })
+      assert.equal(container.querySelector('time')?.textContent, '2026/09/06 09:00:00 JST')
+      assert.equal(container.querySelector('time')?.getAttribute('datetime'), book.uploadedTime)
       assert.equal(container.querySelector('.book-cover button, .book-cover a'), null)
       assert.equal(container.querySelector('.card-actions'), null)
     }

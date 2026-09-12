@@ -6,7 +6,7 @@ import {
 import type { ApiBookCardModel, DisplaySettings } from '../../api'
 import type { BookDownloadHubConnectionState } from '../../realtime/book-download-hub'
 import type { BookTag, HitomiAppend, NyaBookStatus, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
-import { getTagLabel, TAG_TYPE_ORDER } from '../../models'
+import { getTagLabel, SORT_TYPES, TAG_TYPE_ORDER } from '../../models'
 import {
   cloneCriteria,
   createSearchUrlForDestination,
@@ -114,8 +114,8 @@ export function useSearchController({
   const [missingTagsError, setMissingTagsError] = useState(() => validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(routeSearchParams).text)
   const [selectMode, setSelectMode] = useState(false)
-  const [sortType, setSortType] = useState<SortType>('uploaded')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const sortType = isWebSearch ? 'uploaded' : SORT_TYPES.find((type) => type === routeSearchParams.get('sort')) ?? 'uploaded'
+  const sortDirection: SortDirection = !isWebSearch && routeSearchParams.get('direction') === 'asc' ? 'asc' : 'desc'
   const [hitomiSortPeriod, setHitomiSortPeriod] = useState<HitomiSortPeriod>('recent')
   const [hitomiAppend, setHitomiAppend] = useState<HitomiAppend>(() => routeHitomiAppend)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -221,17 +221,22 @@ export function useSearchController({
     navigateSearchUrlFromRoute(removeContinuousSearchParams(new URL(routerLocation.href)))
   }, [navigateSearchUrlFromRoute, routerLocation.href])
 
-  const resetSearchOrder = useCallback(() => {
+  const resetSearchOrder = useCallback((nextSort = sortType, nextDirection = sortDirection) => {
     const url = removeContinuousSearchParams(new URL(routerLocation.href))
     url.searchParams.set('page', '1')
+    if (!isWebSearch) {
+      if (nextSort === 'uploaded') url.searchParams.delete('sort')
+      else url.searchParams.set('sort', nextSort)
+      if (nextDirection === 'desc') url.searchParams.delete('direction')
+      else url.searchParams.set('direction', nextDirection)
+    }
     navigateSearchUrlFromRoute(url)
-  }, [navigateSearchUrlFromRoute, routerLocation.href])
+  }, [isWebSearch, navigateSearchUrlFromRoute, routerLocation.href, sortType, sortDirection])
 
   const changeSortType = useCallback((next: SortType) => {
-    if (next === sortType) return
-    setSortType(next)
-    resetSearchOrder()
-  }, [resetSearchOrder, sortType])
+    if (isWebSearch || next === sortType) return
+    resetSearchOrder(next)
+  }, [isWebSearch, resetSearchOrder, sortType])
 
   const changeHitomiSortPeriod = useCallback((next: HitomiSortPeriod) => {
     if (next === hitomiSortPeriod) return
@@ -240,10 +245,9 @@ export function useSearchController({
   }, [hitomiSortPeriod, resetSearchOrder])
 
   const changeSortDirection = useCallback((next: SortDirection) => {
-    if (next === sortDirection) return
-    setSortDirection(next)
-    resetSearchOrder()
-  }, [resetSearchOrder, sortDirection])
+    if (isWebSearch || next === sortDirection) return
+    resetSearchOrder(sortType, next)
+  }, [isWebSearch, resetSearchOrder, sortType, sortDirection])
 
   const searchOperationScopeKey = `${routerLocation.pathname}\u0000${routerLocation.search}\u0000${sortType}\u0000${sortDirection}\u0000${hitomiSortPeriod}`
   const searchOperations = useSearchOperations({
@@ -425,9 +429,11 @@ export function useSearchController({
     const url = createSearchUrlForDestination(nextCriteria, {
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? hitomiAppend : undefined,
+      sortType,
+      sortDirection,
     })
     navigateSearchUrl(url)
-  }, [criteria, draftStatuses, isStatusSearch, draftMissingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query])
+  }, [criteria, draftStatuses, isStatusSearch, draftMissingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query, sortType, sortDirection])
 
   const getTagSearchHref = useCallback((tag: BookTag) => {
     const resolvedTag = resolveTag(tag)
@@ -439,9 +445,11 @@ export function useSearchController({
     const url = createSearchUrlForDestination(nextCriteria, {
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? hitomiAppend : undefined,
+      sortType,
+      sortDirection,
     })
     return url.href
-  }, [criteria.statuses, isStatusSearch, criteria.missingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled])
+  }, [criteria.statuses, isStatusSearch, criteria.missingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, sortType, sortDirection])
 
   const searchByTag = useCallback((tag: BookTag) => {
     navigateSearchUrl(new URL(getTagSearchHref(tag)))
@@ -561,6 +569,8 @@ export function useSearchController({
     const url = createSearchUrlForDestination(nextCriteria, {
       destination: currentSearchDestination,
       hitomiAppend: isWebSearch ? nextHitomiAppend : undefined,
+      sortType,
+      sortDirection,
     })
     if (isStatusSearch) {
       setQuery(nextCriteria.text)
@@ -573,7 +583,7 @@ export function useSearchController({
     }
     navigateSearchUrl(url)
     requestClose('submit')
-  }, [isStatusSearch, currentSearchDestination, draftCriteria, draftHitomiAppend, isWebSearch, isMissingTagSearch, navigateSearchUrl])
+  }, [isStatusSearch, currentSearchDestination, draftCriteria, draftHitomiAppend, isWebSearch, isMissingTagSearch, navigateSearchUrl, sortType, sortDirection])
 
   const goToResultPage = useCallback((page: number) => {
     const nextPage = Math.min(totalResultPages, Math.max(1, page))

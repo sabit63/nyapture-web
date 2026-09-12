@@ -355,7 +355,7 @@ export type TagAdditionalNameUpsertResponse = {
   updated?: number
 }
 
-export const SORT_TYPES = ['uploaded', 'title', 'pages'] as const
+export const SORT_TYPES = ['uploaded', 'title', 'pages', 'updated'] as const
 
 export type SortType = (typeof SORT_TYPES)[number]
 

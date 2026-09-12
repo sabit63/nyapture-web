@@ -362,6 +362,7 @@ export function SearchPage({ controller }: SearchPageProps) {
               ) : (
                 <select value={sortType} aria-label="並び順の種類" disabled={isSearchLoading} onChange={(event) => setSortType(event.target.value as typeof sortType)}>
                   <option value="uploaded">アップロード日時</option>
+                  <option value="updated">更新日</option>
                   <option value="title">タイトル順</option>
                   <option value="pages">ページ数順</option>
                 </select>

@@ -6,6 +6,65 @@ import { buildHitomiSearchUrl } from '../src/api/hitomi'
 import { navigate } from '../src/app/client-router'
 import { act, installHookDom, renderHook } from './helpers/react-hook'
 
+it('updated sort survives pagination, reload, history and new searches on library routes', async () => {
+  for (const path of ['/search', '/search/missing-tags', '/search/status']) {
+    const dom = installHookDom(`http://localhost${path}?q=sample&page=3`)
+    const requests: { sortType: string; isAsc: boolean; page: number }[] = []
+    globalThis.fetch = async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)))
+      return Response.json({ success: true, books: [], totalPage: 5 })
+    }
+    const mount = () => renderHook(() => useSearchController({
+      isWebSearch: false, isLibrarySearch: true, isMissingTagSearch: path.endsWith('missing-tags'),
+      isStatusSearch: path.endsWith('status'), isBookViewer: false, apiRevision: 0,
+      displaySettings: { thumbnailColumns: 5, colorTheme: 'default' },
+      hubConnectionState: 'idle', notify: () => {},
+    }), undefined)
+    let hook = await mount()
+    const expectSort = (asc: boolean, page: number) => {
+      assert.equal(hook.current.sortType, 'updated')
+      assert.equal(hook.current.sortDirection, asc ? 'asc' : 'desc')
+      assert.equal(requests.at(-1)?.sortType, 'UpdatedTime')
+      assert.equal(requests.at(-1)?.isAsc, asc)
+      assert.equal(requests.at(-1)?.page, page)
+    }
+    const traverse = async (direction: 'back' | 'forward') => {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          dom.window.addEventListener('popstate', () => resolve(), { once: true })
+          dom.window.history[direction]()
+        })
+      })
+    }
+    try {
+      await act(async () => { hook.current.setSortType('updated') })
+      expectSort(false, 1)
+      assert.equal(new URL(dom.window.location.href).searchParams.get('sort'), 'updated')
+      await act(async () => { hook.current.setSortDirection('asc') })
+      expectSort(true, 1)
+      await act(async () => { hook.current.goToResultPage(2) })
+      expectSort(true, 2)
+      await hook.unmount()
+      hook = await mount()
+      expectSort(true, 2)
+      await traverse('back')
+      expectSort(true, 1)
+      await traverse('back')
+      expectSort(false, 1)
+      await traverse('forward')
+      expectSort(true, 1)
+      const href = hook.current.getTagSearchHref({ type: 'Artists', name: 'artist' })
+      await act(async () => { hook.current.searchByTag({ type: 'Artists', name: 'artist' }) })
+      assert.equal(dom.window.location.href, href)
+      expectSort(true, 1)
+      await act(async () => { navigate(`${path}?sort=invalid&direction=invalid`) })
+      assert.equal(hook.current.sortType, 'uploaded')
+      assert.equal(hook.current.sortDirection, 'desc')
+      assert.equal(requests.at(-1)?.sortType, 'UploadedTime')
+    } finally { await hook.unmount(); dom.cleanup() }
+  }
+})
+
 it('Hitomi sort changes restart the search on page one and preserve the period during pagination', async () => {
   const dom = installHookDom('http://localhost/hitomila/search?q=sample&page=3')
   const requests: string[] = []

@@ -15,6 +15,7 @@ import './book-recommendations.css'
 import { RecommendationDebugContext, RecommendationLimitContext } from '../settings/RecommendationDebugContext'
 import { RecommendationHitDebug, RecommendationResponseDebug } from './RecommendationDebug'
 import { createTagSearchDestinationUrls } from '../search/search-utils'
+import { formatDateTime } from '../../models/date-time'
 
 const libraryTagHref = (tag: BookTag) => createTagSearchDestinationUrls(tag).library.href
 const searchLibraryTag = (tag: BookTag) => navigate(libraryTagHref(tag))
@@ -77,7 +78,7 @@ function RecommendationCard({ hit, displayNames, href, onSelect }: { hit: Recomm
     {isBook && <span className="recommendations__card-body">
       {book?.uploadedTime && <time className="recommendations__uploaded-time" dateTime={book.uploadedTime}>
         <CalendarDays size={11} aria-hidden="true" />
-        {book.uploadedTime.slice(0, 16).replace('T', ' ').replaceAll('-', '/')}
+        {formatDateTime(book.uploadedTime)}
       </time>}
       <strong>{title}</strong>
       <span className="recommendations__tags">{tags.filter((tag) => typeof tag === 'string').slice(0, 3).map((tag, index) => <span key={`${tag}:${index}`}>{getTagLabel(recommendationTag('Tags', tag, displayNames))}</span>)}</span>

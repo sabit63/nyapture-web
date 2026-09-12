@@ -44,7 +44,7 @@ async function mount(type: 'Book' | 'Artist' | 'Group', thumbnail: Recommendatio
     if (url.pathname.endsWith('/recommendations') || url.pathname.startsWith('/api/recommendations/entities/')) return new Response(JSON.stringify({
       status: 'success', tagDisplayNames: currentDisplayNames, items: url.searchParams.get('targetType') === type ? [{
         key: { entityType: type, tagName: 'candidate-name', groupId: 'g', bookId: 'b' },
-        book: type === 'Book' ? { title: 'Original book title' } : undefined,
+        book: type === 'Book' ? { title: 'Original book title', uploadedTime: '2026-09-12T15:00:01Z' } : undefined,
         commonTags: ['shared', 'blank', 'raw'],
         score: 0.125, signals: { titleRank: null, exactTagRank: 2 }, reasons: ['タグの一致'],
         entity: { totalBookCount: 4, thumbnailBook: currentThumbnail, representativeTags: ['shared', 'blank', 'raw'] },
@@ -259,7 +259,12 @@ for (const type of ['Book', 'Artist', 'Group'] as const) {
 }
 it('normal mode does not render debug details', async () => {
   const fixture = await mount('Book', null)
-  try { assert.equal(fixture.container.querySelector('.recommendations__debug'), null) }
+  try {
+    assert.equal(fixture.container.querySelector('.recommendations__debug'), null)
+    const time = fixture.container.querySelector('time')
+    assert.equal(time?.textContent, '2026/09/13 00:00:01 JST')
+    assert.equal(time?.getAttribute('datetime'), '2026-09-12T15:00:01Z')
+  }
   finally { await fixture.cleanup() }
 })
 

@@ -5,6 +5,25 @@ import type { SearchCriteria } from '../src/models'
 import { buildBookSearchFilter } from '../src/api/books'
 import { normalizeDisplaySettings, RESULT_LIMIT_OPTIONS } from '../src/api/display-settings-storage'
 
+test('all library sort types map to the API and external searches omit library sorting', () => {
+  const criteria = { ...emptyCriteria(), tagMode: 'or' as const, statuses: ['Standby' as const], missingTagTypes: ['Artists' as const] }
+  for (const [sort, apiSort] of [['uploaded', 'UploadedTime'], ['title', 'Title'], ['pages', 'TotalPage'], ['updated', 'UpdatedTime']] as const) {
+    for (const direction of ['asc', 'desc'] as const) {
+      const filter = buildBookSearchFilter(criteria, sort, direction)
+      assert.equal(filter.sortType, apiSort)
+      assert.equal(filter.isAsc, direction === 'asc')
+      assert.equal(filter.isAnd, false)
+      assert.deepEqual(filter.status, ['Standby'])
+      assert.deepEqual(filter.missingTagTypes, ['Artists'])
+    }
+  }
+  const url = createSearchUrlForDestination(criteria, {
+    destination: 'hitomi', origin: 'http://localhost', sortType: 'updated', sortDirection: 'asc',
+  })
+  assert.equal(url.searchParams.has('sort'), false)
+  assert.equal(url.searchParams.has('direction'), false)
+})
+
 test('search limits default to 50 and support 20, 50, and 100 for normal and missing-tag search', () => {
   for (const missingTagTypes of [[], ['Artists']] as const) {
     const criteria = { ...emptyCriteria(), missingTagTypes: [...missingTagTypes] }

@@ -102,12 +102,7 @@ export const formatBytes = (value?: number | null) => {
   return `${value < 0 ? '-' : ''}${new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(size)} ${units[unitIndex]}`
 }
 
-export const formatDateTime = (value?: string | null) => {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('ja-JP', { dateStyle: 'short', timeStyle: 'short' }).format(date)
-}
+export { formatDateTime } from '../../models/date-time'
 
 export const textValue = (value?: string | number | boolean | null) => (
   value === undefined || value === null || value === '' ? '—' : String(value)
@@ -119,4 +114,3 @@ export const ratio = (value?: number | null) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null
   return clamp(value, 0, 1)
 }
-

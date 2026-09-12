@@ -190,7 +190,7 @@ export const buildBookSearchFilter = (
     ...result,
     [tag.type]: [...(result[tag.type] ?? []), tag.name],
   }), {})
-  const apiSort = sortType === 'title' ? 'Title' : sortType === 'pages' ? 'TotalPage' : 'UploadedTime'
+  const apiSort = sortType === 'title' ? 'Title' : sortType === 'pages' ? 'TotalPage' : sortType === 'updated' ? 'UpdatedTime' : 'UploadedTime'
 
   return {
     tagSet: criteria.tags.length ? tagSet : undefined,

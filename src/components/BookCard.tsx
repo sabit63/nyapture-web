@@ -21,9 +21,8 @@ import { Dialog, DialogBody, DialogHeader } from './ui/Dialog'
 import { IconButton } from './ui/IconButton'
 import { TAG_TYPE_LABELS, TAG_TYPE_ORDER } from '../models'
 import type { BookTag } from '../models'
+import { formatDateTime } from '../models/date-time'
 import './book-card.css'
-
-const formatDisplayDate = (uploadedTime: string) => uploadedTime.slice(0, 16).replace('T', ' ').replaceAll('-', '/')
 
 export type BookCardProps = {
   book: ApiBookCardModel
@@ -250,7 +249,7 @@ export function BookCard({
         <div className="book-card__title-row">
           <time className="book-card__uploaded-time" dateTime={book.uploadedTime}>
             <CalendarDays size={11} aria-hidden="true" />
-            {formatDisplayDate(book.uploadedTime)}
+            {formatDateTime(book.uploadedTime)}
           </time>
           <h3>
             {onOpen ? (
