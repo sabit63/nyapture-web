@@ -1,4 +1,5 @@
 import type { BookCardModel } from '../../models'
+import { ApiError } from '../../api/client'
 
 export type SearchBookIdentity = Pick<BookCardModel, 'groupId' | 'bookId' | 'url'>
 
@@ -50,6 +51,9 @@ export const replaceSearchBookByIdentity = <T extends SearchBookIdentity>(
 ) => {
   const index = findSearchBookIndex(books, original, refreshed)
   if (index < 0) return [...books]
+  if (books.some((book, currentIndex) => currentIndex !== index && identityKey(book) === identityKey(refreshed))) {
+    throw new ApiError('再取得したBookのIDが別の検索結果と重複しています。元のBookを保持しました。', { category: 'validation' })
+  }
   return books.map((book, currentIndex) => currentIndex === index ? refreshed : book)
 }
 
@@ -67,7 +71,7 @@ export const replaceSearchBookAndSelection = <T extends SearchBookIdentity>(
   const refreshedKey = identityKey(refreshed)
   const selected = [...new Set(state.selected.map((key) => sourceKeys.has(key) ? refreshedKey : key))]
   return {
-    books: state.books.map((book, currentIndex) => currentIndex === index ? refreshed : book),
+    books: replaceSearchBookByIdentity(state.books, original, refreshed),
     selected,
   }
 }

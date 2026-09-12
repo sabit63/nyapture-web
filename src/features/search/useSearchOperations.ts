@@ -11,7 +11,7 @@ import {
   startBookDownload,
 } from '../../api'
 import type { ApiBookCardModel } from '../../api'
-import { findSearchBookIndex } from './search-book-download'
+import { findSearchBookIndex, replaceSearchBookByIdentity } from './search-book-download'
 import type { BookCardModel, BookDownloadStatus } from '../../models'
 import { bookDownloadHubClient } from '../../realtime/book-download-hub'
 import { applySearchBookDownloadStatus, normalizeSearchBookDownloadStatus } from '../../realtime/search-book-status'
@@ -262,14 +262,8 @@ export function useSearchOperations({
       replaceWebSearchBook(book, refreshed)
       return
     }
-    setLibrarySearchBooks((current) => {
-      const index = findSearchBookIndex(current, book, refreshed)
-      if (index < 0) return current
-      const next = [...current]
-      next[index] = refreshed
-      return next
-    })
-  }, [isWebSearch, replaceWebSearchBook, setLibrarySearchBooks])
+    setLibrarySearchBooks(replaceSearchBookByIdentity(searchResultsRef.current.librarySearchBooks, book, refreshed))
+  }, [isWebSearch, replaceWebSearchBook, searchResultsRef, setLibrarySearchBooks])
 
   const fetchResultBook = useCallback(async (book: BookCardModel, signal?: AbortSignal) => {
     let refreshed: ApiBookCardModel
@@ -392,9 +386,9 @@ export function useSearchOperations({
             continue
           }
           if (controller.signal.aborted) return
-          succeeded++
-          setSelected((keys) => keys.filter((value) => value !== key))
           if (refreshed) replaceResultBook(current, refreshed)
+          succeeded++
+          setSelected((keys) => keys.filter((value) => value !== key && (!refreshed || value !== getBookIdentityKey(refreshed))))
         } catch {
           if (controller.signal.aborted) return
           markBookFailed(current)

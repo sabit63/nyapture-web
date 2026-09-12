@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
-import { useState } from 'react'
+import { createElement, useState } from 'react'
+import { createRoot } from 'react-dom/client'
 import { mapEBookToCard } from '../src/api/books'
 import { getBookIdentityKey } from '../src/features/library/book-deletion'
 import { useSearchOperations } from '../src/features/search/useSearchOperations'
@@ -13,6 +14,62 @@ const books = Array.from({ length: 5 }, (_, index) => mapEBookToCard({
 }))
 type Scope = { routeKey: string; apiRevision: number }
 const scope: Scope = { routeKey: '/search', apiRevision: 0 }
+
+for (const isWebSearch of [false, true]) {
+  it(`bulk refresh rejects colliding IDs and leaves no old ${isWebSearch ? 'web' : 'library'} cards after paging`, async (t) => {
+    const dom = installHookDom()
+    const errors = t.mock.method(console, 'error', () => {})
+    const messages: string[] = []
+    const makeBook = (id: string) => mapEBookToCard({
+      groupId: 'g', bookId: id, title: id, url: `https://example.test/${id}`, status: 'Downloaded',
+    })
+    globalThis.fetch = async () => Response.json({ success: true, book: makeBook('shared') })
+    const resultKey = isWebSearch ? 'webSearchResultBooks' : 'librarySearchBooks'
+    const setSelectMode = () => {}
+    const notify = (message: string) => { messages.push(message) }
+    const useProbe = () => {
+      const results = useSearchResults()
+      const operations = useSearchOperations({
+        ...results, ...scope, isWebSearch, searchResultsRef: results.stateRef, setSelectMode, notify,
+      })
+      return { ...results, ...operations }
+    }
+    let current!: ReturnType<typeof useProbe>
+    function Probe() {
+      current = useProbe()
+      // Match the result grid's identity keys so duplicate-key DOM remnants are observable.
+      return createElement('ul', null, current[resultKey].map((book) => (
+        createElement('li', { key: getBookIdentityKey(book) }, book.title)
+      )))
+    }
+    const container = document.body.appendChild(document.createElement('div'))
+    const root = createRoot(container)
+    const setBooks = (next: ReturnType<typeof makeBook>[]) => {
+      if (isWebSearch) current.updateWebSearchResultBooks(next)
+      else current.setLibrarySearchBooks(next)
+    }
+    try {
+      await act(async () => { root.render(createElement(Probe)) })
+      await act(async () => {
+        const initial = ['A', 'B', 'C'].map(makeBook)
+        setBooks(initial)
+        current.setSelected(initial.map(getBookIdentityKey))
+      })
+      await act(async () => { await current.refreshSelectedBooks() })
+      assert.deepEqual(current[resultKey].map((book) => book.bookId), ['shared', 'B', 'C'])
+      assert.deepEqual(current.selected, ['g\u0000B', 'g\u0000C'])
+      assert.deepEqual([...current.failedBookKeys], ['g\u0000B', 'g\u0000C'])
+      assert.match(messages[0], /1件を読み込みました、2件は失敗しました/)
+      await act(async () => { setBooks(['D', 'E', 'F'].map(makeBook)) })
+      assert.deepEqual([...container.querySelectorAll('li')].map((item) => item.textContent), ['D', 'E', 'F'])
+      assert.equal(errors.mock.calls.length, 0)
+    } finally {
+      await act(async () => { root.unmount() })
+      errors.mock.restore()
+      dom.cleanup()
+    }
+  })
+}
 
 async function setup() {
   const dom = installHookDom()
