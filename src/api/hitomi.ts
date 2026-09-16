@@ -38,7 +38,7 @@ const safePage = (value: unknown) => {
 
 const tagFieldFor = (tagType: unknown, append: unknown) => {
   if (tagType === 'Languages') return HITOMI_TAG_FIELDS.Languages
-  if (append === 'Male' || append === 'Female') return append.toLocaleLowerCase()
+  if (tagType === 'Tags' && (append === 'Male' || append === 'Female')) return append.toLocaleLowerCase()
   return typeof tagType === 'string' && tagType in HITOMI_TAG_FIELDS
     ? HITOMI_TAG_FIELDS[tagType as NyaTagType]
     : HITOMI_TAG_FIELDS.Unknown
