@@ -15,6 +15,7 @@ export type SearchUrlSyncOptions = {
   isWebSearch: boolean
   isLibrarySearch: boolean
   isStatusSearch?: boolean
+  isRandomSearch?: boolean
   isMissingTagSearch: boolean
   routeBindingsRef?: { current: SearchRouteStateBindings | null }
 }
@@ -99,6 +100,7 @@ export function useSearchUrlSync({
   isLibrarySearch,
   isMissingTagSearch,
   isStatusSearch = false,
+  isRandomSearch = false,
   routeBindingsRef,
 }: SearchUrlSyncOptions) {
   const routerLocation = useRouterLocation()
@@ -108,7 +110,7 @@ export function useSearchUrlSync({
     [isStatusSearch, isMissingTagSearch, isWebSearch, routeSearchParams],
   )
   const routeHitomiAppend = isWebSearch ? parseHitomiAppend(routeSearchParams) : 'Normal'
-  const routeResultPage = parsePageParam(routeSearchParams.get('page'))
+  const routeResultPage = isRandomSearch ? 1 : parsePageParam(routeSearchParams.get('page'))
 
   const navigateSearchUrl = useCallback<SearchRouteSyncNavigation>((url, onSameUrl) => {
     if (url.href === routerLocation.href) {
@@ -139,7 +141,10 @@ export function useSearchUrlSync({
 
   const synchronizeRouteState = useCallback((bindings: SearchRouteStateBindings) => {
     if (!isLibrarySearch && !isWebSearch) return false
-    bindings.setCriteria(cloneCriteria(routeCriteria))
+    // Switching the random result's reading view must preserve the current draw.
+    bindings.setCriteria((current) => isRandomSearch
+      && searchCriteriaRouteKey(current, 'Normal', 1, false) === searchCriteriaRouteKey(routeCriteria, 'Normal', 1, false)
+      ? current : cloneCriteria(routeCriteria))
     bindings.setQuery(routeCriteria.text)
     bindings.setDraftStatuses?.([...(routeCriteria.statuses ?? [])])
     bindings.setDraftMissingTagTypes([...(routeCriteria.missingTagTypes ?? [])])
@@ -151,7 +156,7 @@ export function useSearchUrlSync({
     bindings.setAdvancedErrors({})
     bindings.setSelected([])
     return true
-  }, [isLibrarySearch, isMissingTagSearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage])
+  }, [isRandomSearch, isLibrarySearch, isMissingTagSearch, isWebSearch, routeCriteria, routeHitomiAppend, routeResultPage])
 
   useEffect(() => {
     const bindings = routeBindingsRef?.current

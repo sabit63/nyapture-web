@@ -5,6 +5,7 @@ import * as dashboard from '../src/api/dashboard'
 import * as cache from '../src/api/web-cache'
 import { ApiError, configureApi, getApiSettings } from '../src/api/client'
 import type { WebBookCacheConfigDto } from '../src/api/dto/web-cache'
+import type { BookGroupedSearchRequest, BookSearchFilter } from '../src/models'
 
 const originalFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = originalFetch })
@@ -18,6 +19,8 @@ type Request = (signal?: AbortSignal) => Promise<unknown>
 // These wrappers intentionally return wire responses; application checks belong to callers.
 const rawRequests: Record<string, Request> = {
   searchBooks: (s) => endpoints.searchBooks({}, s),
+  searchRandomBooks: (s) => endpoints.searchRandomBooks({}, s),
+  searchBooksGrouped: (s) => endpoints.searchBooksGrouped({ keyTagType: 'Artists' }, s),
   getBook: (s) => endpoints.getBook('g', 'b', s),
   updateBookTitle: (s) => endpoints.updateBookTitle('g', 'b', 'title', s),
   deleteBookPhysical: (s) => endpoints.deleteBookPhysical('g', 'b', s),
@@ -66,6 +69,36 @@ const rawRequests: Record<string, Request> = {
   getDashboardLogEntries: (s) => dashboard.getDashboardLogEntries(0, undefined, s),
   clearDashboardLogs: dashboard.clearDashboardLogs,
 }
+
+it('book searches send page URL options in JSON and grouped options never use query parameters', async () => {
+  const filter: BookSearchFilter = { limit: null, includePageUrls: false }
+  const grouped: BookGroupedSearchRequest = {
+    keyTagType: 'Artists', page: 2, groupsPerPage: 10, booksPerGroup: 3,
+    groupSortType: 'LatestBook', isAscending: false, filter,
+  }
+  const book = { groupId: 'g', bookId: 'b', totalPage: 3, pageUrls: null }
+  const cases = [
+    { path: '/api/book/search', body: filter, request: () => endpoints.searchBooks(filter), response: { books: [book] } },
+    { path: '/api/book/search/random', body: filter, request: () => endpoints.searchRandomBooks(filter), response: { books: [book], totalCount: 1 } },
+    { path: '/api/book/search/grouped', body: grouped, request: () => endpoints.searchBooksGrouped(grouped), response: {
+      groups: [{ keyTagValue: null, keyTagDisplayName: '未所属', books: [book] }],
+    } },
+  ]
+  for (const { path, body, request, response } of cases) {
+    let calls = 0
+    globalThis.fetch = async (input, init) => {
+      calls += 1
+      const url = new URL(String(input))
+      assert.equal(url.pathname, path)
+      assert.equal(url.search, '')
+      assert.equal(init?.method, 'POST')
+      assert.deepEqual(JSON.parse(String(init?.body)), body)
+      return new Response(JSON.stringify(response), { headers: { 'Content-Type': 'application/json' } })
+    }
+    assert.deepEqual(await request(), response)
+    assert.equal(calls, 1)
+  }
+})
 
 for (const [name, request] of Object.entries(rawRequests)) {
   it(`${name} preserves direct/envelope/failure/missing-data wire responses`, async () => {
@@ -120,6 +153,7 @@ it('sends both configured keys for mutations, including Dashboard and Web Book r
         const headers = new Headers(init?.headers)
         const readOnly = (init?.method ?? 'GET') === 'GET'
           || path.endsWith('/search') || path === '/api/web/page'
+          || path === '/api/book/search/random' || path === '/api/book/search/grouped'
         assert.equal(headers.get('X-Api-Key'), 'read-key', name)
         assert.equal(headers.get('X-Edit-Api-Key'), readOnly ? null : 'edit-key', name)
         return new Response(JSON.stringify({ success: true, data: {} }), {

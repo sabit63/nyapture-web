@@ -204,6 +204,7 @@ export const buildBookSearchFilter = (
     sortType: apiSort,
     isAsc: direction === 'asc',
     isAnd: criteria.tagMode === 'and',
+    includePageUrls: false,
     limit,
     page,
   }

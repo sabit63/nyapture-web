@@ -1,4 +1,4 @@
-import { Download, Gauge, Globe2, ListFilter, Search } from 'lucide-react'
+import { Download, Gauge, Globe2, Library, ListFilter, Search, Shuffle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type NavigationItem = {
@@ -17,6 +17,8 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'ライブラリ',
     items: [
       { label: '検索', icon: Search, href: '/search' },
+      { label: 'ランダム', icon: Shuffle, href: '/search/random' },
+      { label: 'グループ', icon: Library, href: '/search/grouped' },
       { label: '未タグ検索', icon: ListFilter, href: '/search/missing-tags' },
       { label: 'ステータス検索', icon: ListFilter, href: '/search/status' },
     ],

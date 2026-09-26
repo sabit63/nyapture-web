@@ -25,6 +25,8 @@ type Props = Pick<SearchController,
   | 'refreshWebBook'
   | 'downloadWebBook'> & {
   isSearchLoading: boolean
+  allowContinuous?: boolean
+  onColumnsChange?: (columns: number) => void
   onDetailsRequest: (book: ApiBookCardModel, trigger: HTMLButtonElement) => void
 }
 
@@ -47,18 +49,21 @@ export const SearchResultsGrid = memo(function SearchResultsGrid({
   refreshWebBook,
   downloadWebBook,
   isSearchLoading,
+  allowContinuous = true,
+  onColumnsChange,
   onDetailsRequest,
 }: Props) {
   return (
     <BookGrid
       settings={displaySettings}
+      onColumnsChange={onColumnsChange}
       aria-busy={isSearchLoading}
       inert={isSearchLoading ? true : undefined}
     >
       {visibleBooks.map((book) => {
         const bookKey = getBookIdentityKey(book)
         const deletionPending = pendingDeletionKeys.has(bookKey)
-        const canStartContinuous = !isWebSearch && !selectMode && isReadableBook(book)
+        const canStartContinuous = allowContinuous && !isWebSearch && !selectMode && isReadableBook(book)
         return (
           <BookCard
             key={bookKey}

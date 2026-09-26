@@ -39,7 +39,7 @@ type SearchContinuousReaderProps = {
   isLoading: boolean
   onActiveBookChange: (book: ApiBookCardModel) => void
   onBookJump: (book: ApiBookCardModel) => void
-  onResultPageChange: (page: number) => void
+  onResultPageChange?: (page: number) => void
   getTagSearchHref: (tag: BookTag) => string
   onTagSearch: (tag: BookTag) => void
 }
@@ -303,7 +303,7 @@ export function SearchContinuousReader({
         })}
       </div>
 
-      {revealedEnd >= books.length - 1 && (
+      {onResultPageChange && revealedEnd >= books.length - 1 && (
         <nav className="continuous-reader__result-navigation" aria-label="検索結果の前後ページ">
           <Button
             type="button"

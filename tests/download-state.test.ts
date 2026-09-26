@@ -35,6 +35,16 @@ const project = (status: BookDownloadStatus): DownloadProjection => (
   projectDownloadSnapshot(createEmptyDownloadProjection(), { current: status }, { authoritative: true })
 )
 
+test('snapshot URL keys remain available for item commands when book.url is absent', () => {
+  const url = 'https://example.test/books/book-1'
+  for (const book of [{ title: 'Example' }, { groupId: 'group-1', bookId: 'book-1' }]) {
+    const status = makeStatus('Paused', 2, undefined, { book })
+    const snapshot = projectDownloadSnapshot(createEmptyDownloadProjection(), { [url]: status }, { authoritative: true })
+    assert.equal(snapshot.downloads[0]?.url, url)
+    assert.equal(status.book?.url, undefined, 'the API response must not be mutated')
+  }
+})
+
 test('running downloads stay first and stable while only other downloads follow the selected sort', () => {
   const base = project(makeStatus('Running', 2)).downloads[0]!
   const downloads = [

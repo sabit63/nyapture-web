@@ -119,7 +119,7 @@ export const criteriaHasValues = (criteria: SearchCriteria) => Boolean(
   || criteria.pagesMax,
 )
 
-export type SearchDestination = 'library' | 'hitomi' | 'missing-tags' | 'status'
+export type SearchDestination = 'library' | 'hitomi' | 'missing-tags' | 'status' | 'random' | 'grouped'
 
 export const createSearchUrlForDestination = (
   criteria: SearchCriteria,
@@ -128,7 +128,8 @@ export const createSearchUrlForDestination = (
   const isHitomiSearch = options.destination === 'hitomi'
   const isMissingTagSearch = options.destination === 'missing-tags'
   const isStatusSearch = options.destination === 'status'
-  const pathname = isStatusSearch ? '/search/status' : isHitomiSearch ? '/hitomila/search' : isMissingTagSearch ? '/search/missing-tags' : '/search'
+  const isRandomSearch = options.destination === 'random'
+  const pathname = options.destination === 'grouped' ? '/search/grouped' : isRandomSearch ? '/search/random' : isStatusSearch ? '/search/status' : isHitomiSearch ? '/hitomila/search' : isMissingTagSearch ? '/search/missing-tags' : '/search'
   const url = new URL(toPublicPath(pathname), options.origin ?? window.location.origin)
   const text = criteria.text.trim()
   const tags = isHitomiSearch
@@ -154,10 +155,19 @@ export const createSearchUrlForDestination = (
     else criteria.statuses.forEach((status) => url.searchParams.append('status', status))
   }
   if (isHitomiSearch) url.searchParams.set('append', options.hitomiAppend ?? 'Normal')
-  if (!isHitomiSearch && options.sortType && options.sortType !== 'uploaded') url.searchParams.set('sort', options.sortType)
-  if (!isHitomiSearch && options.sortDirection === 'asc') url.searchParams.set('direction', 'asc')
-  url.searchParams.set('page', '1')
+  if (!isHitomiSearch && !isRandomSearch && options.sortType && options.sortType !== 'uploaded') url.searchParams.set('sort', options.sortType)
+  if (!isHitomiSearch && !isRandomSearch && options.sortDirection === 'asc') url.searchParams.set('direction', 'asc')
+  if (!isRandomSearch) url.searchParams.set('page', '1')
   return url
+}
+
+export const createGroupBooksUrl = (criteria: SearchCriteria, type: NyaTagType, value: string | null, origin?: string) => {
+  const next = cloneCriteria(criteria)
+  if (next.tagMode === 'or') next.tags = []
+  next.tagMode = 'and'
+  if (value === null) next.missingTagTypes = [type]
+  else if (!next.tags.some((tag) => sameTag(tag, { type, name: value }))) next.tags.push({ type, name: value })
+  return createSearchUrlForDestination(next, { destination: value === null ? 'missing-tags' : 'library', origin })
 }
 
 export const createTagSearchDestinationUrls = (

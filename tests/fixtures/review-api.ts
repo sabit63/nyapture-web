@@ -8,6 +8,7 @@ const config = {
 }
 let failConfig = false
 let clearRequests = 0
+let randomDraw = 0
 const webBook = { title: 'Fixture web candidate', url: 'https://example.com/book/fixture', totalPage: 3, tagSet: { Artist: ['fixture-artist'] }, status: 'WebBook' }
 const savedBook = { ...webBook, groupId: 'fixture', bookId: 'saved', title: 'Fixture saved book', totalPage: 12, status: 'Downloaded' }
 createServer((request, response) => {
@@ -30,6 +31,23 @@ createServer((request, response) => {
   if (path.endsWith('/config/validate')) return send({ success: true, data: { isValid: true, errors: [] } })
   if (path.endsWith('/web-cache/status')) return send({ success: true, data: { isRunning: false, pagesLoaded: 12 } })
   if (path === '/api/book/search') return send({ success: true, books: [], totalPage: 1, tags: [] })
+  if (path === '/api/book/search/grouped') {
+    let body = ''
+    request.on('data', (chunk) => { body += chunk })
+    request.on('end', () => {
+      const { booksPerGroup = 4 } = JSON.parse(body)
+      send({ success: true, totalPage: 3, totalGroupCount: 24, groups: [
+        { keyTagValue: 'artist-a', keyTagDisplayName: '作者A', totalBooksCount: 24,
+          books: Array.from({ length: booksPerGroup }, (_, index) => ({ ...savedBook, bookId: `shelf-${index}`, title: `本棚の本 ${index + 1}`, pageUrls: null, tagSet: { Artists: ['artist-a'] } })) },
+        { keyTagValue: null, keyTagDisplayName: '未所属', totalBooksCount: 12,
+          books: Array.from({ length: booksPerGroup }, (_, index) => ({ ...savedBook, bookId: `unassigned-${index}`, title: `未所属の本 ${index + 1}`, pageUrls: null, tagSet: {} })) },
+      ] })
+    })
+    return
+  }
+  if (path === '/api/book/search/random') return send({ success: true, books: [
+    { ...savedBook, bookId: `random-${++randomDraw}`, title: `Fixture random draw ${randomDraw}`, pageUrls: null },
+  ], totalPage: 1, totalCount: 1, tags: [] })
   if (path === '/api/web-cache/search') return send({ success: true, books: [], totalPage: 1 })
   if (path.endsWith('/datastore')) return send({ success: true, data: { provider: 'Fixture', isConnected: true, resources: [], statistics: {} } })
   if (path.endsWith('/cache/metrics')) return send({ success: true, data: { entryCount: 0, clearStatus: { state: 'Completed', processedEntries: 4, deletedEntries: 4, failedEntries: 0, totalEntries: 4 } } })

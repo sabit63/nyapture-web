@@ -52,7 +52,7 @@ export const TAG_SEARCH_SORT_TYPES = ['Type', 'Name', 'Created', 'Count'] as con
 
 export type TagSearchSortType = (typeof TAG_SEARCH_SORT_TYPES)[number]
 
-export const BOOK_GROUP_SORT_TYPES = ['BookCount', 'TagName'] as const
+export const BOOK_GROUP_SORT_TYPES = ['BookCount', 'TagName', 'LatestBook'] as const
 
 export type BookGroupSortType = (typeof BOOK_GROUP_SORT_TYPES)[number]
 
@@ -114,7 +114,7 @@ export type EBook = {
   totalPage?: number
   tagSet?: TagSet
   uploadedTime?: string
-  pageUrls?: string[]
+  pageUrls?: string[] | null
   status?: NyaBookStatus
 }
 
@@ -150,8 +150,8 @@ export type BookDeletionJobResponse = NyaApiResponse & {
 
 export type EBookGroup = {
   keyTagType?: string
-  keyTagValue?: string
-  keyTagDisplayName?: string
+  keyTagValue?: string | null
+  keyTagDisplayName?: string | null
   totalBooksCount?: number
   books?: EBook[]
 }
@@ -183,8 +183,19 @@ export type BookSearchFilter = {
   sortType?: BookSearchSortType
   isAsc?: boolean
   isAnd?: boolean
-  limit?: number
+  includePageUrls?: boolean
+  limit?: number | null
   page?: number
+}
+
+export type BookGroupedSearchRequest = {
+  keyTagType: NyaTagType
+  page?: number
+  groupsPerPage?: number
+  booksPerGroup?: number
+  groupSortType?: BookGroupSortType
+  isAscending?: boolean
+  filter?: BookSearchFilter
 }
 
 export type BookTitleUpdateRequest = {

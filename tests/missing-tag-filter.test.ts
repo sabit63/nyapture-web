@@ -156,7 +156,9 @@ test('missing-tag URLs preserve ordinary filters and the API uses both sets of c
 test('missing-tag navigation and titles distinguish the dedicated route', () => {
   const items = navigationGroups[0].items
   assert.equal(isNavigationItemActive(items[0], '/search/missing-tags'), false)
-  assert.equal(isNavigationItemActive(items[1], '/search/missing-tags'), true)
+  const missingTagItem = items.find((item) => item.href === '/search/missing-tags')
+  assert.ok(missingTagItem)
+  assert.equal(isNavigationItemActive(missingTagItem, '/search/missing-tags'), true)
   const title = formatSearchPageTitle({
     isWebSearch: false,
     isLibrarySearch: true,

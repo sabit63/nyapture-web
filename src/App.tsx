@@ -40,7 +40,9 @@ function App() {
   const isWebCache = currentPath === '/web-cache'
   const isMissingTagSearch = currentPath === '/search/missing-tags'
   const isStatusSearch = currentPath === '/search/status'
-  const isLibrarySearch = currentPath === '/search' || isMissingTagSearch || isStatusSearch
+  const isRandomSearch = currentPath === '/search/random'
+  const isGroupedSearch = currentPath === '/search/grouped'
+  const isLibrarySearch = currentPath === '/search' || isMissingTagSearch || isStatusSearch || isRandomSearch || isGroupedSearch
   const isBookViewer = currentPath === '/book/viewer'
   const isDownloadManager = currentPath === '/download/book'
   const isDashboard = currentPath === '/dashboard' || currentPath.startsWith('/dashboard/')
@@ -71,6 +73,8 @@ function App() {
     isLibrarySearch,
     isMissingTagSearch,
     isStatusSearch,
+    isRandomSearch,
+    isGroupedSearch,
     isBookViewer,
     apiRevision: apiSettingsController.apiRevision,
     displaySettings: apiSettingsController.displaySettings,

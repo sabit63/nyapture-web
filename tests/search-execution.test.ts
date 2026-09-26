@@ -9,6 +9,7 @@ import type { BookDownloadHubListener } from '../src/realtime/book-download-hub'
 import { bookDownloadHubClient } from '../src/realtime/book-download-hub'
 import type { BookDownloadStatus, SearchCriteria } from '../src/models'
 import { emptyCriteria } from '../src/features/search/search-utils'
+import { isReadableBook } from '../src/features/search/search-continuous-utils'
 import {
   applyBufferedSearchStatusesToSnapshot,
   shouldApplySearchStatusImmediately,
@@ -28,6 +29,7 @@ const responseFor = (title: string) => new Response(JSON.stringify({
     url: 'https://hitomi.la/galleries/book-1.html',
     title,
     totalPage: 2,
+    pageUrls: null,
     status: 'Downloading',
   }],
   totalPage: 1,
@@ -91,7 +93,12 @@ test('search treats HTTP 200 with no results as success and retains other error 
       { isStatusSearch: true, criteria: { ...EMPTY_CRITERIA, statuses: ['Downloading'] as const } },
     ]) {
       for (const status of [200, 202, 500]) {
-        globalThis.fetch = async () => new Response(JSON.stringify({ success: false, message: 'private details' }), { status })
+        globalThis.fetch = async (input, init) => {
+          if (new URL(String(input)).pathname === '/api/book/search') {
+            assert.equal(JSON.parse(String(init?.body)).includePageUrls, false)
+          }
+          return new Response(JSON.stringify({ success: false, message: 'private details' }), { status })
+        }
         const mounted = await mountExecution({ apiRevision: 1, ...mode } as ExecutionProps)
         try {
           await act(flushPromises)
@@ -167,6 +174,9 @@ test('execution buffers realtime completion into the current snapshot and unsubs
     await act(flushPromises)
 
     assert.equal(mounted.current.libraryBooks[0]?.status, 'Downloaded')
+    assert.deepEqual(mounted.current.libraryBooks[0].pageUrls, [])
+    assert.equal(mounted.current.libraryBooks[0].totalPage, 2)
+    assert.equal(isReadableBook(mounted.current.libraryBooks[0]), true)
     assert.equal(mounted.current.libraryBooks[0]?.title, 'buffered')
     assert.equal(mounted.current.searchResultGeneration, 1)
   } finally {

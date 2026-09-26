@@ -5,8 +5,8 @@ import {
 } from '../../api'
 import type { ApiBookCardModel, DisplaySettings } from '../../api'
 import type { BookDownloadHubConnectionState } from '../../realtime/book-download-hub'
-import type { BookTag, HitomiAppend, NyaBookStatus, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
-import { getTagLabel, SORT_TYPES, TAG_TYPE_ORDER } from '../../models'
+import type { BookGroupSortType, BookTag, HitomiAppend, NyaBookStatus, NyaTagType, SearchCriteria, SortDirection, SortType } from '../../models'
+import { BOOK_GROUP_SORT_TYPES, getTagLabel, SORT_TYPES, TAG_TYPE_ORDER } from '../../models'
 import {
   cloneCriteria,
   createSearchUrlForDestination,
@@ -49,6 +49,8 @@ type SearchControllerOptions = {
   isWebSearch: boolean
   isLibrarySearch: boolean
   isStatusSearch?: boolean
+  isRandomSearch?: boolean
+  isGroupedSearch?: boolean
   isMissingTagSearch: boolean
   isBookViewer: boolean
   apiRevision: number
@@ -70,6 +72,8 @@ export function useSearchController({
   isLibrarySearch,
   isMissingTagSearch,
   isStatusSearch = false,
+  isRandomSearch = false,
+  isGroupedSearch = false,
   isBookViewer,
   apiRevision,
   displaySettings,
@@ -91,6 +95,7 @@ export function useSearchController({
     isLibrarySearch,
     isMissingTagSearch,
     isStatusSearch,
+    isRandomSearch,
     routeBindingsRef: searchRouteBindingsRef,
   })
   const {
@@ -105,7 +110,7 @@ export function useSearchController({
     stateRef: searchResultsStateRef,
   } = useSearchResults()
   const searchResultBooks = isWebSearch ? webSearchResultBooks : librarySearchBooks
-  const searchView = parseSearchViewMode(routeSearchParams, isLibrarySearch)
+  const searchView = parseSearchViewMode(routeSearchParams, isLibrarySearch && !isGroupedSearch)
   const continuousStart = parseSearchStartIdentity(routeSearchParams, isLibrarySearch)
   const [criteria, setCriteria] = useState<SearchCriteria>(() => cloneCriteria(routeCriteria))
   const [draftStatuses, setDraftStatuses] = useState<NyaBookStatus[]>(() => [...(routeCriteria.statuses ?? [])])
@@ -114,8 +119,11 @@ export function useSearchController({
   const [missingTagsError, setMissingTagsError] = useState(() => validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(routeSearchParams).text)
   const [selectMode, setSelectMode] = useState(false)
-  const sortType = isWebSearch ? 'uploaded' : SORT_TYPES.find((type) => type === routeSearchParams.get('sort')) ?? 'uploaded'
-  const sortDirection: SortDirection = !isWebSearch && routeSearchParams.get('direction') === 'asc' ? 'asc' : 'desc'
+  const [groupColumns, setGroupColumns] = useState<number>(displaySettings.thumbnailColumns)
+  const sortType = isWebSearch || isRandomSearch || isGroupedSearch ? 'uploaded' : SORT_TYPES.find((type) => type === routeSearchParams.get('sort')) ?? 'uploaded'
+  const groupBy = TAG_TYPE_ORDER.find((type) => type === routeSearchParams.get('groupBy')) ?? 'Artists'
+  const groupSort = BOOK_GROUP_SORT_TYPES.find((type) => type === routeSearchParams.get('groupSort')) ?? 'LatestBook'
+  const sortDirection: SortDirection = !isWebSearch && !isRandomSearch && routeSearchParams.get('direction') === 'asc' ? 'asc' : 'desc'
   const [hitomiSortPeriod, setHitomiSortPeriod] = useState<HitomiSortPeriod>('recent')
   const [hitomiAppend, setHitomiAppend] = useState<HitomiAppend>(() => routeHitomiAppend)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -151,7 +159,7 @@ export function useSearchController({
     setAdvancedErrors,
     setSelected,
   }
-  const currentSearchDestination: SearchDestination = isWebSearch ? 'hitomi' : isStatusSearch ? 'status' : isMissingTagSearch ? 'missing-tags' : 'library'
+  const currentSearchDestination: SearchDestination = isWebSearch ? 'hitomi' : isGroupedSearch ? 'grouped' : isRandomSearch ? 'random' : isStatusSearch ? 'status' : isMissingTagSearch ? 'missing-tags' : 'library'
   const routeStateSynchronized = isRouteStateSynchronized({
     criteria,
     hitomiAppend,
@@ -164,8 +172,13 @@ export function useSearchController({
     isLibrarySearch,
     isMissingTagSearch,
     isStatusSearch,
+    isRandomSearch,
     apiRevision,
+    isGroupedSearch,
+    groupBy,
+    groupSort,
     criteria,
+    booksPerGroup: isGroupedSearch ? (displaySettings.autoThumbnailColumns ? groupColumns : displaySettings.thumbnailColumns) : undefined,
     hitomiAppend,
     hitomiSortPeriod,
     resultPage,
@@ -184,8 +197,13 @@ export function useSearchController({
     searchLoaderVisible,
     searchError,
     totalResultPages,
-    refresh,
+    refresh: refreshSearch,
   } = searchExecution
+
+  const refresh = useCallback(() => {
+    if (isRandomSearch) setSelected([])
+    refreshSearch()
+  }, [isRandomSearch, refreshSearch, setSelected])
 
   const setResultPage = useCallback((value: SetStateAction<number>) => {
     const nextPage = Math.max(1, Math.floor(typeof value === 'function' ? value(resultPage) : value))
@@ -201,8 +219,20 @@ export function useSearchController({
 
   // New searches start in the grid; reading navigation preserves its own URL.
   const navigateSearchUrl = useCallback((url: URL) => {
-    navigateSearchUrlFromRoute(removeContinuousSearchParams(url), searchExecution.refresh)
-  }, [navigateSearchUrlFromRoute, searchExecution.refresh])
+    if (isGroupedSearch && url.pathname === new URL(routerLocation.href).pathname) {
+      url.searchParams.set('groupBy', groupBy)
+      url.searchParams.set('groupSort', groupSort)
+    }
+    navigateSearchUrlFromRoute(removeContinuousSearchParams(url), refresh)
+  }, [isGroupedSearch, groupBy, groupSort, routerLocation.href, navigateSearchUrlFromRoute, refresh])
+
+  const changeGrouping = useCallback((type: NyaTagType, sort: BookGroupSortType) => {
+    const url = removeContinuousSearchParams(new URL(routerLocation.href))
+    url.searchParams.set('groupBy', type)
+    url.searchParams.set('groupSort', sort)
+    url.searchParams.set('page', '1')
+    navigateSearchUrlFromRoute(url)
+  }, [navigateSearchUrlFromRoute, routerLocation.href])
 
   const getContinuousViewHref = useCallback((book?: ApiBookCardModel) => {
     const identity = book?.apiGroupId?.trim() && book.apiBookId?.trim()
@@ -370,7 +400,7 @@ export function useSearchController({
   }), [searchOperations.pendingDeletionKeys, searchResultBooks, tagDisplayNameOverrides])
 
   // The missing-tag API evaluates ordinary conditions together with the missing types.
-  const filteredBooks = useMemo(() => isWebSearch || isMissingTagSearch || isStatusSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
+  const filteredBooks = useMemo(() => isWebSearch || isMissingTagSearch || isStatusSearch || isRandomSearch || isGroupedSearch ? displayedSearchResultBooks : displayedSearchResultBooks.filter((book) => {
     const normalizedQuery = criteria.text.trim().toLocaleLowerCase()
     if (normalizedQuery) {
       const searchableText = [
@@ -391,7 +421,7 @@ export function useSearchController({
     if (criteria.pagesMin && book.totalPage < Number(criteria.pagesMin)) return false
     if (criteria.pagesMax && book.totalPage > Number(criteria.pagesMax)) return false
     return true
-  }), [isWebSearch, isMissingTagSearch, isStatusSearch, displayedSearchResultBooks, criteria])
+  }), [isWebSearch, isMissingTagSearch, isStatusSearch, isRandomSearch, isGroupedSearch, displayedSearchResultBooks, criteria])
   const visibleBooks = filteredBooks
   const hasCriteria = criteriaHasValues(criteria)
   const localTagCandidates = useMemo(() => displayedSearchResultBooks
@@ -417,6 +447,8 @@ export function useSearchController({
       ...cloneCriteria(criteria),
       text: query.trim(),
       missingTagTypes: [...draftMissingTagTypes],
+    } : isGroupedSearch ? {
+      ...cloneCriteria(criteria), text: query.trim(),
     } : {
       ...emptyCriteria(),
       text: query.trim(),
@@ -433,7 +465,7 @@ export function useSearchController({
       sortDirection,
     })
     navigateSearchUrl(url)
-  }, [criteria, draftStatuses, isStatusSearch, draftMissingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query, sortType, sortDirection])
+  }, [criteria, draftStatuses, isStatusSearch, draftMissingTagTypes, isMissingTagSearch, isGroupedSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, navigateSearchUrl, query, sortType, sortDirection])
 
   const getTagSearchHref = useCallback((tag: BookTag) => {
     const resolvedTag = resolveTag(tag)
@@ -448,8 +480,12 @@ export function useSearchController({
       sortType,
       sortDirection,
     })
+    if (isGroupedSearch) {
+      url.searchParams.set('groupBy', groupBy)
+      url.searchParams.set('groupSort', groupSort)
+    }
     return url.href
-  }, [criteria.statuses, isStatusSearch, criteria.missingTagTypes, isMissingTagSearch, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, sortType, sortDirection])
+  }, [criteria.statuses, isStatusSearch, criteria.missingTagTypes, isMissingTagSearch, isGroupedSearch, groupBy, groupSort, currentSearchDestination, hitomiAppend, isWebSearch, japaneseLanguageEnabled, sortType, sortDirection])
 
   const searchByTag = useCallback((tag: BookTag) => {
     navigateSearchUrl(new URL(getTagSearchHref(tag)))
@@ -618,7 +654,14 @@ export function useSearchController({
     isLibrarySearch,
     isMissingTagSearch,
     isStatusSearch,
+    isRandomSearch,
     draftStatuses,
+    isGroupedSearch,
+    groupBy,
+    groupSort,
+    changeGrouping,
+    searchGroups: searchExecution.searchGroups,
+    setGroupColumns,
     statusesError,
     draftMissingTagTypes,
     setDraftStatuses,

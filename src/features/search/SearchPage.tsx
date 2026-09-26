@@ -24,7 +24,7 @@ import { retryPendingScrollRestoration } from '../../app/client-router'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { TagChip } from '../../components/TagChip'
 import { Button, IconButton, StatePanel } from '../../components/ui'
-import { HITOMI_APPENDS, TAG_TYPE_LABELS, BOOK_STATUS_LABELS } from '../../models'
+import { HITOMI_APPENDS, TAG_TYPE_LABELS, TAG_TYPE_ORDER, BOOK_STATUS_LABELS } from '../../models'
 import type { HitomiAppend } from '../../models'
 import { getBookIdentityKey } from '../library/book-deletion'
 import { getPaginationItems, HITOMI_SORT_PERIODS } from './search-utils'
@@ -36,6 +36,7 @@ import { formatSearchPageTitle, useDocumentTitle } from '../../app/page-title'
 import { BookDetailsSheet } from '../viewer/BookDetailsSheet'
 import { SearchContinuousReader } from './SearchContinuousReader'
 import { resolveContinuousStart } from './search-continuous-utils'
+import { GroupedBookshelves } from './GroupedBookshelves'
 
 export const SEARCH_CONTINUOUS_DETAILS_ACTION_ID = 'search-continuous-details-action'
 export const SEARCH_VIEW_MODE_ACTION_ID = 'search-view-mode-action'
@@ -57,7 +58,7 @@ export function SearchHeader({ controller }: SearchHeaderProps) {
 
   return (
     <form className="quick-search" role="search" onSubmit={submitSearch}>
-      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : controller.isStatusSearch ? 'ステータス検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</label>
+      <label className="sr-only" htmlFor="header-search">{isWebSearch ? 'Web検索' : controller.isGroupedSearch ? 'グループ検索' : controller.isRandomSearch ? 'ランダム検索' : controller.isStatusSearch ? 'ステータス検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}</label>
       <input
         id="header-search"
         type="search"
@@ -176,7 +177,7 @@ export function SearchPage({ controller }: SearchPageProps) {
   }, [])
 
   const isSearchLoading = searchState === 'loading'
-  const showNoResults = searchState === 'success' && visibleBooks.length === 0
+  const showNoResults = searchState === 'success' && (controller.isGroupedSearch ? controller.searchGroups.length === 0 : visibleBooks.length === 0)
   const displayedCriteriaTags = applyTagEntityMetadata(criteria.tags, searchResponseTags)
   const isContinuousView = !isWebSearch && searchView === 'continuous'
   const continuousResolution = useMemo(
@@ -232,6 +233,8 @@ export function SearchPage({ controller }: SearchPageProps) {
     isLibrarySearch: controller.isLibrarySearch,
     isMissingTagSearch: controller.isMissingTagSearch,
     isStatusSearch: controller.isStatusSearch,
+    isRandomSearch: controller.isRandomSearch,
+    isGroupedSearch: controller.isGroupedSearch,
     criteria,
     hitomiAppend,
     resultPage,
@@ -242,9 +245,9 @@ export function SearchPage({ controller }: SearchPageProps) {
     <>
       <h1
         id="page-title"
-        className={isWebSearch ? 'hitomi-search-title' : (controller.isMissingTagSearch || controller.isStatusSearch) ? 'missing-search-title' : 'sr-only'}
+        className={isWebSearch ? 'hitomi-search-title' : (controller.isMissingTagSearch || controller.isStatusSearch || controller.isRandomSearch || controller.isGroupedSearch) ? 'missing-search-title' : 'sr-only'}
       >
-        {isWebSearch ? 'Hitomi' : controller.isStatusSearch ? 'ステータス検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}
+        {isWebSearch ? 'Hitomi' : controller.isGroupedSearch ? 'グループ' : controller.isRandomSearch ? 'ランダム' : controller.isStatusSearch ? 'ステータス検索' : controller.isMissingTagSearch ? '未タグ検索' : '検索'}
       </h1>
 
       {controller.isStatusSearch && (
@@ -346,7 +349,25 @@ export function SearchPage({ controller }: SearchPageProps) {
                 <ChevronDown size={15} aria-hidden="true" />
               </label>
             )}
-            <label className="sort-control sort-control--type">
+            {controller.isGroupedSearch && <>
+              <label className="sort-control">
+                <select aria-label="グループ化するタグの種類" value={controller.groupBy} disabled={isSearchLoading}
+                  onChange={(event) => controller.changeGrouping(event.target.value as typeof controller.groupBy, controller.groupSort)}>
+                  {TAG_TYPE_ORDER.map((type) => <option key={type} value={type}>{TAG_TYPE_LABELS[type]}</option>)}
+                </select>
+                <ChevronDown size={15} aria-hidden="true" />
+              </label>
+              <label className="sort-control">
+                <select aria-label="グループの並び順" value={controller.groupSort} disabled={isSearchLoading}
+                  onChange={(event) => controller.changeGrouping(controller.groupBy, event.target.value as typeof controller.groupSort)}>
+                  <option value="LatestBook">新しい本順</option>
+                  <option value="BookCount">冊数順</option>
+                  <option value="TagName">名前順</option>
+                </select>
+                <ChevronDown size={15} aria-hidden="true" />
+              </label>
+            </>}
+            {!controller.isRandomSearch && !controller.isGroupedSearch && <label className="sort-control sort-control--type">
               {isWebSearch ? (
                 <select
                   value={hitomiSortPeriod}
@@ -368,8 +389,8 @@ export function SearchPage({ controller }: SearchPageProps) {
                 </select>
               )}
               <ChevronDown size={15} aria-hidden="true" />
-            </label>
-            {!isWebSearch && (
+            </label>}
+            {!isWebSearch && !controller.isRandomSearch && (
               <IconButton
                 className="toolbar-icon sort-direction-toggle"
                 variant="ghost"
@@ -498,7 +519,7 @@ export function SearchPage({ controller }: SearchPageProps) {
         )}
 
         {isSearchLoading && visibleBooks.length === 0 ? (
-          <BookGrid settings={displaySettings} aria-hidden="true" inert>
+          <BookGrid settings={displaySettings} onColumnsChange={controller.isGroupedSearch ? controller.setGroupColumns : undefined} aria-hidden="true" inert>
             {Array.from({ length: 10 }, (_, index) => (
               <div className="search-skeleton" key={index}>
                 <div className="search-skeleton__cover" />
@@ -509,7 +530,9 @@ export function SearchPage({ controller }: SearchPageProps) {
           </BookGrid>
         ) : showNoResults ? null : (
           <div className={`results-stage ${isSearchLoading ? 'results-stage--loading-visible' : ''}`}>
-            {isContinuousView ? (
+            {controller.isGroupedSearch ? (
+              searchState !== 'error' && <GroupedBookshelves controller={controller} onDetailsRequest={openBookDetails} />
+            ) : isContinuousView ? (
               readableBooks.length > 0 ? (
                 <SearchContinuousReader
                   books={readableBooks}
@@ -520,7 +543,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                   onActiveBookChange={setActiveContinuousBook}
                   onBookJump={enterContinuousView}
                   getTagSearchHref={getTagSearchHref}
-                  onResultPageChange={goToResultPage}
+                  onResultPageChange={controller.isRandomSearch ? undefined : goToResultPage}
                   onTagSearch={searchByTag}
                 />
               ) : (
@@ -556,7 +579,7 @@ export function SearchPage({ controller }: SearchPageProps) {
           </div>
         )}
 
-        {!isContinuousView && visibleBooks.length > 0 && totalResultPages > 1 && (
+        {!controller.isRandomSearch && !isContinuousView && (controller.isGroupedSearch ? controller.searchGroups.length > 0 : visibleBooks.length > 0) && totalResultPages > 1 && (
           <nav className="pagination" aria-label="検索結果のページ">
             {getPaginationItems(resultPage, totalResultPages, paginationPageCount).map((item, index) => item === 'ellipsis'
               ? <span key={`ellipsis-${index}`} className="pagination__ellipsis" aria-hidden="true">…</span>
@@ -566,7 +589,7 @@ export function SearchPage({ controller }: SearchPageProps) {
           </nav>
         )}
       </section>
-      {controller.isLibrarySearch && viewModeHeaderActionHost && createPortal(
+      {controller.isLibrarySearch && !controller.isGroupedSearch && viewModeHeaderActionHost && createPortal(
         <div className="search-view-toggle" role="group" aria-label="検索結果の表示形式">
           <IconButton
             className={`toolbar-icon ${!isContinuousView ? 'is-active' : ''}`}

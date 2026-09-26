@@ -9,6 +9,8 @@ import {
   mapEBookToCard,
   mapHitomiSearchResponse,
   searchBooks as searchBooksApi,
+  searchRandomBooks,
+  searchBooksGrouped,
 } from '../../api'
 import type { ApiBookCardModel } from '../../api'
 import type { BookDownloadHubStatusEventKind } from '../../realtime/book-download-hub'
@@ -19,7 +21,8 @@ import {
   normalizeSearchBookDownloadStatus,
   type SearchBookStatusVersionMap,
 } from '../../realtime/search-book-status'
-import type { BookDownloadStatus, HitomiAppend, HitomiSortPeriod, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
+import type { BookDownloadStatus, BookGroupSortType, HitomiAppend, HitomiSortPeriod, NyaTagType, SearchCriteria, SortDirection, SortType, TagEntity } from '../../models'
+import { getBookIdentityKey } from '../library/book-deletion'
 import { validateCriteria } from './search-utils'
 import { applyTagEntityMetadata } from './tag-display-name'
 import { resolveSearchTags } from './resolve-search-tags'
@@ -43,10 +46,18 @@ type SearchRealtimeBuffer = {
   events: BufferedSearchStatusEvent[]
 }
 
+export type SearchResultGroup = {
+  value: string | null
+  label: string
+  totalBooksCount: number
+  bookKeys: string[]
+}
+
 type SearchResultSnapshot = {
   books: ApiBookCardModel[]
   tags: TagEntity[]
   totalPages: number
+  groups?: SearchResultGroup[]
 }
 
 type ActiveSearchRequest = {
@@ -59,6 +70,11 @@ export type SearchExecutionOptions = {
   isWebSearch: boolean
   isLibrarySearch: boolean
   isStatusSearch?: boolean
+  isRandomSearch?: boolean
+  isGroupedSearch?: boolean
+  groupBy?: NyaTagType
+  groupSort?: BookGroupSortType
+  booksPerGroup?: number
   isMissingTagSearch: boolean
   apiRevision: number
   searchLimit?: number
@@ -74,6 +90,7 @@ export type SearchExecutionOptions = {
 }
 
 export type SearchExecutionResult = {
+  searchGroups: SearchResultGroup[]
   searchResponseTags: TagEntity[]
   setSearchResponseTags: Dispatch<SetStateAction<TagEntity[]>>
   searchResultGeneration: number
@@ -133,6 +150,11 @@ export function useSearchExecution({
   isLibrarySearch,
   isMissingTagSearch,
   isStatusSearch = false,
+  isRandomSearch = false,
+  isGroupedSearch = false,
+  groupBy = 'Artists',
+  groupSort = 'LatestBook',
+  booksPerGroup = 4,
   apiRevision,
   searchLimit = 50,
   criteria,
@@ -146,6 +168,7 @@ export function useSearchExecution({
   updateWebSearchResultBooks,
 }: SearchExecutionOptions): SearchExecutionResult {
   const [searchResponseTags, setSearchResponseTags] = useState<TagEntity[]>([])
+  const [searchGroups, setSearchGroups] = useState<SearchResultGroup[]>([])
   const [searchResultGeneration, setSearchResultGeneration] = useState(0)
   const [totalResultPages, setTotalResultPages] = useState(1)
   const [searchState, setSearchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
@@ -259,7 +282,32 @@ export function useSearchExecution({
       }
     }
 
-    const response = await searchBooksApi(
+    if (isGroupedSearch) {
+      const response = await searchBooksGrouped({
+        keyTagType: groupBy,
+        page: resultPage,
+        groupsPerPage: 10,
+        booksPerGroup,
+        groupSortType: groupSort,
+        isAscending: sortDirection === 'asc',
+        filter: buildBookSearchFilter(criteria, 'uploaded', sortDirection, 1, searchLimit),
+      }, signal)
+      const books = new Map<string, ApiBookCardModel>()
+      const groups = (response.groups ?? []).map((group) => ({
+        value: group.keyTagValue ?? null,
+        label: group.keyTagDisplayName || group.keyTagValue || '未所属',
+        totalBooksCount: group.totalBooksCount ?? 0,
+        bookKeys: (group.books ?? []).map((book) => {
+          const card = mapEBookToCard(book, { context: 'library' })
+          const key = getBookIdentityKey(card)
+          books.set(key, card)
+          return key
+        }),
+      }))
+      return { books: [...books.values()], groups, tags: [], totalPages: Math.max(1, response.totalPage ?? 1) }
+    }
+
+    const response = await (isRandomSearch ? searchRandomBooks : searchBooksApi)(
       buildBookSearchFilter(criteria, sortType, sortDirection, resultPage, searchLimit),
       signal,
     )
@@ -267,9 +315,9 @@ export function useSearchExecution({
     return {
       books: (response.books ?? []).map((book) => mapEBookToCard(book, { context: 'library', entities })),
       tags: entities,
-      totalPages: Math.max(1, response.totalPage ?? 1),
+      totalPages: isRandomSearch ? 1 : Math.max(1, response.totalPage ?? 1),
     }
-  }, [criteria, hitomiAppend, hitomiSortPeriod, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
+  }, [criteria, hitomiAppend, hitomiSortPeriod, isGroupedSearch, groupBy, groupSort, booksPerGroup, isRandomSearch, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
 
   const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
     tagEnrichmentRef.current?.abort()
@@ -316,6 +364,7 @@ export function useSearchExecution({
     if (isWebSearch) updateWebSearchResultBooks(nextBooks)
     else setLibrarySearchBooks(nextBooks)
     setSearchResponseTags(snapshot.tags)
+    setSearchGroups(snapshot.groups ?? [])
     setTotalResultPages(snapshot.totalPages)
     setSearchResultGeneration((current) => current + 1)
   }, [isWebSearch, setLibrarySearchBooks, updateWebSearchResultBooks])
@@ -383,12 +432,13 @@ export function useSearchExecution({
   }, [createSearchRequest, runSearchRequest])
 
   const requestBackgroundSearch = useCallback(() => {
+    if (isRandomSearch) return
     if ((!isLibrarySearch && !isWebSearch) || !routeStateSynchronized || (isMissingTagSearch && !criteria.missingTagTypes?.length) || (isStatusSearch && !criteria.statuses?.length)) return
     // Connection/resync events never restart a foreground search or own its loader.
     const result = requestBackgroundSearchRequest(searchRequestLifecycleRef.current)
     searchRequestLifecycleRef.current = result.state
     if (result.token) startSearchRequest(result.token)
-  }, [criteria.statuses, isStatusSearch, criteria.missingTagTypes, isLibrarySearch, isMissingTagSearch, isWebSearch, routeStateSynchronized, startSearchRequest])
+  }, [isRandomSearch, criteria.statuses, isStatusSearch, criteria.missingTagTypes, isLibrarySearch, isMissingTagSearch, isWebSearch, routeStateSynchronized, startSearchRequest])
 
   useEffect(() => {
     requestBackgroundSearchRef.current = requestBackgroundSearch
@@ -409,6 +459,7 @@ export function useSearchExecution({
         searchStatusReconciliationFrameRef.current = null
       }
       setLibrarySearchBooks([])
+      setSearchGroups([])
       setSearchResponseTags([])
       setTotalResultPages(1)
       setSearchState('idle')
@@ -479,6 +530,7 @@ export function useSearchExecution({
   }, [])
 
   return {
+    searchGroups,
     searchResponseTags,
     setSearchResponseTags,
     searchResultGeneration,

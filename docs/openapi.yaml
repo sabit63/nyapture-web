@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: Nyaputure API
+  title: Nyapture API
   version: v1
   description: |-
-    Nya Book管理システム API - Book検索・ダウンロード管理・タグ管理・Webスクレイピング・データメンテナンス。
+    Nyapture Book管理システム API - Book検索・ダウンロード管理・タグ管理・Webスクレイピング・データメンテナンス。
     REST API は `paths`、SignalR Hub はルート拡張 `x-signalr-hubs` に記載する。
     security は各キーが設定済みの場合の要件を示す。未設定のキーは検証しない。
     Dashboard を含む全API操作でAPIKeyを要求し、変更系では追加でEditKeyを要求する。
@@ -19,7 +19,7 @@ x-signalr-hubs:
     description: Bookダウンロードの状態、進捗、キュー、システム状態をリアルタイム配信するHub。
     access: public-with-api-key
     cors:
-      policy: NyaputureApiCors
+      policy: NyaptureApiCors
       allowPrivateNetworkOriginsSetting: Cors:AllowPrivateNetworkOrigins
       allowedOriginsSetting: Cors:AllowedOrigins
       allowCredentials: false
@@ -160,7 +160,11 @@ paths:
     post:
       tags: [Book]
       summary: Book検索
-      description: リクエストボディで検索フィルターを指定してBookを検索する
+      description: |-
+        リクエストボディで検索フィルターを指定してBookを検索する。
+        includePageUrlsは省略時true。falseにすると各BookのpageUrlsをnullにし、
+        全ページ分のURL配列の生成・転送を省く。検索結果・件数・順序は変わらない。
+        一覧表示など全ページのURLが不要な場合に指定する。queryパラメーターではなくJSONボディに指定する。
       operationId: searchBooks
       requestBody:
         required: true
@@ -168,6 +172,10 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/BookSearchFilter"
+            example:
+              sortType: TotalPage
+              limit: 50
+              includePageUrls: false
       responses:
         "200":
           description: 検索結果
@@ -177,6 +185,73 @@ paths:
                 $ref: "#/components/schemas/EBookResponse"
         "400":
           description: リクエストパラメーターが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "500":
+          description: サーバーエラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "503":
+          description: データベースタイムアウト
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+
+  /api/book/search/random:
+    post:
+      tags: [Book]
+      summary: ダウンロード済みBookから毎回N冊抽選
+      description: |-
+        検索条件に一致するDownloadedのBookから、毎回独立して最大limit冊を抽選する。
+        過去の抽選結果は考慮しない。1回の結果内では(GroupId, BookId)の重複はない。
+        候補がlimit冊未満なら全件を返し、0件も成功として空のbooksとtagsを返す。
+        page、sortType、isAsc、statusは無視する。その他の条件は通常検索と同じ意味で適用し、
+        条件全体にAND Status=Downloadedを追加する。isAnd=falseでもDownloadedは必須。
+        exclusionStatusは有効で、Downloadedを除外すると0件になる。
+        DownloadedはDBの状態で判定し、ファイルの存在検査は行わない。
+        includePageUrlsは通常検索と同じ。省略時true、falseでは各BookのpageUrlsをnullにする。
+      operationId: searchRandomBooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/BookSearchFilter"
+                - type: object
+                  properties:
+                    limit:
+                      type: [integer, "null"]
+                      minimum: 1
+                      maximum: 100
+                      default: 50
+                      description: 抽選する最大冊数。省略・nullは50。範囲外は400。
+            example:
+              texts: [cat, dog]
+              isAnd: false
+              exclusionTexts: [excluded]
+              limit: 20
+              includePageUrls: false
+      responses:
+        "200":
+          description: |-
+            今回の抽選結果。booksは抽選されたBook、tagsはそのBookに関連するタグ。
+            タグ表示名・保存済みタグ件数は通常検索と同様に付与する。
+            ページ画像URLはincludePageUrls=true（省略時も同じ）の場合に付与する。
+            totalCountは今回返した冊数であり、候補全体の総件数ではない。
+            currentPageは1、totalPageは結果ありで1・0件で0、pageSizeは指定したlimit。
+            ページングはなく、追加取得は同じAPIで再抽選する。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EBookResponse"
+        "400":
+          description: リクエストパラメーターが不正、またはlimitが1～100の範囲外
           content:
             application/json:
               schema:
@@ -492,49 +567,34 @@ paths:
     post:
       tags: [Book]
       summary: タグタイプ別グループ検索
-      description: 指定したタグタイプ（Artists, Parodies等）でBookをグループ化して検索する
+      description: >-
+        検索条件に一致するBookをタグ値でグループ化し、グループ単位でページングする。
+        タグがない・空配列のBookはkeyTagValue=null、keyTagDisplayName=未所属の1グループに含む。
+        LatestBookでは一致BookのUploadedTimeが最新の1冊を代表とし、そのBookの値に
+        filter.sortType/filter.isAscを適用してグループを並べる。
+        各グループのbooksにもfilter.sortType/filter.isAscを適用して上位booksPerGroup冊を返す。
+        代表Bookは上位N冊に含まれなくてもよく、Nによってグループ順は変わらない。
+        同日時の代表選定とBook順はGroupId/BookId昇順、グループ順の同値はタグ値昇順で確定する。
+        URL配列が不要な場合はJSONボディのfilter.includePageUrlsにfalseを指定する。
+        省略時はtrue。falseでは各グループ内のBookのpageUrlsをnullにし、件数・代表Book・順序は維持する。
       operationId: searchBooksGrouped
-      parameters:
-        - name: keyTagType
-          in: query
-          required: true
-          schema:
-            $ref: "#/components/schemas/NyaTagType"
-          description: グループ化キーとなるタグタイプ
-        - name: booksPerGroup
-          in: query
-          schema:
-            type: integer
-          description: グループ内の最大Book数
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-          description: グループのページ番号
-        - name: groupsPerPage
-          in: query
-          schema:
-            type: integer
-            default: 20
-          description: 1ページあたりのグループ数
-        - name: groupSortType
-          in: query
-          schema:
-            $ref: "#/components/schemas/BookGroupSortType"
-          description: グループのソート種別
-        - name: isAscending
-          in: query
-          schema:
-            type: boolean
-            default: false
-          description: 昇順ソートフラグ
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BookSearchFilter"
-        description: Book検索フィルター（省略可能）
+              $ref: "#/components/schemas/BookGroupedSearchRequest"
+            example:
+              keyTagType: Artists
+              page: 1
+              groupsPerPage: 10
+              booksPerGroup: 3
+              groupSortType: LatestBook
+              filter:
+                sortType: TotalPage
+                isAsc: false
+                includePageUrls: false
+        description: 通常検索とは独立したグループ検索の契約。旧queryパラメーター形式は使用しない。
       responses:
         "200":
           description: グループ化された検索結果
@@ -2883,10 +2943,14 @@ components:
           format: date-time
           description: アップロード日時
         pageUrls:
-          type: array
+          type: [array, "null"]
           items:
             type: string
-          description: ページ画像URLリスト
+          description: |-
+            ページ画像URLリスト。Book検索・ランダム検索のincludePageUrls、
+            グループ検索のfilter.includePageUrlsがfalseの場合はnull。
+            省略またはtrueでは従来どおり全ページ分を生成する（totalPageが正の場合）。
+            Book単体取得GET /api/book/{gid}/{id}はこの指定の対象外。
         status:
           $ref: "#/components/schemas/NyaBookStatus"
 
@@ -2987,16 +3051,17 @@ components:
 
     EBookGroup:
       type: object
+      required: [keyTagValue]
       properties:
         keyTagType:
           type: string
           description: グループ化キーのタグタイプ
         keyTagValue:
-          type: string
-          description: グループ化キーのタグ値
+          type: [string, "null"]
+          description: グループ化キーのタグ値。未所属はnull（プロパティ自体は省略しない）。
         keyTagDisplayName:
           type: string
-          description: グループ化キーのタグ表示名（TagAdditionalNameから取得、nullの場合あり）
+          description: グループ化キーのタグ表示名（TagAdditionalNameから取得、nullの場合あり）。未所属は「未所属」。
         totalBooksCount:
           type: integer
           description: グループ内のBook総数
@@ -3005,6 +3070,41 @@ components:
           items:
             $ref: "#/components/schemas/EBook"
           description: グループ内のBook一覧
+
+    BookGroupedSearchRequest:
+      type: object
+      required: [keyTagType]
+      properties:
+        keyTagType:
+          $ref: "#/components/schemas/NyaTagType"
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        groupsPerPage:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        booksPerGroup:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 4
+        groupSortType:
+          allOf:
+            - $ref: "#/components/schemas/BookGroupSortType"
+          default: LatestBook
+        isAscending:
+          type: boolean
+          default: false
+          description: BookCount/TagName用。LatestBookはfilter.isAscを使用。
+        filter:
+          allOf:
+            - $ref: "#/components/schemas/BookSearchFilter"
+          description: |-
+            通常検索と共通の絞り込み・Bookソート・includePageUrls。
+            filter内のpage/limitは無視する。URL配列の生成を省く場合はfilter.includePageUrls=falseを指定する。
 
     BookSearchFilter:
       type: object
@@ -3092,8 +3192,38 @@ components:
         isAnd:
           type: boolean
           description: AND検索フラグ
+        includePageUrls:
+          type: boolean
+          default: true
+          description: |-
+            返却Bookに全ページ分の画像URL配列を含めるか。省略またはtrueは従来の動作。
+            MongoDB・PostgreSQLの両プロバイダーで利用でき、動作は共通。
+            falseではpageUrlsをnullにし、URL配列の生成・転送を省く。
+            Book本体、totalPage、タグ、総件数、検索条件、ソート・ページングは変わらない。
+            通常検索・ランダム検索ではJSONボディ直下、グループ検索ではfilter内に指定する。
+
+            falseの場合も、返却された各BookのbookId・groupId・totalPageから画像URLを構築できる。
+            GET /api/book/page?bookId={bookId}&groupId={groupId}&page={page} を使用し、
+            bookIdとgroupIdはそれぞれクエリ値としてURLエンコードする。
+            pageは1始まりの整数で、1からそのBookのtotalPageまで。totalPageが0以下なら構築しない。
+            検索レスポンス全体のtotalPage（検索結果のページ数）ではなく、各BookのtotalPageを使う。
+            JavaScriptで1ページ分を構築する例（bookは検索結果内のBook、totalPage >= 1）:
+
+            ```javascript
+            const page = 1;
+            const query = new URLSearchParams({
+              bookId: book.bookId,
+              groupId: book.groupId,
+              page: String(page),
+            });
+            const pageUrl = `/api/book/page?${query}`;
+            ```
+
+            この相対URLはAPIサーバーを基準に解決する。必要なページだけ構築すればよい。
+            例: bookId="12345"、groupId="hitomi" の1ページ目は /api/book/page?bookId=12345&groupId=hitomi&page=1。
+            URL配列全体が必要な場合は、GET /api/book/{gid}/{id}でURL付きのBookを取得することもできる。
         limit:
-          type: integer
+          type: [integer, "null"]
           description: 取得件数制限
         page:
           type: integer
@@ -3747,8 +3877,8 @@ components:
     # ----------------------------------------------------------
     BookGroupSortType:
       type: string
-      enum: [BookCount, TagName]
-      description: グループ検索のソート種別（BookCount=グループ内Book数、TagName=タグ名）
+      enum: [BookCount, TagName, LatestBook]
+      description: グループ検索のソート種別（BookCount=グループ内Book数、TagName=タグ名、LatestBook=最新UploadedTimeのBookの値）
 
     # ----------------------------------------------------------
     # Dashboard data contracts

@@ -355,6 +355,9 @@ const mapDownloadStatusEntries = (statuses: Record<string, BookDownloadStatus>) 
   const mapped = new Map<string, MappedDownloadStatus>()
   Object.entries(statuses).forEach(([legacyKey, status]) => {
     if (!status || typeof status !== 'object') return
+    if (!asNonEmptyString(status.book?.url) && isAbsoluteUrl(legacyKey)) {
+      status = { ...status, book: { ...status.book, url: legacyKey } }
+    }
     const job = mapDownloadStatus(status, legacyKey)
     if (!job) return
     const current = mapped.get(job.id)

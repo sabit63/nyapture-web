@@ -3,7 +3,9 @@ import type {
   BookDownloadStatus,
   BookDownloadSystemStatus,
   BookDeletionJobResponse,
+  BookGroupedSearchRequest,
   BookSearchFilter,
+  EBookGroupResponse,
   EBookResponse,
   NyaApiResponse,
   NyaTagType,
@@ -39,6 +41,14 @@ const requestSearch = async <T extends { success?: boolean; message?: string }>(
 
 export const searchBooks = (filter: BookSearchFilter, signal?: AbortSignal) => (
   requestSearch<EBookResponse>('/api/book/search', filter, signal)
+)
+
+export const searchRandomBooks = (filter: BookSearchFilter, signal?: AbortSignal) => (
+  requestSearch<EBookResponse>('/api/book/search/random', filter, signal)
+)
+
+export const searchBooksGrouped = (request: BookGroupedSearchRequest, signal?: AbortSignal) => (
+  requestSearch<EBookGroupResponse>('/api/book/search/grouped', request, signal)
 )
 
 export const getBook = (groupId: string, bookId: string, signal?: AbortSignal) => (

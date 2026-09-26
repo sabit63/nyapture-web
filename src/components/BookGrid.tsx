@@ -2,7 +2,10 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type HTMLAttribu
 import type { DisplaySettings } from '../api'
 import { automaticThumbnailColumns } from './thumbnail-columns'
 
-export function BookGrid({ settings, ...props }: HTMLAttributes<HTMLDivElement> & { settings: DisplaySettings }) {
+export function BookGrid({ settings, onColumnsChange, ...props }: HTMLAttributes<HTMLDivElement> & {
+  settings: DisplaySettings
+  onColumnsChange?: (columns: number) => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [columns, setColumns] = useState(settings.thumbnailColumns as number)
   useLayoutEffect(() => {
@@ -19,5 +22,7 @@ export function BookGrid({ settings, ...props }: HTMLAttributes<HTMLDivElement> 
     observer.observe(grid)
     return () => observer.disconnect()
   }, [settings.autoThumbnailColumns])
-  return <div {...props} ref={ref} className="book-grid" style={{ '--thumbnail-columns': settings.autoThumbnailColumns ? columns : settings.thumbnailColumns } as CSSProperties} />
+  const resolvedColumns = settings.autoThumbnailColumns ? columns : settings.thumbnailColumns
+  useLayoutEffect(() => { onColumnsChange?.(resolvedColumns) }, [onColumnsChange, resolvedColumns])
+  return <div {...props} ref={ref} className="book-grid" style={{ '--thumbnail-columns': resolvedColumns } as CSSProperties} />
 }
