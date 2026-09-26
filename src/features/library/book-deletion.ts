@@ -181,7 +181,7 @@ export const createBookDeletionRunner = (
       if (initialOutcome) return initialOutcome
 
       const pollingStartedAt = dependencies.now()
-      let nextDelayMs = (enqueueResponse?.retryAfterSeconds ?? 1) * 1000
+      let nextDelayMs = (enqueueResponse?.retryAfterSeconds ?? 0.2) * 1000
       while (true) {
         await dependencies.wait(nextDelayMs, signal)
         try {

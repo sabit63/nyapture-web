@@ -40,6 +40,24 @@ const createDependencies = (
 })
 
 describe('book deletion runner', () => {
+  for (const pollsUntilComplete of [1, 2]) {
+    it(`checks after 200ms and waits for success after ${pollsUntilComplete} poll(s)`, async () => {
+      let polls = 0
+      const waits: number[] = []
+      const runner = createBookDeletionRunner(createDependencies({
+        getJob: async () => ({
+          success: true,
+          data: deletionJob(++polls === pollsUntilComplete ? 'Succeeded' : 'Running'),
+        }),
+        wait: async (delayMs) => { waits.push(delayMs) },
+      }))
+
+      assert.deepEqual(await runner(target()), { status: 'succeeded' })
+      assert.equal(polls, pollsUntilComplete)
+      assert.deepEqual(waits, pollsUntilComplete === 1 ? [200] : [200, 1000])
+    })
+  }
+
   it('retries transient enqueue failures three times using Retry-After then 2/4 second backoff', async () => {
     let enqueueCalls = 0
     const waits: number[] = []
