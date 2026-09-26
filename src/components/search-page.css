@@ -212,26 +212,27 @@
   @apply tw:text-(length:--font-size-search-title);
 }
 
-.grouped-bookshelves { display: grid; gap: var(--space-8); }
-.book-shelf { min-width: 0; }
-.book-shelf__header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+.grouped-bookshelves {
+  align-items: start;
+  gap: var(--space-6);
 }
-.book-shelf__header h2 {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.book-shelf {
   min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 1rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-background-deep);
 }
+.book-shelf__header {
+  margin-top: var(--space-2);
+}
+.book-shelf__header h2 { display: flex; min-width: 0; margin: 0; font-size: inherit; }
+.book-shelf .book-grid {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.book-shelf .book-card__body,
+.book-shelf .card-actions { display: none; }
 
 .hitomi-search-title {
   @apply tw:w-full;

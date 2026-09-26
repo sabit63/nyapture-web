@@ -74,7 +74,6 @@ export type SearchExecutionOptions = {
   isGroupedSearch?: boolean
   groupBy?: NyaTagType
   groupSort?: BookGroupSortType
-  booksPerGroup?: number
   isMissingTagSearch: boolean
   apiRevision: number
   searchLimit?: number
@@ -154,7 +153,6 @@ export function useSearchExecution({
   isGroupedSearch = false,
   groupBy = 'Artists',
   groupSort = 'LatestBook',
-  booksPerGroup = 4,
   apiRevision,
   searchLimit = 50,
   criteria,
@@ -286,8 +284,8 @@ export function useSearchExecution({
       const response = await searchBooksGrouped({
         keyTagType: groupBy,
         page: resultPage,
-        groupsPerPage: 10,
-        booksPerGroup,
+        groupsPerPage: searchLimit,
+        booksPerGroup: 4,
         groupSortType: groupSort,
         isAscending: sortDirection === 'asc',
         filter: buildBookSearchFilter(criteria, 'uploaded', sortDirection, 1, searchLimit),
@@ -297,7 +295,7 @@ export function useSearchExecution({
         value: group.keyTagValue ?? null,
         label: group.keyTagDisplayName || group.keyTagValue || '未所属',
         totalBooksCount: group.totalBooksCount ?? 0,
-        bookKeys: (group.books ?? []).map((book) => {
+        bookKeys: (group.books ?? []).slice(0, 4).map((book) => {
           const card = mapEBookToCard(book, { context: 'library' })
           const key = getBookIdentityKey(card)
           books.set(key, card)
@@ -317,7 +315,7 @@ export function useSearchExecution({
       tags: entities,
       totalPages: isRandomSearch ? 1 : Math.max(1, response.totalPage ?? 1),
     }
-  }, [criteria, hitomiAppend, hitomiSortPeriod, isGroupedSearch, groupBy, groupSort, booksPerGroup, isRandomSearch, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
+  }, [criteria, hitomiAppend, hitomiSortPeriod, isGroupedSearch, groupBy, groupSort, isRandomSearch, isStatusSearch, isMissingTagSearch, isWebSearch, resultPage, sortDirection, sortType, searchLimit])
 
   const createSearchRequest = useCallback((token: SearchRequestToken): ActiveSearchRequest => {
     tagEnrichmentRef.current?.abort()

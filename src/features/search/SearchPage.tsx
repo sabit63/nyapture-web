@@ -320,7 +320,7 @@ export function SearchPage({ controller }: SearchPageProps) {
       <section id="results-region" className="results" aria-busy={isSearchLoading} tabIndex={-1}>
         <div className="results-toolbar">
           <div className="results-actions">
-            {selectMode && <span className="selection-count" aria-live="polite">{selected.length}件を選択中</span>}
+            {!controller.isGroupedSearch && selectMode && <span className="selection-count" aria-live="polite">{selected.length}件を選択中</span>}
             {isWebSearch && (
               <Button
                 className={`language-toggle ${japaneseLanguageEnabled ? 'is-active' : ''}`}
@@ -360,9 +360,9 @@ export function SearchPage({ controller }: SearchPageProps) {
               <label className="sort-control">
                 <select aria-label="グループの並び順" value={controller.groupSort} disabled={isSearchLoading}
                   onChange={(event) => controller.changeGrouping(controller.groupBy, event.target.value as typeof controller.groupSort)}>
-                  <option value="LatestBook">新しい本順</option>
-                  <option value="BookCount">冊数順</option>
-                  <option value="TagName">名前順</option>
+                  <option value="LatestBook">最新</option>
+                  <option value="BookCount">Book数</option>
+                  <option value="TagName">タグ名</option>
                 </select>
                 <ChevronDown size={15} aria-hidden="true" />
               </label>
@@ -405,7 +405,7 @@ export function SearchPage({ controller }: SearchPageProps) {
                 {sortDirection === 'desc' ? <ArrowDown size={17} aria-hidden="true" /> : <ArrowUp size={17} aria-hidden="true" />}
               </IconButton>
             )}
-            {!isContinuousView && (
+            {!isContinuousView && !controller.isGroupedSearch && (
               <IconButton
                 className={`toolbar-icon selection-toggle ${selectMode ? 'is-active' : ''}`}
                 variant="ghost"
@@ -463,7 +463,7 @@ export function SearchPage({ controller }: SearchPageProps) {
           </div>
         )}
 
-        {!isWebSearch && (
+        {!isWebSearch && !controller.isGroupedSearch && (
           <div className="selection-toolbar-reveal" data-open={selectMode} inert={!selectMode ? true : undefined} aria-hidden={!selectMode}>
           <div className="selection-toolbar" role="group">
             <IconButton
@@ -519,7 +519,7 @@ export function SearchPage({ controller }: SearchPageProps) {
         )}
 
         {isSearchLoading && visibleBooks.length === 0 ? (
-          <BookGrid settings={displaySettings} onColumnsChange={controller.isGroupedSearch ? controller.setGroupColumns : undefined} aria-hidden="true" inert>
+          <BookGrid settings={displaySettings} aria-hidden="true" inert>
             {Array.from({ length: 10 }, (_, index) => (
               <div className="search-skeleton" key={index}>
                 <div className="search-skeleton__cover" />

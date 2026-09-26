@@ -119,7 +119,6 @@ export function useSearchController({
   const [missingTagsError, setMissingTagsError] = useState(() => validateCriteria(routeCriteria, isMissingTagSearch).missingTags ?? '')
   const [query, setQuery] = useState(() => parseCriteriaFromUrl(routeSearchParams).text)
   const [selectMode, setSelectMode] = useState(false)
-  const [groupColumns, setGroupColumns] = useState<number>(displaySettings.thumbnailColumns)
   const sortType = isWebSearch || isRandomSearch || isGroupedSearch ? 'uploaded' : SORT_TYPES.find((type) => type === routeSearchParams.get('sort')) ?? 'uploaded'
   const groupBy = TAG_TYPE_ORDER.find((type) => type === routeSearchParams.get('groupBy')) ?? 'Artists'
   const groupSort = BOOK_GROUP_SORT_TYPES.find((type) => type === routeSearchParams.get('groupSort')) ?? 'LatestBook'
@@ -167,7 +166,7 @@ export function useSearchController({
   })
 
   const searchExecution = useSearchExecution({
-    searchLimit: displaySettings.searchLimit ?? 50,
+    searchLimit: isGroupedSearch ? 20 : displaySettings.searchLimit ?? 50,
     isWebSearch,
     isLibrarySearch,
     isMissingTagSearch,
@@ -178,7 +177,6 @@ export function useSearchController({
     groupBy,
     groupSort,
     criteria,
-    booksPerGroup: isGroupedSearch ? (displaySettings.autoThumbnailColumns ? groupColumns : displaySettings.thumbnailColumns) : undefined,
     hitomiAppend,
     hitomiSortPeriod,
     resultPage,
@@ -661,7 +659,6 @@ export function useSearchController({
     groupSort,
     changeGrouping,
     searchGroups: searchExecution.searchGroups,
-    setGroupColumns,
     statusesError,
     draftMissingTagTypes,
     setDraftStatuses,
